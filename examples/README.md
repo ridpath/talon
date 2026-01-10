@@ -130,14 +130,4 @@ These examples are for educational and authorized security testing only. Always:
 - Follow responsible disclosure practices
 - Comply with applicable laws and regulations
 
-## Additional Resources
 
-- [TALON Documentation](../docs/)
-- [API Reference](../docs/API.md)
-- [Tutorial Series](../docs/tutorials/)
-- [Community Discord](https://discord.gg/talon-framework)
-
----
-
-*Last updated: January 2026*
-*Examples compatible with TALON Phase 19+*
