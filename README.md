@@ -1,8 +1,23 @@
-# TALON — A Human‑Readable Scripting Language for Offensive Security
+# TALON — A Human-Readable Scripting Language for Offensive Security
 
-TALON is a security‑native, exploit‑centric, English‑like DSL designed for exploit developers, CTF competitors, red teamers, reverse engineers, and malware analysts.
+TALON is a security-native, exploit-centric, English-like domain-specific language designed for exploit developers, CTF competitors, red teamers, reverse engineers, and advanced security researchers.
 
-**Status:** Alpha (active development; breaking changes expected)
+This repository contains the TALON compiler, interpreter, standard library, exploit tooling, plugin system, and IDE integrations.
+
+---
+
+## Key Capabilities
+
+- Human-readable exploit DSL
+- Native compilation via Rust/LLVM
+- Built-in exploitation primitives (ROP, heap, kernel, format strings)
+- Libc database integration (libc.rip)
+- Automatic buffer overflow offset discovery (GDB)
+- Exploit templates and interactive quick helpers
+- Integrated binary analysis (ELF, PE, Mach-O)
+- Modular standard library (138+ modules)
+- Plugin system (TALON modules + native Rust plugins)
+- VS Code IDE extension with debugger and visual tools
 
 ---
 
@@ -12,141 +27,74 @@ TALON is a security‑native, exploit‑centric, English‑like DSL designed for
 git clone https://github.com/ridpath/talon.git
 cd talon
 cargo build --release
-
-./target/release/talon run examples/buffer_overflow.talon
 ./target/release/talon repl
 ```
 
 ---
 
-## CLI Reference (Verified)
-
-TALON uses a subcommand‑based CLI. Always use `--help` to discover what is available in your build.
+## Core CLI Commands
 
 ```bash
-talon --help
-talon run --help
-talon build --help
-talon repl --help
-talon analyze --help
-talon fuzz --help
-talon kernel --help
-talon audit --help
-talon web --help
-talon template --help
+talon run <script.talon>
+talon build <script.talon>
+talon repl
+talon analyze <binary>
+talon fuzz <binary>
+talon kernel exploit <CVE-ID>
+talon audit <contract.sol>
+talon web scan <url>
+talon template <name> <args>
 ```
-
-If an interactive wizard exists, it will appear as its own subcommand in `talon --help`.
 
 ---
 
-## Quick Helpers (REPL & Scripts)
-
-Quick helpers are TALON functions, not CLI commands. Use them inside scripts or the REPL.
+## Interactive Helpers
 
 ```talon
-quick_shell("10.10.14.5", 1337)
-quick_rop("./vuln")
-quick_leak(conn)
-quick_pwn("./vuln", "10.10.14.5", 1337)
+quick_shell("host", port)
+quick_rop("./binary")
+quick_pwn("./binary", "host", port)
 quick_heap()
 quick_fmt()
 ```
 
-Launch REPL:
-
-```bash
-talon repl
-```
-
 ---
 
-## Templates
+## Plugin System
 
-```bash
-talon template ret2libc 10.10.14.5 1337 > exploit.talon
-talon run exploit.talon
-```
-
----
-
-## Documentation & Help
-
-### Man Pages
-```bash
-man talon
-man talon-<topic>
-```
-
-### REPL Help
-```talon
-help()
-help(search: "libc")
-help(search: "rop")
-help(search: "fmt")
-```
-
----
-
-## Modules & Plugin System
-
-### Module Paths
-- `talon_std/` — standard library
-- `~/.talon/modules/` — user modules
+### Custom TALON Modules
 
 ```talon
-import "custom_exploit"
+define function my_helper(arg)
+    print(arg)
+end
 ```
 
-### Native Plugins
+### Native Rust Plugins
 
 ```talon
 load_plugin("plugins/my_plugin.so")
 ```
 
-Extensions:
-- Linux: `.so`
-- macOS: `.dylib`
-- Windows: `.dll`
-
 ---
 
-## Filesystem Layout
+## VS Code Extension
 
-- `~/.talon/libc/` — libc cache (libc.rip)
-- `~/.talon/modules/` — user modules
-- `~/.talon/cache/` — internal cache (if enabled)
-
----
-
-## Common Workflows
-
-### Analyze Binary
-```bash
-talon analyze ./vuln_binary
-```
-
-### Find Offset
-```talon
-let offset = auto_offset("./vuln")
-print(offset)
-```
-
-### Debug Crash
-```talon
-let info = gdb_run("./vuln")
-print(info.signal)
-print(hex(info.rip))
-```
+See `README_VSCODE.md` for IDE features, debugging, and visual tools.
 
 ---
 
 ## License
 
-MIT License.
+MIT License
 
----
+## Built-in Functions Reference
 
-## Security Notice
+A short quick-reference is included in this repo:
 
-For authorized security testing, CTFs, education, and research only.
+- `BUILTIN_FUNCTIONS_REFERENCE.md` - Quick reference for core language helpers (collections, conversion, file I/O, packing/unpacking, and common utilities)
+
+For the full catalog (exploitation, analysis, fuzzing, kernel, web, blockchain, forensics, templates, and helpers), see the "Built-in Functions" section in this README and the in-tool docs:
+
+- `talon repl` then `help()` or `help(search: "keyword")`
+- `man talon` and `man talon-<topic>`
