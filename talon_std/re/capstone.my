@@ -1,0 +1,131 @@
+define function disassemble(file)
+    print "🧠 Disassembling binary:" file
+    read file file into buf
+
+    # Arch/Mode/Base auto-detection
+    if "MZ" in buf
+        print "📦 Detected PE (Windows)"
+        let arch = "x86"
+        let mode = "64"
+        let base = 0x400000
+
+    else if "\x7fELF" in buf
+        print "🐧 Detected ELF (Linux)"
+        let arch = detect_elf_arch(buf)
+        let mode = detect_elf_mode(buf)
+        let base = 0x1000
+
+    else if "\xfe\xed\xfa" in buf
+        print "🍏 Detected Mach-O"
+        let arch = "arm64"
+        let mode = "64"
+        let base = 0x100000000
+
+    else
+        print "❓ Unknown format — defaulting to x86_64"
+        let arch = "x86"
+        let mode = "64"
+        let base = 0x1000
+    end
+
+    use capstone to disassemble buf with arch arch mode mode base base offset 0 limit 256
+
+    print "🧬 Annotated disassembly with comments:"
+    for instr in disassembled
+        if instr contains "syscall"
+            print "🔧 " instr "  ← system call"
+        else if instr contains "mov" and instr contains "rsp"
+            print "🛡️  " instr "  ← stack operation"
+        else if instr contains "int 0x80"
+            print "📟 " instr "  ← syscall (legacy)"
+        else if instr contains "xor eax, eax"
+            print "💡 " instr "  ← zeroing register"
+        else
+            print instr
+        end
+    end
+
+    scan_for_gadgets buf
+    analyze_entropy buf
+    histogram_opcodes buf
+    dump_bytes buf start 0x0 length 128
+end
+
+define function detect_elf_arch(buf)
+    if buf[18] == "EM_X86_64"
+        return "x86"
+    else if buf[18] == "EM_ARM"
+        return "arm"
+    else if buf[18] == "EM_AARCH64"
+        return "arm64"
+    else
+        return "x86"
+    end
+end
+
+define function detect_elf_mode(buf)
+    if buf[4] == 2
+        return "64"
+    else
+        return "32"
+    end
+end
+
+define function scan_for_gadgets(buf)
+    print "🔎 Scanning for common ROP gadgets:"
+    for i in 0..len(buf)-5
+        let window = buf[i..i+5]
+        if window contains "c3"
+            print "📌 ret at offset 0x" + hex(i)
+        else if window contains "cc"
+            print "💥 int3 at 0x" + hex(i)
+        else if window contains "0f05"
+            print "📟 syscall at 0x" + hex(i)
+        else if window contains "ffe4"
+            print "🧬 jmp esp at 0x" + hex(i)
+        end
+    end
+end
+
+define function analyze_entropy(buf)
+    print "📊 Calculating entropy of binary..."
+    let total = len(buf)
+    let freq = {}
+    for b in buf
+        if b in freq
+            freq[b] += 1
+        else
+            freq[b] = 1
+        end
+    end
+
+    let entropy = 0.0
+    for byte in freq
+        let p = freq[byte] / total
+        entropy += -p * log2(p)
+    end
+    print "Entropy: " entropy
+
+    if entropy > 7.5
+        print "🔒 Likely packed"
+    else if entropy < 3
+        print "🧾 Likely text/config"
+    end
+end
+
+define function histogram_opcodes(buf)
+    print "📈 Instruction histogram (example):"
+    print "→ mov: 22% | push: 18% | call: 11% | jmp: 9%"
+    # TODO: full instruction decoding stats when symbol support is added
+end
+
+define function dump_bytes(buf, start, length)
+    print "🔬 Hex dump:"
+    for i in start..(start + length)
+        if i % 16 == 0
+            print "\n0x" + hex(i) + ": "
+        end
+        print hex(buf[i]) + " "
+    end
+    print "\n"
+end

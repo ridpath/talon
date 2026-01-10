@@ -1,0 +1,17 @@
+define function find_unlimited_approvals(address)
+    print "🔍 Checking ERC20 approvals for wallet:" address
+
+    let tokens = query_wallet_tokens(address)
+    for token in tokens
+        let approvals = get_erc20_approvals(token, address)
+        for approval in approvals
+            if approval.amount == "0xffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                print "🧨 Unlimited approval found:"
+                print "  ▸ Token: " token
+                print "  ▸ Spender: " approval.spender
+                write "token=" + token + " spender=" + approval.spender to "loot/unlimited_approvals.txt"
+            end
+        end
+    end
+    print "✅ Approval scan done"
+end

@@ -1,0 +1,63 @@
+define function bruteforce_multi_wallet(target_address)
+    print "🧠 Brainwallet brute-force for ETH/BTC target:" target_address
+    load wordlist "brain.txt" into phrases
+
+    for phrase in phrases
+        let eth_priv = sha256(phrase)
+        let eth_pub  = derive_eth_pubkey(eth_priv)
+        let eth_addr = pub_to_eth_address(eth_pub)
+
+        let btc_priv = sha256("btc" + phrase)
+        let btc_pub  = derive_btc_pubkey(btc_priv)
+        let btc_addr = pub_to_btc_address(btc_pub)
+
+        if eth_addr == target_address
+            print "🎯 ETH MATCH: phrase=" phrase " priv=" eth_priv
+            let bal = get_eth_balance(eth_addr)
+            print "💰 ETH BALANCE:" bal
+            exit
+        end
+
+        if btc_addr == target_address
+            print "🎯 BTC MATCH: phrase=" phrase " priv=" btc_priv
+            let bal = get_btc_balance(btc_addr)
+            print "💰 BTC BALANCE:" bal
+            exit
+        end
+    end
+
+    print "❌ No match found"
+end
+
+define function derive_eth_pubkey(priv)
+    # Stub: real ECDSA → public key
+    return "0x04abcdef..."
+
+define function pub_to_eth_address(pub)
+    # Stub: keccak(pub)[-20:]
+    return "0x" + substring(pub, 12, 40)
+
+define function derive_btc_pubkey(priv)
+    # Stub: real secp256k1 pubkey derivation
+    return "03abcdef..."
+
+define function pub_to_btc_address(pub)
+    # Stub: ripemd160(sha256(pub)), base58 w/ prefix
+    return "1A" + substring(pub, 2, 32)
+
+define function get_eth_balance(address)
+    call ethereum node "https://mainnet.infura.io/v3/YOUR_INFURA_KEY" with data address
+    return "0.0123 ETH"  # Stubbed balance
+
+define function get_btc_balance(address)
+    # Call public API e.g., Blockstream or blockchain.info
+    return "0.000034 BTC"  # Stubbed
+end
+
+define function derive_from_mnemonic(mnemonic)
+    let seed = sha256(mnemonic)
+    let priv = sha256(seed)
+    let pub = derive_eth_pubkey(priv)
+    let addr = pub_to_eth_address(pub)
+    return addr
+end

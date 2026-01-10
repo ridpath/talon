@@ -1,0 +1,29 @@
+define function detect_mev_opportunity(logs)
+    print "🧠 Analyzing logs for MEV strategies..."
+
+    parse events from logs logs
+
+    let patterns = ["Swap", "Transfer", "FlashLoan"]
+    let sequence = []
+
+    for event in logs
+        if event contains "Swap"
+            sequence += "S"
+        else if event contains "Transfer"
+            sequence += "T"
+        else if event contains "FlashLoan"
+            sequence += "F"
+        end
+    end
+
+    if sequence contains "STS"
+        print "💸 Detected Sandwich attack flow (Swap → Transfer → Swap)"
+    else if sequence contains "FST"
+        print "⚡ Flashloan + Arbitrage pattern detected"
+    else
+        print "✅ No known MEV pattern found"
+    end
+
+    write sequence to "output/mev_candidates.txt"
+    print "📄 Sequence saved to output/mev_candidates.txt"
+end

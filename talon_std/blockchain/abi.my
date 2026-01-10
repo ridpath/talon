@@ -1,0 +1,39 @@
+define function abi_decode(sig)
+    print "🔍 Decoding ABI signature:" sig
+
+    # Known sigs: ERC20, ERC721, Router, Wallets
+    if sig == "a9059cbb"
+        print "🪙 transfer(address,uint256)"
+    else if sig == "095ea7b3"
+        print "🔐 approve(address,uint256)"
+    else if sig == "23b872dd"
+        print "📤 transferFrom(address,address,uint256)"
+    else if sig == "70a08231"
+        print "💰 balanceOf(address)"
+    else if sig == "dd62ed3e"
+        print "📊 allowance(address,address)"
+    else if sig == "c87b56dd"
+        print "🔁 batchTransfer(address[],uint256)"
+    else if sig == "f305d719"
+        print "🧪 addLiquidityETH(address,uint,...)"
+    else if sig == "7ff36ab5"
+        print "🌊 swapExactETHForTokens(uint,..."
+    else
+        print "❓ Unknown signature"
+
+        # Optional: offline signature DB lookup
+        let found = 0
+        read file "data/abisigs.txt" into db
+        for line in db
+            if line contains sig
+                print "🔬 Match from database:" line
+                let found = 1
+                break
+            end
+        end
+
+        if found == 0
+            print "🧱 Not in offline DB — use external lookup or fuzz"
+        end
+    end
+end

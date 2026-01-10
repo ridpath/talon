@@ -1,0 +1,231 @@
+WHITESPACE = _{ " " | "\t" | "\n" | "\r" }
+COMMENT    = _{ 
+    ("//" ~ (!NEWLINE ~ ANY)* ~ NEWLINE?) |
+    ("/*" ~ (!"*/" ~ ANY)* ~ "*/") |
+    ("#" ~ (!NEWLINE ~ ANY)* ~ NEWLINE?)
+}
+
+program     = { SOI ~ statement* ~ EOI }
+
+statement   = {
+    include_stmt |
+    import_stmt |
+    function_def |
+    macro_def |
+    struct_def |
+    if_stmt |
+    for_stmt |
+    while_stmt |
+    break_stmt |
+    continue_stmt |
+    parallel_stmt |
+    var_decl |
+    const_decl |
+    destructuring_decl |
+    assignment |
+    match_stmt |
+    try_catch_stmt |
+    return_stmt |
+    call_macro |
+    call_func |
+    expr
+}
+
+include_stmt = { "include" ~ quoted_string }
+import_stmt = { "from" ~ quoted_string ~ "import" ~ (ident ~ ","?)+ | "import" ~ quoted_string }
+function_def = { ("async")? ~ "define" ~ "function" ~ ident ~ "(" ~ (arg_def ~ ","?)* ~ ")" ~ (":" ~ type_hint)? ~ statement* ~ "end" }
+macro_def = { "macro" ~ ident ~ "(" ~ (ident ~ ","?)* ~ ")" ~ statement* ~ "end" }
+arg_def = { ident ~ (":" ~ type_hint)? ~ ("=" ~ expr)? }
+struct_def   = { "struct" ~ ident ~ "{" ~ (ident ~ ":" ~ type_hint ~ ","?)* ~ "}" }
+var_decl     = { "let" ~ ident ~ (":" ~ type_hint)? ~ "=" ~ expr }
+const_decl   = { "const" ~ ident ~ "=" ~ expr }
+destructuring_decl = { "let" ~ "(" ~ (ident ~ ","?)+ ~ ")" ~ "=" ~ expr }
+assignment   = { ident ~ ("=" | "+=" | "-=" | "*=" | "/=") ~ expr }
+if_stmt      = { "if" ~ expr ~ ("then")? ~ statement* ~ else_stmt? ~ "end" }
+else_stmt    = { "else" ~ statement* }
+for_stmt     = { "for" ~ ident ~ "in" ~ (range | expr) ~ statement* ~ "end" }
+while_stmt   = { "while" ~ expr ~ statement* ~ "end" }
+parallel_stmt = { "parallel" ~ statement* ~ "end" }
+match_stmt   = { "match" ~ expr ~ case_stmt+ ~ "end" }
+case_stmt    = { "case" ~ expr ~ (guard)? ~ ":" ~ statement* }
+guard        = { "if" ~ expr }
+try_catch_stmt = { "try" ~ statement* ~ catch_stmt ~ "end" }
+catch_stmt   = { "catch" ~ ident ~ statement* }
+return_stmt  = { "return" ~ expr? }
+break_stmt   = { "break" }
+continue_stmt = { "continue" }
+
+type_hint    = { "int" | "string" | "list" | "map" | "set" | "bytes" | "bool" | "any" }
+
+expr         = { pipe }
+pipe         = { logical_or ~ ("|" ~ logical_or)* }
+logical_or   = { logical_and ~ ("or" ~ logical_and)* }
+logical_and  = { comparison ~ ("and" ~ comparison)* }
+comparison   = { term ~ (comp_op ~ term)* }
+term         = { factor ~ (add_op ~ factor)* }
+factor       = { unary ~ (mul_op ~ unary)* }
+unary        = { unary_op? ~ primary ~ postfix* }
+unary_op     = { "not" | "-" | "!" }
+postfix      = { "." ~ ident | "(" ~ (named_arg | expr ~ ","?)* ~ ")" | "[" ~ (slice_range | expr) ~ "]" }
+slice_range  = { expr? ~ ".." ~ expr? }
+primary      = { 
+    pack_expr | 
+    unpack_expr | 
+    literal | 
+    interpolated_string | 
+    list | 
+    map | 
+    set | 
+    lambda | 
+    list_comprehension | 
+    env | 
+    regex_match | 
+    await_expr | 
+    variant |
+    ident | 
+    "(" ~ expr ~ ")" 
+}
+
+comp_op      = { "==" | "!=" | "<=" | ">=" | "<" | ">" | "in" }
+add_op       = { "+" | "-" }
+mul_op       = { "*" | "/" | "%" }
+
+literal      = { boolean | number | quoted_string | multiline_string | null | byte_array }
+boolean      = { "true" | "false" }
+null         = { "null" }
+
+pack_expr    = { ("p64" | "p32" | "p16" | "p8") ~ "(" ~ expr ~ ")" }
+unpack_expr  = { ("u64" | "u32" | "u16" | "u8") ~ "(" ~ expr ~ ")" }
+
+quoted_string = @{ "\"" ~ string_content* ~ "\"" }
+string_content = @{ 
+    escape_sequence | 
+    (!("\"" | "\\") ~ ANY)
+}
+escape_sequence = @{
+    "\\" ~ (
+        "n" | "r" | "t" | "\\" | "\"" | "'" |
+        ("x" ~ ASCII_HEX_DIGIT{2}) |
+        ("u" ~ "{" ~ ASCII_HEX_DIGIT{1,6} ~ "}")
+    )
+}
+multiline_string = @{ "\"\"\"" ~ (!"\"\"\"" ~ ANY)* ~ "\"\"\"" }
+
+byte_array   = @{ "0x" ~ ASCII_HEX_DIGIT+ }
+hex_number   = @{ "0x" ~ ASCII_HEX_DIGIT+ }
+number       = @{ hex_number | decimal_number }
+decimal_number = @{ "-"? ~ ASCII_DIGIT+ ~ ("." ~ ASCII_DIGIT+)? }
+
+interpolated_string = @{ "\"" ~ (string_part | interp_expr)* ~ "\"" }
+string_part  = @{ (!"{" ~ !"\"" ~ ANY)+ }
+interp_expr  = { "{" ~ expr ~ "}" }
+
+list         = { "[" ~ (list_item ~ ","?)* ~ "]" }
+list_item    = { spread_expr | expr }
+spread_expr  = { "..." ~ expr }
+
+map          = { "{" ~ (map_pair ~ ","?)* ~ "}" }
+map_pair     = { (ident | quoted_string) ~ ":" ~ expr }
+
+set          = { "#{" ~ (expr ~ ","?)* ~ "}" }
+
+lambda       = { "fn" ~ "(" ~ (ident ~ ","?)* ~ ")" ~ "=>" ~ expr }
+list_comprehension = { "[" ~ expr ~ "for" ~ ident ~ "in" ~ expr ~ (guard)? ~ "]" }
+
+variant      = { ident ~ "(" ~ expr? ~ ")" }
+env          = { "env" ~ "(" ~ quoted_string ~ ")" }
+regex_match  = { "/" ~ (!"/" ~ ANY)+ ~ "/" ~ ("in" | "match") ~ expr }
+await_expr   = { "await" ~ expr }
+
+range        = { expr ~ ".." ~ expr }
+
+named_arg    = { ident ~ "=" ~ expr }
+
+// Function and macro calls (can appear as statements)
+call_func    = { ident ~ "(" ~ (named_arg | expr ~ ","?)* ~ ")" }
+call_macro   = { "@" ~ ident ~ "(" ~ (expr ~ ","?)* ~ ")" }
+
+// Legacy command rules (for backward compatibility with parser.rs)
+// These all map to function calls now
+command = _{ call_func | call_macro }
+tool_exec = { "tool" ~ ident ~ "(" ~ (expr ~ ","?)* ~ ")" }
+bitwise_op = { expr ~ ("&" | "|" | "^" | "<<" | ">>") ~ expr }
+
+// Placeholder rules for commands that have been converted to functions  
+// Parser.rs may reference these but they won't match in new code
+run_cmd = { "run" ~ "command" ~ quoted_string }
+bytes_expr = { "bytes" ~ "(" ~ (quoted_string | expr) ~ ")" }
+
+// Advanced command blocks (these are valid complex syntaxes to keep)
+symbolic_cmd = { "symbolic" ~ "let" ~ ident ~ "=" ~ ("bytes" | "int" | "string") ~ "(" ~ number ~ ")" }
+ai_cmd = { "auto_exploit" ~ quoted_string ~ statement* ~ "end" }
+debug_cmd = { "debug" ~ "attach" ~ quoted_string ~ statement* ~ "end" }
+fuzz_advanced_cmd = { "fuzz" ~ "protocol" ~ ident ~ statement* ~ "end" }
+heap_cmd = { "heap_groom" ~ "target" ~ ":" ~ hex_number ~ statement* ~ "end" }
+gadget_cmd = { "find_one_gadget" ~ quoted_string | "find_magic" ~ quoted_string }
+kernel_cmd = { "kernel_exploit" ~ statement* ~ "end" }
+scan_cve_cmd = { "scan_cve" ~ quoted_string ~ statement* ~ "end" }
+similarity_cmd = { "find_similar_to" ~ quoted_string ~ statement* ~ "end" }
+chain_cmd = { 
+    "connect_to" ~ quoted_string ~ "port" ~ number ~ ("timeout" ~ number)? |
+    "send" ~ expr |
+    "receive" ~ number |
+    "receive_until" ~ quoted_string ~ "max" ~ number |
+    "exploit_leak" ~ quoted_string ~ "payload" ~ ":" ~ expr ~ "offset" ~ ":" ~ number ~ "size" ~ ":" ~ number |
+    "calculate_base" ~ expr ~ "offset" ~ ":" ~ hex_number ~ "as" ~ quoted_string |
+    "bruteforce_aslr" ~ "attempts" ~ ":" ~ number ~ "payload" ~ ":" ~ expr ~ "offset" ~ ":" ~ number |
+    "interactive" |
+    "save_chain_state" ~ quoted_string |
+    "load_chain_state" ~ quoted_string |
+    "chain_summary"
+}
+safety_cmd = {
+    "set_timeout" ~ number |
+    "set_memory_limit" ~ number |
+    "set_recursion_limit" ~ number |
+    "enable_strict_mode" |
+    "disable_strict_mode" |
+    "get_safety_stats" |
+    "reset_safety"
+}
+solidity_cmd = { "audit" ~ "solidity" ~ quoted_string ~ statement* ~ "end" }
+distributed_cmd = { "distribute" ~ "over" ~ quoted_string ~ statement* ~ "end" }
+timetravel_cmd = { "debug" ~ quoted_string ~ "with" ~ "rr" ~ statement* ~ "end" }
+aslr_cmd = { "bypass" ~ "aslr" ~ "for" ~ quoted_string ~ statement* ~ "end" }
+diff_cmd = { "diff" ~ "binaries" ~ quoted_string ~ "vs" ~ quoted_string ~ statement* ~ "end" }
+wasm_cmd = { "analyze" ~ "wasm" ~ quoted_string ~ statement* ~ "end" }
+container_cmd = { "escape" ~ ("docker" | "kubernetes") ~ statement* ~ "end" }
+cloud_cmd = { "cloud_exploit" ~ ("aws" | "gcp" | "azure") ~ statement* ~ "end" }
+translate_cmd = { "translate" ~ "shellcode" ~ "from" ~ ident ~ "to" ~ ident ~ statement* ~ "end" }
+decompile_cmd = { "decompile" ~ ("function" ~ "at" ~ hex_number | quoted_string) ~ statement* ~ "end" }
+patch_cmd = { "patch" ~ quoted_string ~ statement* ~ "end" }
+
+// Simple command placeholders (converted to function calls)
+load_shellcode_cmd = { "load" ~ "shellcode" ~ "from" ~ quoted_string }
+execute_shellcode_cmd = { "execute" ~ "shellcode" ~ ("in" ~ "memory")? }
+read_file_cmd = { "read" ~ "file" ~ quoted_string ~ "into" ~ ident }
+write_file_cmd = { "write" ~ expr ~ "to" ~ quoted_string }
+format_string_cmd = { "format" ~ "string" ~ "exploit" ~ "on" ~ quoted_string ~ "using" ~ "offset" ~ number }
+stack_overflow_cmd = { "stack" ~ "overflow" ~ "with" ~ "padding" ~ number ~ "and" ~ "return" ~ "to" ~ hex_number }
+dump_memory_cmd = { "dump" ~ "memory" ~ "from" ~ hex_number ~ "for" ~ number ~ "bytes" }
+assemble_cmd = { "assemble" ~ ":" ~ (!(("end" ~ !ASCII_ALPHANUMERIC) | EOI) ~ ANY)* }
+beacon_cmd = { "beacon" ~ "to" ~ quoted_string ~ "every" ~ number ~ "seconds" }
+download_cmd = { "download" ~ "from" ~ quoted_string ~ "to" ~ quoted_string }
+encode_base64_cmd = { "encode" ~ "base64" ~ expr }
+decode_base64_cmd = { "decode" ~ "base64" ~ expr }
+offensive_cmd = _{ ghidra_bridge_cmd | ida_bridge_cmd }
+ghidra_bridge_cmd = { "bridge" ~ "ghidra" ~ "script" ~ quoted_string ~ "on" ~ "binary" ~ quoted_string }
+ida_bridge_cmd = { "bridge" ~ "ida" ~ "script" ~ quoted_string ~ "on" ~ "binary" ~ quoted_string }
+nop_sled_cmd = { "nop_sled" ~ "of" ~ "length" ~ number }
+heap_spray_cmd = { "heap_spray" ~ "with" ~ quoted_string }
+sigrop_chain_cmd = { "sigrop" ~ "chain" ~ "for" ~ quoted_string }
+find_format_offset_cmd = { "find" ~ "format" ~ "offset" ~ "for" ~ quoted_string }
+visualize_heap_cmd = { "visualize" ~ "heap" ~ "for" ~ quoted_string }
+fuzz_cmd = { "fuzz" ~ "binary" ~ quoted_string ~ "with" ~ "seed" ~ quoted_string ~ "for" ~ number ~ "cycles" }
+
+// Lexical rules
+ip           = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+port         = @{ ASCII_DIGIT+ }
+
+reserved = { "define" | "function" | "end" | "if" | "then" | "else" | "for" | "while" | "break" | "continue" | "async" | "await" | "return" | "let" | "const" | "import" | "include" | "macro" | "struct" | "match" | "case" | "try" | "catch" | "parallel" | "and" | "or" | "not" | "in" | "true" | "false" | "null" }
+ident        = @{ !(reserved ~ !ASCII_ALPHANUMERIC) ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }

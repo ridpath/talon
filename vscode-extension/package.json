@@ -1,0 +1,357 @@
+{
+  "name": "talon-language",
+  "displayName": "TALON DSL - Exploit Development Language",
+  "description": "Exploit development with Phase 23 features: libc.rip integration, auto-offset finding, 16 exploit templates, flag automation, real GDB parsing, and interactive quick-mode helpers. CTF-focused scripting language.",
+  "version": "3.1.0",
+  "publisher": "talon-dev",
+  "engines": {
+    "vscode": "^1.70.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Snippets",
+    "Debuggers",
+    "Other"
+  ],
+  "keywords": [
+    "talon",
+    "exploit",
+    "pwn",
+    "ctf",
+    "security",
+    "pentesting",
+    "game hacking",
+    "reverse engineering",
+    "binary exploitation"
+  ],
+  "activationEvents": [
+    "onLanguage:talon",
+    "onCommand:talon.loadTemplate",
+    "onCommand:talon.newProject",
+    "onDebugResolve:talon",
+    "onDebugDynamicConfigurations:talon"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "breakpoints": [
+      {
+        "language": "talon"
+      }
+    ],
+    "debuggers": [
+      {
+        "type": "talon",
+        "label": "TALON Debugger",
+        "program": "./out/debugAdapter.js",
+        "runtime": "node",
+        "configurationAttributes": {
+          "launch": {
+            "required": ["program"],
+            "properties": {
+              "program": {
+                "type": "string",
+                "description": "Absolute path to the TALON script",
+                "default": "${file}"
+              },
+              "args": {
+                "type": "array",
+                "description": "Command line arguments",
+                "default": []
+              },
+              "cwd": {
+                "type": "string",
+                "description": "Working directory",
+                "default": "${workspaceFolder}"
+              },
+              "stopOnEntry": {
+                "type": "boolean",
+                "description": "Automatically stop after launch",
+                "default": true
+              },
+              "gdbPath": {
+                "type": "string",
+                "description": "Path to GDB executable",
+                "default": "gdb"
+              }
+            }
+          }
+        },
+        "initialConfigurations": [
+          {
+            "type": "talon",
+            "request": "launch",
+            "name": "Debug TALON Exploit",
+            "program": "${file}",
+            "stopOnEntry": true
+          }
+        ],
+        "configurationSnippets": [
+          {
+            "label": "TALON: Launch Exploit",
+            "description": "Debug a TALON exploit script",
+            "body": {
+              "type": "talon",
+              "request": "launch",
+              "name": "Debug TALON Exploit",
+              "program": "^\"\\${file}\"",
+              "stopOnEntry": true
+            }
+          }
+        ]
+      }
+    ],
+    "languages": [
+      {
+        "id": "talon",
+        "aliases": ["TALON", "talon"],
+        "extensions": [".talon"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "talon",
+        "scopeName": "source.talon",
+        "path": "./syntaxes/talon.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "talon",
+        "path": "./snippets/talon.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "talon.loadTemplate",
+        "title": "Load Template",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.newProject",
+        "title": "New Exploit Project",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.payloadFactory",
+        "title": "Payload Factory - Weaponize POC",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.liveProcessAttach",
+        "title": "Live Process Attach",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.saveExploitRecipe",
+        "title": "Save Exploit Recipe",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.loadExploitRecipe",
+        "title": "Load Exploit Recipe",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.runExploit",
+        "title": "Run Exploit",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.showMemoryVisualizer",
+        "title": "Show Memory Visualizer",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.showRopBuilder",
+        "title": "Show ROP Chain Builder",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.showDebugger",
+        "title": "Show Live Debugger",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.generateExploit",
+        "title": "Generate Buffer Overflow Exploit",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.generateGameHack",
+        "title": "Generate Game Hack",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.analyzeExploitability",
+        "title": "Analyze Binary Exploitability",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.explainCode",
+        "title": "Explain Code",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.formatExploit",
+        "title": "Format Code",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.showVisualBuilder",
+        "title": "Visual Exploit Builder",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.showSmartAssistant",
+        "title": "Smart AI Assistant",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.showTutorial",
+        "title": "Interactive Tutorials",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.showFindings",
+        "title": "Research Findings Panel",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.addFinding",
+        "title": "Add Finding",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.createSnapshot",
+        "title": "Create Workspace Snapshot",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.loadSnapshot",
+        "title": "Load Workspace Snapshot",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.shareSnapshot",
+        "title": "Share Snapshot",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.importSnapshot",
+        "title": "Import Snapshot",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.libcSearch",
+        "title": "Search Libc Database",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.autoOffset",
+        "title": "Auto-Find Buffer Offset",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.insertTemplate",
+        "title": "Insert Exploit Template",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.flagSearch",
+        "title": "Search for Flags",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.gdbAnalyze",
+        "title": "Analyze with GDB",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.quickHelper",
+        "title": "Quick Exploitation Helper",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.checksec",
+        "title": "Checksec - Binary Protections",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.vmmap",
+        "title": "Vmmap - Memory Mappings",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.searchMemory",
+        "title": "Search Memory",
+        "category": "TALON"
+      },
+      {
+        "command": "talon.telescope",
+        "title": "Telescope - Follow Pointers",
+        "category": "TALON"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "when": "resourceLangId == talon",
+          "command": "talon.runExploit",
+          "group": "navigation@1"
+        },
+        {
+          "when": "resourceLangId == talon",
+          "command": "talon.payloadFactory",
+          "group": "1_modification@1"
+        },
+        {
+          "when": "resourceLangId == talon",
+          "command": "talon.explainCode",
+          "group": "1_modification@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "talon.runExploit",
+          "when": "resourceLangId == talon"
+        }
+      ]
+    },
+    "keybindings": [
+      {
+        "command": "talon.runExploit",
+        "key": "F5",
+        "when": "resourceLangId == talon"
+      },
+      {
+        "command": "talon.payloadFactory",
+        "key": "ctrl+shift+p",
+        "when": "resourceLangId == talon"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src --ext ts"
+  },
+  "devDependencies": {
+    "@types/node": "^16.x",
+    "@types/vscode": "^1.70.0",
+    "@typescript-eslint/eslint-plugin": "^5.x",
+    "@typescript-eslint/parser": "^5.x",
+    "eslint": "^8.x",
+    "typescript": "^4.9.x"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/talon-lang/vscode-talon"
+  },
+  "license": "MIT"
+}

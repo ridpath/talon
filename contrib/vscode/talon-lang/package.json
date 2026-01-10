@@ -1,0 +1,30 @@
+{
+  "name": "talon-lang",
+  "displayName": "TALON Language Support",
+  "description": "Syntax highlighting and language support for TALON exploit development language",
+  "version": "0.1.0",
+  "publisher": "talon-project",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "talon",
+        "aliases": ["TALON", "talon"],
+        "extensions": [".tal", ".talon"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "talon",
+        "scopeName": "source.talon",
+        "path": "./syntaxes/talon.tmLanguage.json"
+      }
+    ]
+  }
+}

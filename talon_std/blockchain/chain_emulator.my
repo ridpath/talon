@@ -1,0 +1,8 @@
+define function simulate_block_context(block_number, sender)
+    print "⛓️  Simulated EVM Environment"
+    print "  block.number = " block_number
+    print "  msg.sender   = " sender
+    print "  tx.origin    = " sender
+    print "  gasleft()    = 8000000"
+    print "  block.timestamp = 1700000000"
+end

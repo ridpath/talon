@@ -1,0 +1,28 @@
+define function monitor_airdrop_candidates()
+    print "🛰️ Monitoring mempool for airdrop signatures..."
+
+    let sigs = ["0xa9059cbb", "0x095ea7b3"]  # transfer / approve
+    let target_tokens = ["UNI", "ARB", "OP"]
+
+    while true
+        let tx = fetch_next_pending_tx()
+        let sig = substring(tx.input, 0, 8)
+
+        if sig in sigs
+            let token = resolve_token(tx.to)
+            if token in target_tokens
+                print "🎯 MATCH: " token " → TX: " tx.hash
+                alert_operator(tx)
+            end
+        end
+    end
+end
+
+define function fetch_next_pending_tx()
+    # Stub: Hook into mempool watcher, stream txs
+    return {
+        input: "0xa9059cbb...",
+        hash: "0xdeadbeef...",
+        to: "0xTokenAddr..."
+    }
+end

@@ -1,0 +1,31 @@
+define function detect_sol_flaws(code)
+    print "🔍 Scanning Solidity code for known anti-patterns..."
+
+    if code contains "tx.origin"
+        print "⚠️  Unsafe use of tx.origin"
+    end
+
+    if code contains "delegatecall"
+        print "🚨 Use of delegatecall detected"
+    end
+
+    if code contains "selfdestruct"
+        print "💣 selfdestruct() found — potential contract suicide"
+    end
+
+    if code contains "call.value"
+        print "⚠️ Unchecked external call using call.value"
+    end
+
+    if code contains "assembly"
+        print "🧬 Inline assembly detected"
+    end
+
+    if code contains "public" and code contains "uint" and not code contains "onlyOwner"
+        print "🔓 Potential public state var without access control"
+    end
+
+    if code contains "external" and code contains("call(")
+        print "🔁 External call that may be reentrant"
+    end
+end

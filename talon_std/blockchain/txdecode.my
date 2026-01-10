@@ -1,0 +1,25 @@
+include "blockchain/abi.my"
+
+define function decode_tx_input(input)
+    print "🧬 Analyzing TX input: " input
+
+    if input startswith "0x"
+        input = substring(input, 2, length(input))
+    end
+
+    let sig = substring(input, 0, 8)
+    print "🧾 Function Signature: 0x" + sig
+
+    abi_decode(sig)
+
+    let param_data = substring(input, 8, length(input))
+    print "📦 Param (raw):" param_data
+
+    # Pattern-based heuristics
+    if length(param_data) >= 128
+        let p1 = substring(param_data, 24, 64)
+        let p2 = substring(param_data, 88, 64)
+        print "📍 Param 1 (address/target): 0x" + p1
+        print "💸 Param 2 (value/amount): 0x" + p2
+    end
+end

@@ -1,0 +1,21 @@
+define function forge_eth_signature(message, private_key)
+    print "🔐 Forging Ethereum ECDSA signature"
+    
+    # Hash message if not already hex
+    if not message startswith "0x"
+        let hashed = keccak256(message)
+    else
+        let hashed = message
+    end
+
+    sign message hashed with private key private_key using curve "secp256k1"
+    print "📝 Signature (hex r|s|v):"
+    print " - r: <r_value>"
+    print " - s: <s_value>"
+    print " - v: <v_value> (27/28)"
+
+    let raw_sig = r_value + s_value + v_value
+    write raw_sig to "output/ecdsa.sig"
+
+    print "📦 Saved forged signature to output/ecdsa.sig"
+end

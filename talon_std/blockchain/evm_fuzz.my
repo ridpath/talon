@@ -1,0 +1,26 @@
+define function fuzz_evm_bytecode(bytecode, cycles)
+    print "🔬 Fuzzing EVM bytecode for reentrancy, RCE, logic bombs..."
+
+    let rare_opcodes = ["ff", "fa", "f5", "f4", "f1", "f2", "f3"]
+    let crash_on = ["CALLCODE", "DELEGATECALL", "CREATE2", "REVERT"]
+
+    for i in 1..cycles
+        let mutated = mutate(bytecode)
+
+        for rare in rare_opcodes
+            if mutated contains rare
+                print "⚠️ Rare opcode found (cycle " + i + "): 0x" + rare
+                write mutated to "output/evm_crash_" + i + ".bin"
+            end
+        end
+
+        for sig in crash_on
+            if mutated contains sig
+                print "💣 Found potential logic bomb: " sig
+                write mutated to "output/evm_" + sig + "_" + i + ".bin"
+            end
+        end
+    end
+
+    print "✅ Fuzzing complete"
+end

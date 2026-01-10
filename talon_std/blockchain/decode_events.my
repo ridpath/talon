@@ -1,0 +1,21 @@
+define function parse_event_topics(logs)
+    print "🎯 Parsing LogsBloom/Event Topics..."
+
+    if logs contains "ddf252ad"  # Transfer(address,address,uint256)
+        print "✅ Detected ERC20 Transfer"
+    end
+
+    if logs contains "8c5be1e5"  # Approval(address,address,uint256)
+        print "✅ Detected ERC20 Approval"
+    end
+
+    if logs contains "0c396cd9896d8c0d"  # OwnershipTransferred
+        print "✅ Detected OwnershipTransferred"
+    end
+
+    if logs contains "4c209b5e"  # Transfer (ERC721 or Mint)
+        print "✅ Detected NFT Transfer or Mint"
+    end
+
+    print "🧾 Logs scan complete"
+end

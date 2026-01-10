@@ -1,0 +1,109 @@
+%YAML 1.2
+---
+name: TALON
+file_extensions: [tal, talon]
+scope: source.talon
+
+contexts:
+  main:
+    - include: comments
+    - include: strings
+    - include: numbers
+    - include: keywords
+    - include: functions
+    - include: operators
+    - include: constants
+
+  comments:
+    - match: '//'
+      scope: punctuation.definition.comment.talon
+      push:
+        - meta_scope: comment.line.double-slash.talon
+        - match: $
+          pop: true
+
+    - match: '/\*'
+      scope: punctuation.definition.comment.begin.talon
+      push:
+        - meta_scope: comment.block.talon
+        - match: '\*/'
+          scope: punctuation.definition.comment.end.talon
+          pop: true
+
+  strings:
+    - match: '"'
+      scope: punctuation.definition.string.begin.talon
+      push:
+        - meta_scope: string.quoted.double.talon
+        - match: '\\[nrt\\"]'
+          scope: constant.character.escape.talon
+        - match: '"'
+          scope: punctuation.definition.string.end.talon
+          pop: true
+
+    - match: "'"
+      scope: punctuation.definition.string.begin.talon
+      push:
+        - meta_scope: string.quoted.single.talon
+        - match: "\\\\[nrt\\\\']"
+          scope: constant.character.escape.talon
+        - match: "'"
+          scope: punctuation.definition.string.end.talon
+          pop: true
+
+  numbers:
+    - match: '\b0x[0-9a-fA-F]+\b'
+      scope: constant.numeric.hex.talon
+    - match: '\b0b[01]+\b'
+      scope: constant.numeric.binary.talon
+    - match: '\b\d+\b'
+      scope: constant.numeric.decimal.talon
+
+  keywords:
+    - match: '\b(if|else|end|for|in|while|try|catch|match|when|default|break|continue|return)\b'
+      scope: keyword.control.talon
+
+    - match: '\b(let|const|def|macro|import|from|as)\b'
+      scope: keyword.declaration.talon
+
+    - match: '\b(analyze|connect|send|recv|print|shellcode|payload|exploit|rop|heap|kernel)\b'
+      scope: keyword.other.talon
+
+    - match: '\b(auto_rop|heap_exploit|auto_exploit|taint_analysis|symbolic_exec|binary_similarity|notebook|export_to|note)\b'
+      scope: keyword.other.exploit.talon
+
+    - match: '\b(enable_strict_mode|disable_safety|set_timeout|set_max_memory|set_recursion_depth)\b'
+      scope: keyword.other.safety.talon
+
+    - match: '\b(int|str|bytes|list|map|set|bool|null)\b'
+      scope: storage.type.talon
+
+    - match: '\b(buffer-overflow|rop|format-string|heap|kernel|ret2libc|ret2csu|ret2plt|fsop|srop|house-of-force|off-by-one|use-after-free)\b'
+      scope: entity.name.type.exploit.talon
+
+    - match: '\b(tcache_poisoning|fastbin_attack|unsorted_bin_attack|largebin_attack|one_gadget|ret2syscall|mprotect_rwx|stack_pivot)\b'
+      scope: entity.name.technique.talon
+
+  functions:
+    - match: '\b(p64|p32|p16|p8|u64|u32|u16|u8|len|bytes|hex|decode|encode)\b'
+      scope: support.function.builtin.talon
+
+    - match: '\b(leak_pie_base|leak_canary|leak_libc|find_gadgets|build_rop_chain)\b'
+      scope: support.function.exploit.talon
+
+    - match: '\b(malloc|free|mprotect|mmap|execve|system)\b'
+      scope: support.function.libc.talon
+
+    - match: '\b(connect_to|send_payload|receive_data|interactive)\b'
+      scope: support.function.network.talon
+
+  operators:
+    - match: '[+\-*/%=<>!&|^~]|\.\.\.|\.\.|\|>'
+      scope: keyword.operator.talon
+
+  constants:
+    - match: '\b(true|false|null)\b'
+      scope: constant.language.talon
+
+    - match: '\b(to|on|port|technique|target|objective|constraints|strategy|glibc_version|overwrite_with)\b'
+      scope: constant.language.special.talon

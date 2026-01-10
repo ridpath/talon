@@ -1,0 +1,28 @@
+define function eth_call(node, data)
+    print "🌐 ETH JSON-RPC ->" node
+
+    let body = "{" +
+        "\"jsonrpc\":\"2.0\"," +
+        "\"method\":\"eth_call\"," +
+        "\"params\":[{\"to\":\"0xContract\",\"data\":\"" + data + "\"}, \"latest\"]," +
+        "\"id\":1" +
+    "}"
+
+    write body to "payloads/rpc_request.json"
+    print "🧾 Payload dumped to: payloads/rpc_request.json"
+
+    print "⚡ Try with curl:"
+    print "curl -s -X POST " + node + " -H 'Content-Type: application/json' -d @payloads/rpc_request.json"
+end
+
+define function generate_ethcall_payload(sig, args)
+    print "🧬 Constructing ETH calldata with sig:" sig
+
+    let payload = sig
+    for arg in args
+        let hex = pad(hexify(arg), 64)
+        payload += hex
+    end
+
+    print "🚀 Final Payload: 0x" + payload
+end

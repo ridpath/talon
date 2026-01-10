@@ -1,0 +1,11 @@
+define function scrape_verified_contract(address)
+    print "📥 Attempting Etherscan scrape for verified contract:" address
+
+    let url = "https://etherscan.io/address/" + address
+    let out = "payloads/" + address + ".html"
+
+    download from url to out
+
+    print "📄 HTML source saved to" out
+    print "🔍 Use extract() or regex search to pull Solidity source manually"
+end

@@ -1,0 +1,24 @@
+
+{
+  "name": "Talon",
+  "scopeName": "source.talon",
+  "patterns": [
+    {
+      "name": "keyword.control.talon",
+      "match": "\\b(if|else|for|define|function|struct|let|connect|generate|exit|end)\\b"
+    },
+    {
+      "name": "string.quoted.double.talon",
+      "begin": "\"",
+      "end": "\""
+    },
+    {
+      "name": "constant.numeric.talon",
+      "match": "\\b\\d+\\b"
+    },
+    {
+      "name": "entity.name.function.talon",
+      "match": "\\b(parse|call|disassemble|assemble|build|fuzz|encrypt|sign)\\b"
+    }
+  ]
+}

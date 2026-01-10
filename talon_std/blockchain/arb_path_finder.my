@@ -1,0 +1,23 @@
+define function detect_arb_path(token_a, token_b)
+    print "🔍 Fetching live prices for" token_a "↔" token_b
+
+    let uniswap_price = dex_price("uniswap", token_a, token_b)
+    let curve_price = dex_price("curve", token_a, token_b)
+
+    print "🦄 Uniswap: " + uniswap_price
+    print "🌊 Curve: " + curve_price
+
+    let diff = abs(uniswap_price - curve_price)
+
+    if diff > 0.01
+        print "💰 ARB Opportunity Detected"
+        if uniswap_price < curve_price
+            print "➡️ Buy on Uniswap, sell on Curve"
+        else
+            print "➡️ Buy on Curve, sell on Uniswap"
+        end
+        print "📈 Spread: " + diff * 100 + "%"
+    else
+        print "❌ No arbitrage gap found"
+    end
+end

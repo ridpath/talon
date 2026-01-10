@@ -1,0 +1,36 @@
+define function yara_match(file, pattern)
+    print "🧬 Scanning" file "for YARA pattern logic"
+
+    read file file into content
+
+    # Simulated YARA-like logic
+    if pattern == "xor_shellcode"
+        if "0x90" in content and "0xAA" in content
+            print "💥 XOR-encoded shellcode detected"
+        else
+            print "✅ No XOR shellcode match"
+        end
+
+    else if pattern == "packed_upx"
+        if "UPX!" in content or "UPX0" in content
+            print "💣 UPX packing signature found"
+        else
+            print "✅ No UPX marker"
+        end
+
+    else if pattern == "http_beacon"
+        if "http" in content and "GET /beacon" in content
+            print "🌐 HTTP beacon signature detected"
+        else
+            print "✅ No C2 HTTP beacon"
+        end
+
+    else
+        print "⚠️ Unknown or generic pattern, using simple string match"
+        if pattern in content
+            print "🎯 Match found for pattern:" pattern
+        else
+            print "🚫 No match for:" pattern
+        end
+    end
+end

@@ -1,0 +1,28 @@
+define function detect_nonce_race(wallet)
+    print "⚠️ Detecting nonce reuse for wallet:" wallet
+    let seen = []
+    let txs = fetch_tx_history(wallet)
+
+    for tx in txs
+        if tx.nonce in seen
+            print "🚨 Nonce reuse: " tx.nonce " in tx " tx.hash
+        else
+            seen += tx.nonce
+        end
+    end
+
+    if seen.length != unique(seen).length
+        print "💣 Replay vector possible"
+    else
+        print "✅ No nonce race detected"
+    end
+end
+
+define function fetch_tx_history(wallet)
+    # Stub: Use etherscan or Infura API
+    return [
+        { nonce: 5, hash: "0xabc" },
+        { nonce: 5, hash: "0xdef" },
+        { nonce: 6, hash: "0xghi" }
+    ]
+end

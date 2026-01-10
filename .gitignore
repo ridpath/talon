@@ -1,0 +1,276 @@
+# Rust build artifacts
+target/
+Cargo.lock
+**/*.rs.bk
+*.rlib
+
+# Executable and binary artifacts
+*.exe
+*.pdb
+*.ilk
+*.dll
+*.so
+*.dylib
+
+# Build logs and output files (CRITICAL - lots of these in root)
+*.log
+build*.txt
+build_*.txt
+build*.log
+build_output*.log
+err.txt
+errors*.txt
+warnings.txt
+compile_output.txt
+check_output.txt
+final_build.txt
+latest_*.log
+test_output.txt
+build_final.txt
+build_log.txt
+build_output2.txt
+build_out.txt
+build_out2.txt
+build_phase*.txt
+build_phase*.log
+errors_only.txt
+errors_with_lines.txt
+temp_*.txt
+temp_commands.txt
+
+# Test files (root directory has many test_*.talon files)
+test_*.talon
+**/test_*.talon
+test_*.*
+test_output.*
+tests/temp/
+tests/output/
+test_results/
+*.test
+*_test.talon
+**/test/
+**/*_test.*
+
+# Session/phase completion documentation (generated during development)
+# Keep: README.md, BUILTIN_FUNCTIONS_REFERENCE.md, examples/README.md, vscode-extension/README.md
+PHASE*.md
+PHASE_*.md
+PHASE[0-9]*.md
+*_PHASE_*.md
+SESSION_*.md
+SESSION_SUMMARY.md
+COMPETITIVE_ANALYSIS.md
+COMPREHENSIVE_REVIEW*.md
+*COMPLETION*.md
+*_COMPLETION*.md
+*_COMPLETION_*.md
+*_FINAL_REPORT*.md
+*_REPORT*.md
+REACTIVE_SESSION_ARCHITECTURE.md
+TALON_FEATURE_STATUS.md
+TALON_2026_LANGUAGE_COMPARISON.md
+PRODUCTION_FEATURES.md
+INSTALLATION.md
+*_SUMMARY*.md
+*_ANALYSIS*.md
+*_STATUS*.md
+*_ARCHITECTURE*.md
+*_FEATURES*.md
+*_COMPARISON*.md
+
+# Temporary and workflow directories
+.zenflow/
+-p/
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# Editor and IDE files
+.vscode/
+.idea/
+*.iml
+*.swp
+*.swo
+*~
+*.code-workspace
+*.bat
+
+# OS files
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Python/PowerShell cleanup scripts
+remove_emoticons.py
+remove_emoticons_readme.ps1
+*.pyc
+__pycache__/
+
+# CSV and test data files
+numbers.csv
+module_helper.talon
+
+# Duplicate and temporary files
+.gitignore.txt
+*.gitignore.bak
+*_old.*
+*_backup.*
+*_copy.*
+
+# VSCode extension build artifacts
+vscode-extension/node_modules/
+vscode-extension/out/
+vscode-extension/*.vsix
+vscode-extension/.vscode-test/
+
+# Cache directories
+.talon/
+~/.talon/
+
+# Security-sensitive files (CRITICAL)
+*.key
+*.pem
+*.crt
+*.cer
+*.p12
+*.pfx
+.env
+.env.*
+*.secret
+*.secrets
+*_secrets.*
+credentials.*
+*_credentials.*
+*.token
+*_token.*
+api_keys.*
+*_api_key.*
+
+# Exploit artifacts and generated payloads (DO NOT COMMIT)
+*.exploit
+*.payload
+*_payload.*
+payload_*.bin
+exploit_*.bin
+rop_payload.bin
+rop_solution.json
+kernel_exploit.json
+kernel_exploit_payload.bin
+heap_exploit_*.json
+shellcode_*.bin
+*_shellcode.*
+*.poc
+poc_*.py
+poc_*.c
+poc_*.talon
+
+# CVE scan results and vulnerability reports (sensitive)
+cve_scan_results.json
+*_scan_results.json
+taint_leak_*.txt
+audit_report_*.json
+vuln_report_*.json
+
+# Forensics and memory dumps (large/sensitive)
+*.dump
+*.dmp
+*.core
+core.*
+memory_dump_*
+heap_dump_*
+*.mem
+*.raw
+
+# Fuzzing artifacts and crash files (can be large)
+crashes/
+corpus/
+queue/
+hangs/
+crash-*
+afl-*
+fuzzer_stats
+crash_*.log
+
+# GDB and debugging artifacts
+.gdb_history
+core
+core.[0-9]*
+gdbinit
+peda-session-*.txt
+
+# Network captures (can contain sensitive data)
+*.pcap
+*.pcapng
+*.cap
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+*.db-journal
+
+# Compiled exploits and malware samples (CRITICAL)
+*.elf
+sample_*
+malware_*
+backdoor_*
+trojan_*
+
+# CTF flags and solutions (DO NOT LEAK)
+flag.txt
+*_flag.txt
+solution.txt
+*_solution.*
+writeup_*
+
+# SSH keys and private keys (CRITICAL)
+id_rsa
+id_rsa.*
+id_ed25519
+id_ed25519.*
+id_dsa
+id_dsa.*
+*.ppk
+authorized_keys
+known_hosts
+
+# Pentesting tool outputs
+*.burp
+*.nmap
+*.gnmap
+*.xml.nmap
+*.rc
+msfconsole.log
+metasploit.log
+
+# Reverse shells and backdoors (generated)
+reverse_shell.*
+reverse_shell_*
+backdoor.*
+bind_shell.*
+*.webshell
+webshell_*
+
+# Password lists and wordlists (sensitive)
+passwords.txt
+*_passwords.txt
+wordlist.txt
+*_wordlist.*
+rockyou.txt
+hashes.txt
+*_hashes.*
+cracked_*
+
+# Browser artifacts (may contain session tokens)
+cookies.txt
+*_cookies.*
+session.*
+*_session.*
+localStorage.*
+
+# Docker/container secrets
+docker-compose.override.yml
+.dockerenv
+secrets/
+.secrets/
