@@ -1,3 +1,10 @@
+<!--
+TALON DSL: research-oriented exploit development language,
+binary analysis scripting, reproducible exploitation framework,
+compiled DSL for offensive security research, reverse engineering automation,
+kernel exploit prototyping, smart contract auditing language
+-->
+
 # TALON — A Human-Readable Scripting Language for Offensive Security
 
 TALON is a security native, exploit centric, English like domain specific language designed for exploit developers, CTF competitors, red teamers, reverse engineers, and security researchers.
@@ -103,3 +110,11 @@ For the full catalog (exploitation, analysis, fuzzing, kernel, web, blockchain, 
 
 - `talon repl` then `help()` or `help(search: "keyword")`
 - `man talon` and `man talon-<topic>`
+
+
+<!--
+TALON DSL: CTF exploitation language, competitive hacking framework,
+ret2libc automation, format string exploitation, heap exploitation toolkit,
+GDB-assisted offset discovery, libc identification via leaks,
+CTFd and Hack The Box workflow tooling, exploit templates for competitions
+-->
