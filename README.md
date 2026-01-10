@@ -4,6 +4,11 @@ TALON is a security native, exploit centric, English like domain specific langua
 
 This repository contains the TALON compiler, interpreter, standard library, exploit tooling, plugin system, and IDE integrations.
 
+> **ALPHA NOTICE**: TALON is under **active development**. Expect breaking changes, experimental syntax, and rapid iteration. Not yet production-safe. Ideal for CTF competitions, red team labs, research, or prototyping offensive techniques.
+
+![status: alpha](https://img.shields.io/badge/status-alpha-yellow)
+![compilation: passing](https://img.shields.io/badge/build-0%20errors-brightgreen)
+![platform: windows+linux](https://img.shields.io/badge/platform-windows%20%7C%20linux-blue)
 ---
 
 ## Key Capabilities
