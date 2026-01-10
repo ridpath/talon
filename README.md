@@ -1,6 +1,6 @@
 # TALON — A Human-Readable Scripting Language for Offensive Security
 
-TALON is a security-native, exploit-centric, English-like domain-specific language designed for exploit developers, CTF competitors, red teamers, reverse engineers, and advanced security researchers.
+TALON is a security native, exploit centric, English like domain specific language designed for exploit developers, CTF competitors, red teamers, reverse engineers, and security researchers.
 
 This repository contains the TALON compiler, interpreter, standard library, exploit tooling, plugin system, and IDE integrations.
 
@@ -80,7 +80,7 @@ load_plugin("plugins/my_plugin.so")
 
 ## VS Code Extension
 
-See `README_VSCODE.md` for IDE features, debugging, and visual tools.
+See `README.md in vscode-extensions directory` for IDE features, debugging, and visual tools.
 
 ---
 
