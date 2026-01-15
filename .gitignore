@@ -189,6 +189,16 @@ taint_leak_*.txt
 audit_report_*.json
 vuln_report_*.json
 
+# Security audit artifacts
+audit.log
+cargo-audit.log
+cargo-deny.log
+security_audit_*.log
+security_audit_*.txt
+advisory-db/
+.cargo-audit/
+.cargo-deny/
+
 # Forensics and memory dumps (large/sensitive)
 *.dump
 *.dmp
