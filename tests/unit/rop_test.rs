@@ -1,6 +1,7 @@
 use std::fs;
 use std::io::Write;
 use tempfile::NamedTempFile;
+use std::time::Instant;
 
 fn create_test_elf_x64() -> NamedTempFile {
     let mut file = NamedTempFile::new().expect("Failed to create temp file");
@@ -90,6 +91,138 @@ fn create_test_elf_x86() -> NamedTempFile {
     
     elf[gadgets_offset + 20] = 0xcd;
     elf[gadgets_offset + 21] = 0x80;
+    
+    file.write_all(&elf).expect("Failed to write test ELF");
+    file.flush().expect("Failed to flush");
+    file
+}
+
+fn create_test_elf_arm() -> NamedTempFile {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    
+    let mut elf = Vec::new();
+    elf.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46, 0x01, 0x01, 0x01, 0x00]);
+    elf.extend_from_slice(&[0x00; 8]);
+    elf.extend_from_slice(&[0x02, 0x00, 0x28, 0x00]);
+    elf.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x01, 0x00]);
+    elf.extend_from_slice(&[0x34, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x34, 0x00, 0x20, 0x00]);
+    
+    while elf.len() < 0x800 {
+        elf.push(0x00);
+    }
+    
+    let gadgets_offset = 0x400;
+    elf[gadgets_offset] = 0x04;
+    elf[gadgets_offset + 1] = 0x70;
+    elf[gadgets_offset + 2] = 0xbd;
+    elf[gadgets_offset + 3] = 0xe8;
+    
+    elf[gadgets_offset + 10] = 0x1e;
+    elf[gadgets_offset + 11] = 0xff;
+    elf[gadgets_offset + 12] = 0x2f;
+    elf[gadgets_offset + 13] = 0xe1;
+    
+    file.write_all(&elf).expect("Failed to write test ELF");
+    file.flush().expect("Failed to flush");
+    file
+}
+
+fn create_test_elf_arm64() -> NamedTempFile {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    
+    let mut elf = Vec::new();
+    elf.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]);
+    elf.extend_from_slice(&[0x00; 8]);
+    elf.extend_from_slice(&[0x02, 0x00, 0xb7, 0x00]);
+    elf.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x40, 0x00, 0x38, 0x00, 0x01, 0x00, 0x00, 0x00]);
+    
+    while elf.len() < 0x1000 {
+        elf.push(0x00);
+    }
+    
+    let gadgets_offset = 0x500;
+    elf[gadgets_offset] = 0xc0;
+    elf[gadgets_offset + 1] = 0x03;
+    elf[gadgets_offset + 2] = 0x5f;
+    elf[gadgets_offset + 3] = 0xd6;
+    
+    file.write_all(&elf).expect("Failed to write test ELF");
+    file.flush().expect("Failed to flush");
+    file
+}
+
+fn create_large_test_binary() -> NamedTempFile {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    
+    let mut elf = Vec::new();
+    elf.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]);
+    elf.extend_from_slice(&[0x00; 8]);
+    elf.extend_from_slice(&[0x02, 0x00, 0x3e, 0x00]);
+    elf.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x40, 0x00, 0x38, 0x00, 0x01, 0x00, 0x00, 0x00]);
+    
+    while elf.len() < 0x100000 {
+        let offset = elf.len();
+        
+        if offset % 256 == 0 {
+            elf.push(0x5f);
+            elf.push(0xc3);
+        } else if offset % 512 == 0 {
+            elf.push(0x5e);
+            elf.push(0xc3);
+        } else if offset % 1024 == 0 {
+            elf.push(0x0f);
+            elf.push(0x05);
+        } else {
+            elf.push(0x90);
+        }
+    }
+    
+    file.write_all(&elf).expect("Failed to write test ELF");
+    file.flush().expect("Failed to flush");
+    file
+}
+
+fn create_binary_with_bad_chars() -> NamedTempFile {
+    let mut file = NamedTempFile::new().expect("Failed to create temp file");
+    
+    let mut elf = Vec::new();
+    elf.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]);
+    elf.extend_from_slice(&[0x00; 8]);
+    elf.extend_from_slice(&[0x02, 0x00, 0x3e, 0x00]);
+    elf.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+    elf.extend_from_slice(&[0x40, 0x00, 0x38, 0x00, 0x01, 0x00, 0x00, 0x00]);
+    
+    while elf.len() < 0x1000 {
+        elf.push(0x00);
+    }
+    
+    let offset = 0x500;
+    elf[offset] = 0x48;
+    elf[offset + 1] = 0xc7;
+    elf[offset + 2] = 0xc0;
+    elf[offset + 3] = 0x00;
+    elf[offset + 4] = 0x00;
+    elf[offset + 5] = 0x00;
+    elf[offset + 6] = 0x00;
+    elf[offset + 7] = 0xc3;
     
     file.write_all(&elf).expect("Failed to write test ELF");
     file.flush().expect("Failed to flush");
