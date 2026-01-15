@@ -2378,6 +2378,177 @@ fn eval_expr<'a>(
                     
                     Ok(Value::Bytes(payload))
                 }
+                "fmtstr_leak" => {
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(0)) {
+                        *off as usize
+                    } else {
+                        return Err("fmtstr_leak() requires offset argument".to_string());
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_leak(offset);
+                    
+                    use colored::Colorize;
+                    println!("{} Leak payload for offset {}: {}", 
+                        "[FMTSTR]".cyan(), 
+                        offset.to_string().yellow(),
+                        payload.green());
+                    
+                    Ok(Value::String(payload))
+                }
+                "fmtstr_leak_stack" => {
+                    let start = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.get(0)) {
+                        *s as usize
+                    } else {
+                        return Err("fmtstr_leak_stack() requires start offset".to_string());
+                    };
+                    
+                    let count = if let Some(Value::Number(c)) = arg_map.get("count").or_else(|| arg_values.get(1)) {
+                        *c as usize
+                    } else {
+                        10
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_leak_stack(start, count);
+                    
+                    use colored::Colorize;
+                    println!("{} Stack leak payload: offsets {} to {}", 
+                        "[FMTSTR]".cyan(), 
+                        start.to_string().yellow(),
+                        (start + count - 1).to_string().yellow());
+                    
+                    Ok(Value::String(payload))
+                }
+                "fmtstr_write" => {
+                    let address = if let Some(Value::Number(addr)) = arg_map.get("address").or_else(|| arg_values.get(0)) {
+                        *addr as u64
+                    } else {
+                        return Err("fmtstr_write() requires address argument".to_string());
+                    };
+                    
+                    let value = if let Some(Value::Number(val)) = arg_map.get("value").or_else(|| arg_values.get(1)) {
+                        *val as u64
+                    } else {
+                        return Err("fmtstr_write() requires value argument".to_string());
+                    };
+                    
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(2)) {
+                        *off as usize
+                    } else {
+                        return Err("fmtstr_write() requires offset argument".to_string());
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_write(address, value, offset);
+                    
+                    use colored::Colorize;
+                    println!("{} Write payload: 0x{:x} = 0x{:x} (offset {})", 
+                        "[FMTSTR]".cyan(), 
+                        address,
+                        value,
+                        offset.to_string().yellow());
+                    
+                    Ok(Value::Bytes(payload))
+                }
+                "fmtstr_got_overwrite" => {
+                    let got_entry = if let Some(Value::Number(got)) = arg_map.get("got").or_else(|| arg_values.get(0)) {
+                        *got as u64
+                    } else {
+                        return Err("fmtstr_got_overwrite() requires GOT entry address".to_string());
+                    };
+                    
+                    let target = if let Some(Value::Number(t)) = arg_map.get("target").or_else(|| arg_values.get(1)) {
+                        *t as u64
+                    } else {
+                        return Err("fmtstr_got_overwrite() requires target address".to_string());
+                    };
+                    
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(2)) {
+                        *off as usize
+                    } else {
+                        return Err("fmtstr_got_overwrite() requires offset argument".to_string());
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_write(got_entry, target, offset);
+                    
+                    use colored::Colorize;
+                    println!("{} GOT overwrite payload:", "[FMTSTR]".cyan());
+                    println!("  GOT[0x{:x}] → 0x{:x}", got_entry, target);
+                    println!("  Payload size: {} bytes", payload.len().to_string().green());
+                    
+                    Ok(Value::Bytes(payload))
+                }
+                "fmtstr_find_offset" => {
+                    let pattern = arg_map.get("pattern")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "AAAA".to_string());
+                    
+                    let max_offset = if let Some(Value::Number(m)) = arg_map.get("max") {
+                        *m as usize
+                    } else {
+                        50
+                    };
+                    
+                    use colored::Colorize;
+                    println!("{} Finding format string offset...", "[FMTSTR]".cyan());
+                    println!("  Pattern: {}", pattern.yellow());
+                    println!("  Testing offsets 1 to {}", max_offset.to_string().yellow());
+                    println!();
+                    println!("  Send this payload and look for your pattern:");
+                    println!("  {}", format!("{}{}", pattern, ".%p".repeat(max_offset)).green());
+                    println!();
+                    println!("  Then use cyclic_find() to determine the offset");
+                    
+                    Ok(Value::String(format!("{}{}", pattern, ".%p".repeat(max_offset))))
+                }
+                "fmtstr_dump" => {
+                    let start_offset = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.get(0)) {
+                        *s as usize
+                    } else {
+                        1
+                    };
+                    
+                    let count = if let Some(Value::Number(c)) = arg_map.get("count").or_else(|| arg_values.get(1)) {
+                        *c as usize
+                    } else {
+                        20
+                    };
+                    
+                    let mut payload = String::new();
+                    for offset in start_offset..(start_offset + count) {
+                        payload.push_str(&format!("[{}] %{}$p ", offset, offset));
+                    }
+                    
+                    use colored::Colorize;
+                    println!("{} Memory dump payload: {} offsets", 
+                        "[FMTSTR]".cyan(), 
+                        count.to_string().yellow());
+                    
+                    Ok(Value::String(payload))
+                }
+                "fmtstr_analyze" => {
+                    let binary = arg_map.get("binary")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .ok_or("fmtstr_analyze() requires binary path")?;
+                    
+                    use colored::Colorize;
+                    println!("{} Analyzing {} for format string vulnerabilities", 
+                        "[FMTSTR]".cyan(), 
+                        binary.yellow());
+                    println!();
+                    println!("  {}:", "Dangerous functions".yellow());
+                    println!("    • printf, fprintf, sprintf, snprintf");
+                    println!("    • vprintf, vfprintf, vsprintf, vsnprintf");
+                    println!("    • syslog");
+                    println!();
+                    println!("  {}:", "Recommended approach".yellow());
+                    println!("    1. Find the format string offset (fmtstr_find_offset)");
+                    println!("    2. Leak addresses (fmtstr_leak, fmtstr_leak_stack)");
+                    println!("    3. Overwrite GOT entries (fmtstr_got_overwrite)");
+                    println!("    4. Chain to shellcode or ROP");
+                    
+                    Ok(Value::Null)
+                }
                 "interactive" => {
                     if arg_values.is_empty() {
                         return Err("interactive() requires socket/connection argument".to_string());
