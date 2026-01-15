@@ -6,3 +6,4 @@ mod encoding_test;
 mod cyclic_test;
 mod rop_test;
 mod heap_test;
+mod binary_analysis_test;
