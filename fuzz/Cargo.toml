@@ -1,0 +1,30 @@
+[package]
+name = "talon-fuzz"
+version = "0.0.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+talon = { path = ".." }
+
+[[bin]]
+name = "fuzz_rop_gadget_finder"
+path = "fuzz_targets/fuzz_rop_gadget_finder.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_rop_chain_builder"
+path = "fuzz_targets/fuzz_rop_chain_builder.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_auto_solver"
+path = "fuzz_targets/fuzz_auto_solver.rs"
+test = false
+doc = false

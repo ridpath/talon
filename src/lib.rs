@@ -17,6 +17,7 @@ pub mod shellcode_encoders;
 pub mod shellcode_library;
 pub mod srop_tools;
 pub mod heap_tools;
+pub mod heap_grooming;
 pub mod format_string;
 pub mod encoding_tools;
 pub mod binary_analyzer;
@@ -26,6 +27,9 @@ pub mod web_tools;
 pub mod crypto_tools;
 pub mod socket_tools;
 pub mod interactive_io;
+pub mod libc_db;
+pub mod gdb_tools;
+pub mod quick_pwn;
 
 pub mod helpers;
 pub mod output_utils;

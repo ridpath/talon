@@ -138,19 +138,6 @@ debug = false
 lto = "thin"
 codegen-units = 1
 
-# Benchmarks - uncomment when bench files are created
-# [[bench]]
-# name = "parser_bench"
-# harness = false
-# 
-# [[bench]]
-# name = "interpreter_bench"
-# harness = false
-# 
-# [[bench]]
-# name = "binary_analysis_bench"
-# harness = false
-# 
-# [[bench]]
-# name = "rop_bench"
-# harness = false
+[[bench]]
+name = "rop_bench"
+harness = false

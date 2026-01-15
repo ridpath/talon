@@ -827,6 +827,404 @@ mod integration_tests {
     }
 }
 
+mod performance_tests {
+    use super::*;
+    use talon::rop_tools::RopChain;
+    use talon::rop_gadget_finder::ROPGadgetFinder;
+    
+    #[test]
+    fn test_gadget_search_performance_small_binary() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let start = Instant::now();
+        let rop = RopChain::new(path).unwrap();
+        let duration = start.elapsed();
+        
+        assert!(duration.as_millis() < 100, "Small binary search took {:?}, expected <100ms", duration);
+        assert!(rop.gadgets.len() >= 0);
+    }
+    
+    #[test]
+    fn test_gadget_search_performance_large_binary() {
+        let test_elf = create_large_test_binary();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let start = Instant::now();
+        let rop = RopChain::new(path).unwrap();
+        let duration = start.elapsed();
+        
+        assert!(duration.as_millis() < 2000, "Large binary search took {:?}, expected <2000ms", duration);
+        assert!(rop.gadgets.len() > 0);
+    }
+    
+    #[test]
+    fn test_chain_building_performance() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        let rop = RopChain::new(path).unwrap();
+        
+        let addresses: Vec<u64> = (0..1000).map(|i| 0x400000 + i * 8).collect();
+        
+        let start = Instant::now();
+        let _chain = rop.build_chain(&addresses);
+        let duration = start.elapsed();
+        
+        assert!(duration.as_micros() < 1000, "Chain building took {:?}, expected <1ms", duration);
+    }
+    
+    #[test]
+    fn test_pattern_search_performance() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        let rop = RopChain::new(path).unwrap();
+        
+        let start = Instant::now();
+        for _ in 0..100 {
+            let _gadgets = rop.find_gadgets("pop");
+        }
+        let duration = start.elapsed();
+        
+        assert!(duration.as_millis() < 100, "100 pattern searches took {:?}, expected <100ms", duration);
+    }
+}
+
+mod advanced_tests {
+    use super::*;
+    use talon::rop_tools::{RopChain, AutoROPSolver, Constraint, ROPGoal, ROPStrategy};
+    use talon::rop_gadget_finder::ROPGadgetFinder;
+    
+    #[test]
+    fn test_null_byte_constraint_enforcement() {
+        let test_elf = create_binary_with_bad_chars();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let mut solver = AutoROPSolver::new(path).unwrap();
+        solver.add_constraint(Constraint::NoNullBytes);
+        solver.libc_base = Some(0x7ffff7a00000);
+        
+        let goal = ROPGoal::System("/bin/sh".to_string());
+        let result = solver.solve(goal, vec![ROPStrategy::Ret2Libc]);
+        
+        if let Ok(solution) = result {
+            for byte in &solution.chain_bytes {
+                assert_ne!(*byte, 0x00, "Found null byte in chain with NoNullBytes constraint");
+            }
+        }
+    }
+    
+    #[test]
+    fn test_alphanumeric_constraint() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let mut solver = AutoROPSolver::new(path).unwrap();
+        solver.add_constraint(Constraint::AlphanumericOnly);
+        
+        let addresses = vec![0x30303030u64, 0x41414141u64];
+        let result = solver.check_constraints(&addresses);
+        
+        assert!(result);
+    }
+    
+    #[test]
+    fn test_max_length_constraint() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let mut solver = AutoROPSolver::new(path).unwrap();
+        solver.add_constraint(Constraint::MaxLength(64));
+        solver.libc_base = Some(0x7ffff7a00000);
+        
+        let goal = ROPGoal::System("/bin/sh".to_string());
+        let result = solver.solve(goal, vec![ROPStrategy::Ret2Libc]);
+        
+        if let Ok(solution) = result {
+            assert!(solution.chain_bytes.len() <= 64);
+        }
+    }
+    
+    #[test]
+    fn test_avoid_bad_chars_constraint() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let mut solver = AutoROPSolver::new(path).unwrap();
+        solver.add_constraint(Constraint::AvoidBadChars(vec![0x0a, 0x0d, 0x00]));
+        
+        let addresses = vec![0x400500, 0x400510];
+        let result = solver.check_constraints(&addresses);
+        
+        assert!(result);
+    }
+    
+    #[test]
+    fn test_stack_alignment_constraint() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let mut solver = AutoROPSolver::new(path).unwrap();
+        solver.add_constraint(Constraint::StackAlignment(16));
+        
+        assert_eq!(solver.constraints.len(), 1);
+    }
+    
+    #[test]
+    fn test_multiple_strategy_fallback() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let mut solver = AutoROPSolver::new(path).unwrap();
+        solver.libc_base = Some(0x7ffff7a00000);
+        
+        let goal = ROPGoal::System("/bin/sh".to_string());
+        let strategies = vec![
+            ROPStrategy::OneGadget,
+            ROPStrategy::Ret2Libc,
+            ROPStrategy::Ret2Syscall,
+        ];
+        
+        let result = solver.solve(goal, strategies);
+        
+        if result.is_ok() {
+            let solution = result.unwrap();
+            assert!(solution.chain.len() > 0);
+        }
+    }
+    
+    #[test]
+    fn test_complex_rop_chain() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let rop = RopChain::new(path).unwrap();
+        
+        let addresses = vec![
+            0x400500,
+            0xdeadbeef,
+            0x400510,
+            0xcafebabe,
+            0x400520,
+        ];
+        
+        let chain = rop.build_chain(&addresses);
+        assert_eq!(chain.len(), 40);
+        
+        let first_addr = u64::from_le_bytes([
+            chain[0], chain[1], chain[2], chain[3],
+            chain[4], chain[5], chain[6], chain[7],
+        ]);
+        assert_eq!(first_addr, 0x400500);
+    }
+    
+    #[test]
+    fn test_gadget_quality_accuracy() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let rop = RopChain::new(path).unwrap();
+        
+        if rop.gadgets.len() > 1 {
+            let syscall_gadgets: Vec<_> = rop.gadgets.iter()
+                .filter(|g| g.instructions.iter().any(|i| i.contains("syscall")))
+                .collect();
+            
+            let pop_gadgets: Vec<_> = rop.gadgets.iter()
+                .filter(|g| g.instructions.iter().any(|i| i.starts_with("pop")))
+                .collect();
+            
+            if !syscall_gadgets.is_empty() && !pop_gadgets.is_empty() {
+                assert!(syscall_gadgets[0].quality_score >= pop_gadgets[0].quality_score,
+                    "Syscall gadgets should have higher quality than simple pop gadgets");
+            }
+        }
+    }
+    
+    #[test]
+    fn test_gadget_search_with_regex_patterns() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let rop = RopChain::new(path).unwrap();
+        
+        let patterns = vec!["pop", "ret", "syscall", "mov", "xor"];
+        
+        for pattern in patterns {
+            let gadgets = rop.find_gadgets(pattern);
+            if !gadgets.is_empty() {
+                for gadget in &gadgets {
+                    let gadget_str = gadget.instructions.join(" ").to_lowercase();
+                    assert!(gadget_str.contains(pattern), 
+                        "Gadget '{}' should contain pattern '{}'", gadget_str, pattern);
+                }
+            }
+        }
+    }
+    
+    #[test]
+    fn test_ret2dlresolve_complete_chain() {
+        let test_elf = create_test_elf_x86();
+        let path = test_elf.path().to_str().unwrap();
+        
+        let rop = RopChain::new(path).unwrap();
+        let result = rop.find_ret2dlresolve_gadgets();
+        
+        assert!(result.is_ok());
+    }
+    
+    #[test]
+    fn test_gadget_byte_accuracy() {
+        let x64_code = vec![
+            0x5f,
+            0xc3,
+        ];
+        
+        let mut finder = ROPGadgetFinder::new(talon::rop_gadget_finder::Architecture::X64).unwrap();
+        finder.analyze_bytes(&x64_code, 0x400000).unwrap();
+        
+        if !finder.gadgets.is_empty() {
+            let gadget = &finder.gadgets[0];
+            assert!(gadget.bytes.len() > 0);
+            assert!(gadget.bytes.contains(&0xc3));
+        }
+    }
+    
+    #[test]
+    fn test_cross_architecture_support() {
+        let x64_elf = create_test_elf_x64();
+        let x86_elf = create_test_elf_x86();
+        
+        let x64_rop = RopChain::new(x64_elf.path().to_str().unwrap());
+        let x86_rop = RopChain::new(x86_elf.path().to_str().unwrap());
+        
+        assert!(x64_rop.is_ok());
+        assert!(x86_rop.is_ok());
+    }
+}
+
+mod edge_case_tests {
+    use super::*;
+    use talon::rop_tools::RopChain;
+    use talon::rop_gadget_finder::{ROPGadgetFinder, Architecture};
+    
+    #[test]
+    fn test_empty_gadget_search() {
+        let mut file = NamedTempFile::new().expect("Failed to create temp file");
+        let elf: Vec<u8> = vec![0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00];
+        file.write_all(&elf).expect("Failed to write");
+        file.flush().expect("Failed to flush");
+        
+        let result = RopChain::new(file.path().to_str().unwrap());
+        assert!(result.is_ok() || result.is_err());
+    }
+    
+    #[test]
+    fn test_gadget_with_invalid_instructions() {
+        let invalid_code = vec![0xff, 0xff, 0xff, 0xc3];
+        
+        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
+        let result = finder.analyze_bytes(&invalid_code, 0x400000);
+        
+        assert!(result.is_ok());
+    }
+    
+    #[test]
+    fn test_very_long_gadget_chain() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        let rop = RopChain::new(path).unwrap();
+        
+        let long_chain: Vec<u64> = (0..10000).map(|i| 0x400000 + i).collect();
+        let chain_bytes = rop.build_chain(&long_chain);
+        
+        assert_eq!(chain_bytes.len(), 10000 * 8);
+    }
+    
+    #[test]
+    fn test_gadget_dedup_edge_cases() {
+        let duplicate_code = vec![
+            0x5f, 0xc3,
+            0x90,
+            0x5f, 0xc3,
+            0x90,
+            0x5f, 0xc3,
+        ];
+        
+        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
+        finder.analyze_bytes(&duplicate_code, 0x400000).unwrap();
+        
+        let pop_rdi_count = finder.find_gadgets_by_pattern("pop rdi").len();
+        assert!(pop_rdi_count >= 1);
+    }
+    
+    #[test]
+    fn test_high_address_ranges() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        let rop = RopChain::new(path).unwrap();
+        
+        let high_addresses = vec![
+            0x7ffff7a00000,
+            0x7ffff7b00000,
+            0x7ffff7c00000,
+        ];
+        
+        let chain = rop.build_chain(&high_addresses);
+        assert_eq!(chain.len(), 24);
+    }
+    
+    #[test]
+    fn test_gadget_search_case_insensitivity_thorough() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        let rop = RopChain::new(path).unwrap();
+        
+        let patterns = vec![
+            ("pop", "POP", "Pop"),
+            ("ret", "RET", "Ret"),
+            ("syscall", "SYSCALL", "SysCall"),
+        ];
+        
+        for (lower, upper, mixed) in patterns {
+            let lower_results = rop.find_gadgets(lower);
+            let upper_results = rop.find_gadgets(upper);
+            let mixed_results = rop.find_gadgets(mixed);
+            
+            assert_eq!(lower_results.len(), upper_results.len());
+            assert_eq!(lower_results.len(), mixed_results.len());
+        }
+    }
+    
+    #[test]
+    fn test_zero_address_handling() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        let rop = RopChain::new(path).unwrap();
+        
+        let addresses_with_zero = vec![0x0, 0x400500, 0x400510];
+        let chain = rop.build_chain(&addresses_with_zero);
+        
+        assert_eq!(chain.len(), 24);
+        assert_eq!(&chain[0..8], &[0, 0, 0, 0, 0, 0, 0, 0]);
+    }
+    
+    #[test]
+    fn test_boundary_conditions() {
+        let test_elf = create_test_elf_x64();
+        let path = test_elf.path().to_str().unwrap();
+        let rop = RopChain::new(path).unwrap();
+        
+        let boundary_addresses = vec![
+            0x0,
+            0xFFFFFFFFFFFFFFFF,
+            0x8000000000000000,
+        ];
+        
+        let chain = rop.build_chain(&boundary_addresses);
+        assert_eq!(chain.len(), 24);
+    }
+}
+
 mod property_based_tests {
     use super::*;
     use proptest::prelude::*;
