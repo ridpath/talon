@@ -133,6 +133,13 @@ vscode-extension/node_modules/
 vscode-extension/out/
 vscode-extension/*.vsix
 vscode-extension/.vscode-test/
+vscode-extension/package-lock.json
+
+# LSP test artifacts
+tests/lsp_test_output/
+tests/lsp_logs/
+*.lsp.log
+.lsp_cache/
 
 # Cache directories
 .talon/
