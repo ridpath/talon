@@ -1,0 +1,106 @@
+# TALON Fuzzing Configuration
+
+[general]
+max_total_time = 3600
+max_len = 1048576
+timeout = 1200
+rss_limit_mb = 2048
+jobs = 4
+print_final_stats = true
+
+[targets.fuzz_parser]
+priority = 5
+max_len = 100000
+timeout = 30
+dict = "fuzz/dict/parser.dict"
+focus_functions = ["parse_script", "parse_expr", "parse_stmt"]
+
+[targets.fuzz_elf_parser]
+priority = 4
+max_len = 10000000
+timeout = 60
+required_bytes = "\\x7fELF"
+
+[targets.fuzz_pe_parser]
+priority = 4
+max_len = 10000000
+timeout = 60
+required_bytes = "MZ"
+
+[targets.fuzz_shellcode_generator]
+priority = 4
+max_len = 10000
+jobs = 8
+
+[targets.fuzz_format_string]
+priority = 4
+max_len = 10000
+jobs = 8
+
+[targets.fuzz_heap_tools]
+priority = 4
+max_len = 100000
+
+[targets.fuzz_packing_tools]
+priority = 3
+max_len = 10000
+jobs = 16
+
+[targets.fuzz_rop_gadget_finder]
+priority = 4
+max_len = 1000000
+
+[targets.fuzz_rop_chain_builder]
+priority = 3
+max_len = 10000
+
+[targets.fuzz_auto_solver]
+priority = 4
+max_len = 100000
+timeout = 120
+
+[targets.fuzz_interpreter]
+priority = 5
+max_len = 50000
+timeout = 30
+dict = "fuzz/dict/parser.dict"
+
+[targets.fuzz_ast]
+priority = 4
+max_len = 10000
+
+[targets.fuzz_exploit_chain]
+priority = 4
+max_len = 100000
+
+[targets.fuzz_network_protocol]
+priority = 3
+max_len = 65536
+
+[targets.fuzz_crypto_tools]
+priority = 3
+max_len = 10000
+jobs = 8
+
+[targets.fuzz_syscall_chain]
+priority = 4
+max_len = 10000
+
+[targets.fuzz_disassembler]
+priority = 4
+max_len = 100000
+
+[corpus]
+minimize_interval = 3600
+merge_interval = 7200
+export_path = "fuzz/corpus_export"
+
+[sanitizers]
+address_sanitizer = true
+undefined_behavior_sanitizer = false
+memory_sanitizer = false
+thread_sanitizer = false
+
+[coverage]
+track_coverage = true
+coverage_report_interval = 3600

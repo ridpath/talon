@@ -15,6 +15,16 @@ import {
     ServerOptions,
     TransportKind
 } from 'vscode-languageclient/node';
+import {
+    TalonDocumentSymbolProvider,
+    TalonDefinitionProvider,
+    TalonReferenceProvider,
+    TalonRenameProvider,
+    TalonFoldingRangeProvider,
+    TalonCodeLensProvider,
+    TalonInlayHintsProvider,
+    TalonSemanticTokensProvider
+} from './lspFeatures';
 
 let client: LanguageClient;
 const memoryVisualizer = new MemoryVisualizer();
@@ -68,6 +78,23 @@ export function activate(context: vscode.ExtensionContext) {
 
     client.start();
 
+    const talonSelector: vscode.DocumentSelector = { scheme: 'file', language: 'talon' };
+
+    context.subscriptions.push(
+        vscode.languages.registerDocumentSymbolProvider(talonSelector, new TalonDocumentSymbolProvider()),
+        vscode.languages.registerDefinitionProvider(talonSelector, new TalonDefinitionProvider()),
+        vscode.languages.registerReferenceProvider(talonSelector, new TalonReferenceProvider()),
+        vscode.languages.registerRenameProvider(talonSelector, new TalonRenameProvider()),
+        vscode.languages.registerFoldingRangeProvider(talonSelector, new TalonFoldingRangeProvider()),
+        vscode.languages.registerCodeLensProvider(talonSelector, new TalonCodeLensProvider()),
+        vscode.languages.registerInlayHintsProvider(talonSelector, new TalonInlayHintsProvider()),
+        vscode.languages.registerDocumentSemanticTokensProvider(
+            talonSelector,
+            new TalonSemanticTokensProvider(),
+            TalonSemanticTokensProvider.legend
+        )
+    );
+
     context.subscriptions.push(
         vscode.commands.registerCommand('talon.showMemoryVisualizer', () => {
             memoryVisualizer.show(context);
@@ -106,10 +133,10 @@ export function activate(context: vscode.ExtensionContext) {
         }),
         vscode.commands.registerCommand('talon.analyzeExploitability', async () => {
             const message = 'Analyzing target binary for exploitability...\n\n' +
-                '✓ Stack canaries: Disabled\n' +
-                '✓ NX: Disabled\n' +
-                '✓ PIE: Disabled\n' +
-                '✓ RELRO: Partial\n\n' +
+                '[+] Stack canaries: Disabled\n' +
+                '[+] NX: Disabled\n' +
+                '[+] PIE: Disabled\n' +
+                '[+] RELRO: Partial\n\n' +
                 'Vulnerability: Buffer overflow detected\n' +
                 'Exploitability: HIGH';
             vscode.window.showInformationMessage(message, { modal: true });

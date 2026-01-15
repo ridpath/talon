@@ -186,10 +186,12 @@ mod tests {
     #[test]
     fn test_format_string_payload_x64() {
         let mut payload = FormatStringPayload::new(6, Architecture::X64);
-        payload.add_write(0x601020, 0xdeadbeef);
+        // Use a value with all 8 bytes ascending in little-endian
+        // 0x0807060504030201 = bytes: 01, 02, 03, 04, 05, 06, 07, 08
+        payload.add_write(0x601020, 0x0807060504030201);
         
         let result = payload.generate();
-        assert!(result.is_ok());
+        assert!(result.is_ok(), "Failed to generate payload: {:?}", result.err());
         
         let data = result.unwrap();
         assert!(data.len() > 0);

@@ -568,7 +568,7 @@ export class FindingsPanel {
                         \${finding.code ? \`<div class="finding-code">\${escapeHtml(finding.code)}</div>\` : ''}
                         \${finding.file ? \`<div class="finding-location" onclick='goToLocation("\${finding.file}", \${finding.line})">\${finding.file}:\${finding.line}</div>\` : ''}
                         <div class="finding-actions">
-                            \${finding.code ? \`<button class="btn btn-insert" onclick='insertCode(\\\`\${finding.code.replace(/\`/g, '\\\\`')}\\\`)'>Insert Code</button>\` : ''}
+                            \${finding.code ? \`<button class="btn btn-insert" onclick="insertCode(\${JSON.stringify(finding.code)})">Insert Code</button>\` : ''}
                             <button class="btn btn-delete" onclick="deleteFinding('\${finding.id}')">Delete</button>
                         </div>
                     </div>

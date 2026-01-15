@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔒 SHELLCODE ENCODERS - BYPASS FILTERS & BAD CHARS
+// SHELLCODE ENCODERS - BYPASS FILTERS & BAD CHARS
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Shellcode encoder with multiple encoding schemes

@@ -4,7 +4,7 @@ use std::fs;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔍 ELF/PE SYMBOL RESOLUTION - PWNTOOLS-STYLE BINARY CONTEXT
+// ELF/PE SYMBOL RESOLUTION - PWNTOOLS-STYLE BINARY CONTEXT
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// ELF binary context with symbol resolution
@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn test_symbol_lookup() {
         // Would need a real ELF file to test properly
-        let symbols = HashMap::new();
+        let symbols: HashMap<String, u64> = HashMap::new();
         assert!(symbols.get("main").is_none());
     }
 }

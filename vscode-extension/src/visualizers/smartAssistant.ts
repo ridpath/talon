@@ -624,7 +624,7 @@ Or type "help" to see all my capabilities!`;
                                 <div class="code-block">
                                     <pre>\${escapeHtml(msg.code)}</pre>
                                     <div class="code-actions">
-                                        <button class="code-btn" onclick='insertCode(\\\`\${msg.code.replace(/\`/g, '\\\\`')}\\\`)'>Insert into Editor</button>
+                                        <button class="code-btn" onclick="insertCode(\${JSON.stringify(msg.code)})">Insert into Editor</button>
                                     </div>
                                 </div>
                             \` : ''}

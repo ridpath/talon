@@ -48,8 +48,18 @@ tests/output/
 test_results/
 *.test
 *_test.talon
-**/test/
-**/*_test.*
+test_chain_state.json
+stdlib_functions.txt
+extract_functions.ps1
+
+# Keep structured test files
+!tests/**/*.rs
+!tests/**/*.talon
+!tests/**/*.md
+!tests/*_test.rs
+!tests/common_test.rs
+!scripts/test_*.sh
+!scripts/test_*.ps1
 
 # Session/phase completion documentation (generated during development)
 # Keep: README.md, BUILTIN_FUNCTIONS_REFERENCE.md, examples/README.md, vscode-extension/README.md
@@ -123,6 +133,17 @@ vscode-extension/node_modules/
 vscode-extension/out/
 vscode-extension/*.vsix
 vscode-extension/.vscode-test/
+vscode-extension/package-lock.json
+
+# LSP and DAP test artifacts
+tests/lsp_test_output/
+tests/lsp_logs/
+*.lsp.log
+.lsp_cache/
+*.dap.log
+.dap_cache/
+tests/integration/temp/
+tests/integration/output/
 
 # Cache directories
 .talon/
@@ -172,6 +193,16 @@ taint_leak_*.txt
 audit_report_*.json
 vuln_report_*.json
 
+# Security audit artifacts
+audit.log
+cargo-audit.log
+cargo-deny.log
+security_audit_*.log
+security_audit_*.txt
+advisory-db/
+.cargo-audit/
+.cargo-deny/
+
 # Forensics and memory dumps (large/sensitive)
 *.dump
 *.dmp
@@ -183,14 +214,36 @@ heap_dump_*
 *.raw
 
 # Fuzzing artifacts and crash files (can be large)
+# Note: fuzz/corpus/ contains seed inputs and SHOULD be committed
 crashes/
-corpus/
+/corpus/
 queue/
 hangs/
 crash-*
 afl-*
 fuzzer_stats
 crash_*.log
+fuzz/artifacts/
+fuzz/target/
+*.profdata
+*.profraw
+coverage/
+tarpaulin-report.html
+tarpaulin-report.json
+htmlcov/
+.coverage
+
+# Keep fuzzing seed corpus (essential for reproducible fuzzing)
+!fuzz/corpus/
+!fuzz/corpus/**
+
+# Benchmark artifacts
+benchmark-results/
+*_bench_output.txt
+benchmark_*.txt
+benchmark_*.json
+.github/benchmark-baselines/
+criterion-results/
 
 # GDB and debugging artifacts
 .gdb_history
@@ -274,3 +327,40 @@ docker-compose.override.yml
 .dockerenv
 secrets/
 .secrets/
+
+# CI/CD and workflow artifacts
+.github/workflows/*.log
+.github/workflows/artifacts/
+**/.tarpaulin-*.json
+cobertura.xml
+lcov.info
+*.profdata
+*.gcda
+*.gcno
+
+# Pre-commit and git hooks
+.pre-commit-cache/
+.git/hooks/*.backup.*
+.git/hooks/*.sample
+**/.pre-commit-*
+
+# Secrets baseline (detect-secrets)
+.secrets.baseline.bak
+.secrets.baseline.tmp
+
+# Pytest and Python test artifacts
+.pytest_cache/
+.tox/
+htmlcov/
+.hypothesis/
+*.cover
+.coverage.*
+
+# Node.js test artifacts
+coverage-final.json
+.nyc_output/
+
+# Rust test artifacts
+tests/snapshots/*.snap.new
+tests/*.profraw
+tests/*.profdata

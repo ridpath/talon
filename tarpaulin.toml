@@ -1,0 +1,70 @@
+[config]
+# Tarpaulin Configuration for TALON
+
+# Output formats
+out = ["Html", "Xml", "Lcov", "Json"]
+
+# Coverage targets
+run-types = ["Tests", "Doctests"]
+
+# Features to enable
+all-features = true
+workspace = true
+
+# Timeout settings (5 minutes for comprehensive tests)
+timeout = 300
+
+# Excluded paths
+exclude = [
+    "tests/*",
+    "benches/*",
+    "examples/*",
+    "fuzz/*",
+    "vscode-extension/*",
+]
+
+# Excluded files patterns
+exclude-files = [
+    "**/test_*.rs",
+    "**/*_test.rs",
+    "**/bench_*.rs",
+    "**/*_bench.rs",
+]
+
+# Engine settings
+engine = "llvm"
+
+# Coverage thresholds (warning and failure)
+fail-under = 80.0
+
+# Post-run settings
+post-run-hook = ""
+
+# Verbose output
+verbose = true
+
+# CI-specific settings
+[ci]
+fail-under = 80.0
+ignore-panics = false
+
+# Profile configurations
+[profile.quick]
+out = ["Stdout"]
+run-types = ["Tests"]
+timeout = 60
+all-features = false
+
+[profile.comprehensive]
+out = ["Html", "Xml", "Lcov", "Json"]
+run-types = ["Tests", "Doctests"]
+timeout = 600
+all-features = true
+follow-exec = true
+
+[profile.ci]
+out = ["Xml"]
+run-types = ["Tests", "Doctests"]
+timeout = 300
+all-features = true
+fail-under = 80.0

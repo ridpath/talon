@@ -156,11 +156,13 @@ pub fn auto_offset_args(binary: &str) -> Result<usize, String> {
     finder.find_offset(InputMethod::Args)
 }
 
+#[allow(dead_code)]
 pub fn auto_offset_file(binary: &str, filepath: &str) -> Result<usize, String> {
     let finder = OffsetFinder::new(binary.to_string());
     finder.find_offset(InputMethod::File(filepath.to_string()))
 }
 
+#[allow(dead_code)]
 pub fn auto_offset_custom(binary: &str, pattern_size: usize, input_method: &str) -> Result<usize, String> {
     let finder = OffsetFinder::new(binary.to_string()).with_pattern_size(pattern_size);
     

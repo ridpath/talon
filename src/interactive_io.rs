@@ -13,7 +13,7 @@ const DEFAULT_RECV_SIZE: usize = 4096;
 /// Socket connection wrapper with pwntools-style interface
 pub struct Socket {
     stream: TcpStream,
-    buffer: Vec<u8>,
+    _buffer: Vec<u8>,
     timeout: Duration,
 }
 
@@ -40,7 +40,7 @@ impl Socket {
         
         Ok(Socket {
             stream,
-            buffer: Vec::new(),
+            _buffer: Vec::new(),
             timeout: Duration::from_secs(DEFAULT_TIMEOUT_SECS),
         })
     }

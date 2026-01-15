@@ -2,7 +2,7 @@
 // De Bruijn sequence implementation for precise offset calculation
 
 const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
-const ALPHABET_SIZE: usize = 26;
+const _ALPHABET_SIZE: usize = 26;
 const SUBSEQUENCE_LENGTH: usize = 4;
 
 pub struct CyclicPattern {

