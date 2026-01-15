@@ -16,8 +16,7 @@ This repository contains the TALON compiler, interpreter, standard library, expl
 
 > **ALPHA NOTICE**: TALON is under **active development**. Expect breaking changes, experimental syntax, and rapid iteration. Not yet production-safe. Ideal for CTF competitions, red team labs, research, or prototyping offensive techniques.
 
-[![CI](https://github.com/ridpath/talon/workflows/CI/badge.svg)](https://github.com/ridpath/talon/actions/workflows/ci.yml)
-[![Security Audit](https://github.com/ridpath/talon/workflows/Security%20Audit/badge.svg)](https://github.com/ridpath/talon/actions/workflows/security.yml)
+
 [![codecov](https://codecov.io/gh/ridpath/talon/branch/main/graph/badge.svg)](https://codecov.io/gh/ridpath/talon)
 ![status: alpha](https://img.shields.io/badge/status-alpha-yellow)
 ![platform: windows+linux](https://img.shields.io/badge/platform-windows%20%7C%20linux-blue)
