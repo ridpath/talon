@@ -294,11 +294,21 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 
 ## Phase 7: .gitignore Updates & Git Workflow
 
-### [ ] Step: .gitignore Enhancement
+### [x] Step: .gitignore Enhancement
+<!-- chat-id: 59379181-7f84-427b-a982-e5bfb16164c7 -->
 - Add test artifacts patterns
 - Add fuzzing, benchmark, coverage patterns
 - Verify: `git status` shows no unwanted files
 - Unless normally in documentation for scrimpting laguage remove from .gitignore
+- COMPLETED: Fixed fuzzing corpus exclusion (fuzz/corpus/ now tracked as seed inputs)
+- COMPLETED: Added coverage artifacts (htmlcov/, .coverage, etc.)
+- COMPLETED: Enhanced benchmark patterns (criterion-results/, *.json)
+- COMPLETED: Added LSP/DAP test artifacts (*.dap.log, .dap_cache/, tests/integration/temp/)
+- COMPLETED: Added Rust/Python/Node.js test artifacts (snapshots, .pytest_cache, .nyc_output)
+- COMPLETED: Added secrets baseline patterns (.secrets.baseline.bak)
+- VERIFIED: Core documentation files (README.md, CONTRIBUTING.md, etc.) NOT ignored
+- VERIFIED: Build/test/fuzz artifacts correctly ignored
+- VERIFIED: Seed corpus files (fuzz/corpus/) correctly included for tracking
 
 ### [ ] Step: Git Workflow Documentation
 - Write docs/GIT_WORKFLOW.md
