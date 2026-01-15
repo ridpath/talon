@@ -93,14 +93,14 @@ for script in "$EXAMPLES_DIR"/*.talon; do
     
     if [ -n "$TIMEOUT_CMD" ]; then
         if $TIMEOUT_CMD "$TALON_BIN" run "$script" > "$OUTPUT_FILE" 2>&1; then
-            echo -e "${GREEN}✓ PASS${NC}"
+            echo -e "${GREEN}PASS${NC}"
             PASSED_COUNT=$((PASSED_COUNT + 1))
         else
             EXIT_CODE=$?
             if [ $EXIT_CODE -eq 124 ]; then
-                echo -e "${RED}✗ FAIL (timeout)${NC}"
+                echo -e "${RED}FAIL (timeout)${NC}"
             else
-                echo -e "${RED}✗ FAIL (exit code: $EXIT_CODE)${NC}"
+                echo -e "${RED}FAIL (exit code: $EXIT_CODE)${NC}"
             fi
             FAILED_COUNT=$((FAILED_COUNT + 1))
             FAILED_SCRIPTS+=("$script_name")
@@ -113,10 +113,10 @@ for script in "$EXAMPLES_DIR"/*.talon; do
         fi
     else
         if "$TALON_BIN" run "$script" > "$OUTPUT_FILE" 2>&1; then
-            echo -e "${GREEN}✓ PASS${NC}"
+            echo -e "${GREEN}PASS${NC}"
             PASSED_COUNT=$((PASSED_COUNT + 1))
         else
-            echo -e "${RED}✗ FAIL${NC}"
+            echo -e "${RED}FAIL${NC}"
             FAILED_COUNT=$((FAILED_COUNT + 1))
             FAILED_SCRIPTS+=("$script_name")
             

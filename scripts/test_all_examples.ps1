@@ -80,16 +80,16 @@ foreach ($Script in $Scripts) {
         }
         
         if ($TimedOut) {
-            Write-Host "✗ FAIL (timeout)" -ForegroundColor Red
+            Write-Host "FAIL (timeout)" -ForegroundColor Red
             $FailedCount++
             $FailedScripts += $ScriptName
         }
         elseif ($Process.ExitCode -eq 0) {
-            Write-Host "✓ PASS" -ForegroundColor Green
+            Write-Host "PASS" -ForegroundColor Green
             $PassedCount++
         }
         else {
-            Write-Host "✗ FAIL (exit code: $($Process.ExitCode))" -ForegroundColor Red
+            Write-Host "FAIL (exit code: $($Process.ExitCode))" -ForegroundColor Red
             $FailedCount++
             $FailedScripts += $ScriptName
             
@@ -101,7 +101,7 @@ foreach ($Script in $Scripts) {
         }
     }
     catch {
-        Write-Host "✗ FAIL (exception)" -ForegroundColor Red
+        Write-Host "FAIL (exception)" -ForegroundColor Red
         $FailedCount++
         $FailedScripts += $ScriptName
         

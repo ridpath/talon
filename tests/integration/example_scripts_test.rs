@@ -114,17 +114,17 @@ fn test_all_examples_execute() {
         
         match run_example_with_timeout(example) {
             Ok(()) => {
-                println!("✓ PASS");
+                println!("PASS");
                 passed += 1;
                 results.push((example.name.clone(), true, None));
             }
             Err(e) => {
                 if example.expected_to_pass {
-                    println!("✗ FAIL: {}", e);
+                    println!("FAIL: {}", e);
                     failed += 1;
                     results.push((example.name.clone(), false, Some(e)));
                 } else {
-                    println!("⊘ SKIP (expected fail)");
+                    println!("SKIP (expected fail)");
                     skipped += 1;
                 }
             }
