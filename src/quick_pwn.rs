@@ -5,12 +5,11 @@
 // Combines IO + heap + libc + GDB into human-readable DSL
 
 use crate::interactive_io::Socket;
-use crate::heap_tools::{HeapExploit, ModernHeapExploit, GlibcVersion, HeapTechnique, HeapTarget};
+use crate::heap_tools::{ModernHeapExploit, GlibcVersion, HeapTechnique, HeapTarget};
 use crate::heap_grooming::{HeapGroom, GroomingStrategy};
 use crate::libc_db::LibcDatabase;
 use crate::gdb_tools::GdbSession;
 use crate::packing_tools::{pack64 as p64, unpack64};
-use crate::rop_tools::RopChain;
 use std::collections::HashMap;
 
 /// Quick exploitation context - integrates everything
@@ -155,7 +154,7 @@ impl QuickPwn {
         }
         
         // Otherwise leak from output
-        let output = self.recvuntil(marker)?;
+        let _output = self.recvuntil(marker)?;
         
         // Extract address (assume it's after marker)
         let leak_data = self.recv(8)?;
@@ -231,7 +230,7 @@ impl QuickPwn {
         let bin_sh = self.symbol(libc_name, "/bin/sh")?;
         
         // Get pop rdi gadget
-        let pop_rdi = if let Some(ref mut gdb) = self.gdb.as_ref() {
+        let pop_rdi = if let Some(_gdb) = self.gdb.as_ref() {
             // This is a workaround since we can't mutably borrow self
             0x0 // TODO: Fix this properly
         } else {

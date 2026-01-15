@@ -1,25 +1,23 @@
 use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
-use talon::parser::TalonParser;
+use talon::parser::parse_script;
 
 fn bench_expression_parsing(c: &mut Criterion) {
     let mut group = c.benchmark_group("expression_parsing");
     
     let expressions = vec![
-        ("simple_literal", "42"),
-        ("string_literal", r#""hello world""#),
-        ("simple_arithmetic", "1 + 2 * 3"),
-        ("complex_arithmetic", "(10 + 20) * (30 - 15) / 5"),
+        ("simple_literal", "let x = 42"),
+        ("string_literal", r#"let x = "hello world""#),
+        ("simple_arithmetic", "let x = 1 + 2 * 3"),
+        ("complex_arithmetic", "let x = (10 + 20) * (30 - 15) / 5"),
         ("function_call", "print(\"hello\")"),
-        ("nested_function", "p64(u64(leak) + 0x1234)"),
-        ("array_indexing", "array[0][1][2]"),
-        ("method_chain", "rop.find(\"pop rdi\").build().execute()"),
+        ("nested_function", "let x = p64(u64(leak) + 0x1234)"),
+        ("array_indexing", "let x = array[0][1][2]"),
     ];
     
     for (name, expr) in expressions.iter() {
         group.bench_with_input(BenchmarkId::from_parameter(name), expr, |b, &expr| {
             b.iter(|| {
-                let parser = TalonParser::new();
-                let result = parser.parse_expression(black_box(expr));
+                let result = parse_script(black_box(expr));
                 black_box(result.is_ok());
             });
         });
@@ -33,18 +31,17 @@ fn bench_statement_parsing(c: &mut Criterion) {
     
     let statements = vec![
         ("variable_declaration", "let x = 42"),
-        ("if_statement", "if x > 10 { print(x) }"),
-        ("while_loop", "while x < 100 { x = x + 1 }"),
-        ("for_loop", "for i in range(0, 10) { print(i) }"),
-        ("function_definition", "fn add(a, b) { return a + b }"),
+        ("if_statement", "if x > 10\nprint(x)\nend"),
+        ("while_loop", "while x < 100\nx = x + 1\nend"),
+        ("for_loop", "for i in range(0, 10)\nprint(i)\nend"),
+        ("function_definition", "fn add(a, b)\nreturn a + b\nend"),
         ("return_statement", "return 42"),
     ];
     
     for (name, stmt) in statements.iter() {
         group.bench_with_input(BenchmarkId::from_parameter(name), stmt, |b, &stmt| {
             b.iter(|| {
-                let parser = TalonParser::new();
-                let result = parser.parse_statement(black_box(stmt));
+                let result = parse_script(black_box(stmt));
                 black_box(result.is_ok());
             });
         });
@@ -118,24 +115,21 @@ fn bench_full_script_parsing(c: &mut Criterion) {
     
     group.bench_function("small_script", |b| {
         b.iter(|| {
-            let parser = TalonParser::new();
-            let result = parser.parse(black_box(small_script));
+            let result = parse_script(black_box(small_script));
             black_box(result.is_ok());
         });
     });
     
     group.bench_function("medium_script", |b| {
         b.iter(|| {
-            let parser = TalonParser::new();
-            let result = parser.parse(black_box(medium_script));
+            let result = parse_script(black_box(medium_script));
             black_box(result.is_ok());
         });
     });
     
     group.bench_function("large_script", |b| {
         b.iter(|| {
-            let parser = TalonParser::new();
-            let result = parser.parse(black_box(large_script));
+            let result = parse_script(black_box(large_script));
             black_box(result.is_ok());
         });
     });
@@ -155,8 +149,7 @@ fn bench_error_recovery(c: &mut Criterion) {
     for (name, script) in invalid_scripts.iter() {
         group.bench_with_input(BenchmarkId::from_parameter(name), script, |b, &script| {
             b.iter(|| {
-                let parser = TalonParser::new();
-                let result = parser.parse(black_box(script));
+                let result = parse_script(black_box(script));
                 black_box(result.is_err());
             });
         });
@@ -173,15 +166,13 @@ fn bench_complex_expressions(c: &mut Criterion) {
             BenchmarkId::from_parameter(nesting_level),
             nesting_level,
             |b, &level| {
-                let expr = (0..level)
-                    .map(|_| "(")
-                    .collect::<String>()
+                let expr = "let x = ".to_string()
+                    + &(0..level).map(|_| "(").collect::<String>()
                     + "42"
                     + &(0..level).map(|_| ")").collect::<String>();
                 
                 b.iter(|| {
-                    let parser = TalonParser::new();
-                    let result = parser.parse_expression(black_box(&expr));
+                    let result = parse_script(black_box(&expr));
                     black_box(result.is_ok());
                 });
             },

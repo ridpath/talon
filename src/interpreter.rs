@@ -1542,7 +1542,7 @@ fn interpret_with_scope<'a>(
                 println!("[SYMBIOTIC] Synchronizing all symlinks");
             }
             
-            Command::Achieve { goal, address, value, constraints, primitives } => {
+            Command::Achieve { goal, address: _, value: _, constraints, primitives } => {
                 println!("[GOAL-PLANNER] Synthesizing exploit for goal: {}", goal);
                 if !constraints.is_empty() {
                     println!("[GOAL-PLANNER]   Constraints: {:?}", constraints);
@@ -1552,7 +1552,7 @@ fn interpret_with_scope<'a>(
                 }
             }
             
-            Command::DefineStrategy { name, parameters, implementation } => {
+            Command::DefineStrategy { name, parameters, implementation: _ } => {
                 println!("[STRATEGY] Defining strategy: {} with {} parameters", name, parameters.len());
             }
             
@@ -1884,7 +1884,7 @@ fn eval_expr<'a>(
                     // Apply encoding if requested
                     if let Some(encoder) = arg_map.get("encoder").map(|v| v.to_string()) {
                         use crate::shellcode_encoders::ShellcodeEncoder;
-                        let mut enc = ShellcodeEncoder::new(shellcode.clone());
+                        let enc = ShellcodeEncoder::new(shellcode.clone());
                         
                         shellcode = match encoder.as_str() {
                             "xor" => {

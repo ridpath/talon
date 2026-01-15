@@ -141,18 +141,21 @@ debug = false
 lto = "thin"
 codegen-units = 1
 
-[[bench]]
-name = "rop_bench"
-harness = false
+# Disabled pending API updates
+# [[bench]]
+# name = "rop_bench"
+# harness = false
 
 [[bench]]
 name = "parser_bench"
 harness = false
 
-[[bench]]
-name = "interpreter_bench"
-harness = false
+# Disabled pending interpreter API
+# [[bench]]
+# name = "interpreter_bench"
+# harness = false
 
-[[bench]]
-name = "binary_analysis_bench"
-harness = false
+# Disabled pending API updates
+# [[bench]]
+# name = "binary_analysis_bench"
+# harness = false

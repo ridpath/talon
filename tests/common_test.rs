@@ -125,8 +125,8 @@ fn test_rop_gadget_binary_generation() {
     assert!(binary.len() >= 1024);
     assert_eq!(&binary[0..4], &[0x7f, 0x45, 0x4c, 0x46]);
     
-    assert!(binary.contains(&[0x5f, 0xc3]));
-    assert!(binary.contains(&[0x5e, 0xc3]));
+    assert!(binary.windows(2).any(|w| w == [0x5f, 0xc3]));
+    assert!(binary.windows(2).any(|w| w == [0x5e, 0xc3]));
 }
 
 #[test]
