@@ -48,6 +48,8 @@ tests/output/
 test_results/
 *.test
 *_test.talon
+stdlib_functions.txt
+extract_functions.ps1
 
 # Keep structured test files
 !tests/**/*.rs

@@ -38,13 +38,47 @@ This repository contains the TALON compiler, interpreter, standard library, expl
 
 ---
 
-## Quick Start
+## Installation
 
+### Prerequisites
+
+**Linux/macOS**
+```bash
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+```
+
+**Windows**
+```powershell
+# Download and install from https://rustup.rs
+# Or use winget:
+winget install Rustlang.Rustup
+```
+
+### Build from Source
+
+**Linux/macOS**
 ```bash
 git clone https://github.com/ridpath/talon.git
 cd talon
 cargo build --release
 ./target/release/talon repl
+```
+
+**Windows (PowerShell)**
+```powershell
+git clone https://github.com/ridpath/talon.git
+cd talon
+cargo build --release
+.\target\release\talon.exe repl
+```
+
+**Windows (CMD)**
+```cmd
+git clone https://github.com/ridpath/talon.git
+cd talon
+cargo build --release
+target\release\talon.exe repl
 ```
 
 ---
