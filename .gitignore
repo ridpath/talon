@@ -48,6 +48,7 @@ tests/output/
 test_results/
 *.test
 *_test.talon
+test_chain_state.json
 stdlib_functions.txt
 extract_functions.ps1
 
