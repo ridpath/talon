@@ -1813,6 +1813,279 @@ fn eval_expr<'a>(
                         Ok(Value::List(addresses))
                     }
                 }
+                "rop_new" => {
+                    if arg_values.is_empty() {
+                        return Err("rop_new() requires binary path argument".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} ROP chain initialized", "[ROP]".cyan());
+                    println!("  Binary: {}", binary.yellow());
+                    println!("  Gadgets found: {}", chain.gadgets.len().to_string().green());
+                    println!("  Architecture: {:?}", chain.arch);
+                    
+                    Ok(Value::String(format!("RopChain[{}]", binary)))
+                }
+                "rop_set_libc" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_set_libc() requires binary path and libc base address".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let base = if let Value::Number(n) = &arg_values[1] {
+                        *n as u64
+                    } else {
+                        return Err("rop_set_libc() requires numeric libc base address".to_string());
+                    };
+                    
+                    let mut chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    chain.set_libc_base(base);
+                    
+                    use colored::Colorize;
+                    println!("{} libc base set to 0x{:x}", "[ROP]".cyan(), base);
+                    Ok(Value::Null)
+                }
+                "rop_find_gadget" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_find_gadget() requires binary path and pattern".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let pattern = arg_values[1].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    if let Some(addr) = chain.find_gadget(&pattern) {
+                        use colored::Colorize;
+                        println!("{} Gadget found: {} @ 0x{:016x}", "[ROP]".cyan(), pattern.yellow(), addr);
+                        Ok(Value::Number(addr as i64))
+                    } else {
+                        Err(format!("Gadget not found: {}", pattern))
+                    }
+                }
+                "rop_find_gadgets" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_find_gadgets() requires binary path and pattern".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let pattern = arg_values[1].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    let gadgets = chain.find_gadgets(&pattern);
+                    use colored::Colorize;
+                    println!("{} Found {} gadgets matching '{}'", "[ROP]".cyan(), gadgets.len().to_string().green(), pattern.yellow());
+                    
+                    let addresses: Vec<Value> = gadgets.iter()
+                        .map(|g| Value::Number(g.address as i64))
+                        .collect();
+                    Ok(Value::List(addresses))
+                }
+                "rop_build_chain" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_build_chain() requires binary path and address list".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    
+                    let addresses: Vec<u64> = if let Value::List(list) = &arg_values[1] {
+                        list.iter()
+                            .map(|v| match v {
+                                Value::Number(n) => *n as u64,
+                                _ => 0,
+                            })
+                            .collect()
+                    } else {
+                        return Err("rop_build_chain() requires list of addresses".to_string());
+                    };
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    let chain_bytes = chain.build_chain(&addresses);
+                    use colored::Colorize;
+                    println!("{} ROP chain built: {} gadgets, {} bytes", 
+                        "[ROP]".cyan(), 
+                        addresses.len().to_string().green(), 
+                        chain_bytes.len().to_string().yellow());
+                    
+                    Ok(Value::Bytes(chain_bytes))
+                }
+                "rop_ret2libc" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_ret2libc() requires binary path and command".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let cmd = arg_values[1].to_string();
+                    
+                    let mut chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    if let Some(Value::Number(base)) = arg_map.get("libc_base") {
+                        chain.set_libc_base(*base as u64);
+                    }
+                    
+                    let addresses = chain.ret2libc(&cmd)
+                        .map_err(|e| format!("ret2libc failed: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} ret2libc chain created", "[ROP]".cyan());
+                    println!("  Command: {}", cmd.yellow());
+                    println!("  Chain length: {} gadgets", addresses.len().to_string().green());
+                    
+                    let chain_bytes = chain.build_chain(&addresses);
+                    Ok(Value::Bytes(chain_bytes))
+                }
+                "rop_ret2syscall" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_ret2syscall() requires binary path and syscall number".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let syscall_num = if let Value::Number(n) = &arg_values[1] {
+                        *n as u64
+                    } else {
+                        return Err("rop_ret2syscall() requires numeric syscall number".to_string());
+                    };
+                    
+                    let mut chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    let arg1 = if let Some(Value::Number(n)) = arg_map.get("arg1") { *n as u64 } else { 0 };
+                    let arg2 = if let Some(Value::Number(n)) = arg_map.get("arg2") { *n as u64 } else { 0 };
+                    let arg3 = if let Some(Value::Number(n)) = arg_map.get("arg3") { *n as u64 } else { 0 };
+                    
+                    let addresses = chain.ret2syscall(syscall_num, arg1, arg2, arg3)
+                        .map_err(|e| format!("ret2syscall failed: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} ret2syscall chain created", "[ROP]".cyan());
+                    println!("  Syscall: {}", syscall_num.to_string().yellow());
+                    println!("  Chain length: {} gadgets", addresses.len().to_string().green());
+                    
+                    let chain_bytes = chain.build_chain(&addresses);
+                    Ok(Value::Bytes(chain_bytes))
+                }
+                "rop_solve" => {
+                    use crate::rop_tools::{AutoROPSolver, ROPGoal, ROPStrategy};
+                    
+                    if arg_values.len() < 2 {
+                        return Err("rop_solve() requires binary path and goal type".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let goal_type = arg_values[1].to_string();
+                    
+                    let mut solver = AutoROPSolver::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP solver: {}", e))?;
+                    
+                    if let Some(Value::Number(base)) = arg_map.get("libc_base") {
+                        solver.libc_base = Some(*base as u64);
+                    }
+                    
+                    let goal = match goal_type.as_str() {
+                        "system" => {
+                            let cmd = arg_map.get("cmd")
+                                .or_else(|| arg_values.get(2))
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "/bin/sh".to_string());
+                            ROPGoal::System(cmd)
+                        }
+                        "execve" => {
+                            let cmd = arg_map.get("cmd")
+                                .or_else(|| arg_values.get(2))
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "/bin/sh".to_string());
+                            ROPGoal::Execve(cmd, vec![])
+                        }
+                        "mprotect" => {
+                            let addr = if let Some(Value::Number(n)) = arg_map.get("addr") { *n as u64 } else { 0x600000 };
+                            let size = if let Some(Value::Number(n)) = arg_map.get("size") { *n as u64 } else { 0x1000 };
+                            let perms = if let Some(Value::Number(n)) = arg_map.get("perms") { *n as u64 } else { 7 };
+                            ROPGoal::Mprotect(addr, size, perms)
+                        }
+                        _ => return Err(format!("Unknown goal type: {}", goal_type)),
+                    };
+                    
+                    let strategies = if let Some(Value::List(strats)) = arg_map.get("strategies") {
+                        strats.iter()
+                            .filter_map(|v| {
+                                match v.to_string().as_str() {
+                                    "one_gadget" => Some(ROPStrategy::OneGadget),
+                                    "ret2libc" => Some(ROPStrategy::Ret2Libc),
+                                    "mprotect_rwx" => Some(ROPStrategy::MprotectRWX),
+                                    "ret2syscall" => Some(ROPStrategy::Ret2Syscall),
+                                    "srop" => Some(ROPStrategy::SROP),
+                                    "jop" => Some(ROPStrategy::JOP),
+                                    "cop" => Some(ROPStrategy::COP),
+                                    "stack_pivot" => Some(ROPStrategy::StackPivot),
+                                    _ => None,
+                                }
+                            })
+                            .collect()
+                    } else {
+                        vec![ROPStrategy::Ret2Libc, ROPStrategy::Ret2Syscall]
+                    };
+                    
+                    let solution = solver.solve(goal, strategies)
+                        .map_err(|e| format!("ROP solver failed: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} ROP solution found!", "[SOLVER]".cyan().bold());
+                    println!("  Strategy: {}", solution.strategy.green());
+                    println!("  Gadgets used: {}", solution.gadgets_used.len().to_string().yellow());
+                    println!("  Payload size: {} bytes", solution.chain_bytes.len().to_string().yellow());
+                    println!("  Success probability: {:.1}%", (solution.success_probability * 100.0).to_string().green());
+                    
+                    Ok(Value::Bytes(solution.chain_bytes))
+                }
+                "rop_list_gadgets" => {
+                    if arg_values.is_empty() {
+                        return Err("rop_list_gadgets() requires binary path".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    crate::rop_tools::list_common_gadgets(&chain);
+                    Ok(Value::Null)
+                }
+                "rop_search" => {
+                    if arg_values.len() < 2 {
+                        return Err("rop_search() requires binary path and instruction pattern".to_string());
+                    }
+                    let binary = arg_values[0].to_string();
+                    let pattern = arg_values[1].to_string();
+                    
+                    let chain = crate::rop_tools::RopChain::new(&binary)
+                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
+                    
+                    let gadgets = chain.find_gadgets(&pattern);
+                    
+                    use colored::Colorize;
+                    println!("{} ROP Gadget Search Results", "[ROP]".cyan().bold());
+                    println!("  Pattern: {}", pattern.yellow());
+                    println!("  Found: {} gadgets\n", gadgets.len().to_string().green());
+                    
+                    for (i, gadget) in gadgets.iter().take(20).enumerate() {
+                        println!("  {}. 0x{:016x}: {}", 
+                            i + 1, 
+                            gadget.address, 
+                            gadget.instructions.join("; ").cyan());
+                    }
+                    
+                    if gadgets.len() > 20 {
+                        println!("\n  ... and {} more", gadgets.len() - 20);
+                    }
+                    
+                    let addresses: Vec<Value> = gadgets.iter()
+                        .map(|g| Value::Number(g.address as i64))
+                        .collect();
+                    Ok(Value::List(addresses))
+                }
                 "fmtstr_payload" => {
                     let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(0)) {
                         *off as usize
