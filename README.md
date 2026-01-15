@@ -42,43 +42,108 @@ This repository contains the TALON compiler, interpreter, standard library, expl
 
 ### Prerequisites
 
-**Linux/macOS**
+#### Linux (Ubuntu/Debian)
 ```bash
+# Install Rust toolchain
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 source $HOME/.cargo/env
+
+# Install build essentials (required for linking)
+sudo apt-get update
+sudo apt-get install build-essential pkg-config libssl-dev
 ```
 
-**Windows**
+#### Linux (Fedora/RHEL/CentOS)
+```bash
+# Install Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# Install development tools
+sudo dnf groupinstall "Development Tools"
+sudo dnf install openssl-devel pkg-config
+```
+
+#### macOS
+```bash
+# Install Rust toolchain
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# Install Xcode Command Line Tools (if not already installed)
+xcode-select --install
+```
+
+#### Windows
+
+**Option 1: Using winget (Windows 10/11)**
 ```powershell
-# Download and install from https://rustup.rs
-# Or use winget:
+# Install Rust
 winget install Rustlang.Rustup
+
+# Install Visual Studio Build Tools (required for linking)
+winget install Microsoft.VisualStudio.2022.BuildTools --override "--quiet --wait --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
+
+# Restart terminal to refresh PATH
+```
+
+**Option 2: Manual Installation**
+1. Download and install Rust from https://rustup.rs
+2. Download and install Visual Studio Build Tools: https://visualstudio.microsoft.com/downloads/#build-tools-for-visual-studio-2022
+   - Select "Desktop development with C++" workload
+3. Restart your terminal
+
+**Option 3: Using MinGW (alternative to MSVC)**
+```powershell
+# Download MinGW-w64 from: https://github.com/niXman/mingw-builds-binaries/releases
+# Extract to C:\mingw64 and add C:\mingw64\bin to PATH
+
+# Then configure Rust to use GNU toolchain:
+rustup default stable-x86_64-pc-windows-gnu
 ```
 
 ### Build from Source
 
-**Linux/macOS**
+#### Linux/macOS
 ```bash
 git clone https://github.com/ridpath/talon.git
 cd talon
 cargo build --release
+./target/release/talon --version
 ./target/release/talon repl
 ```
 
-**Windows (PowerShell)**
+#### Windows (PowerShell)
 ```powershell
 git clone https://github.com/ridpath/talon.git
 cd talon
 cargo build --release
+.\target\release\talon.exe --version
 .\target\release\talon.exe repl
 ```
 
-**Windows (CMD)**
+#### Windows (CMD)
 ```cmd
 git clone https://github.com/ridpath/talon.git
 cd talon
 cargo build --release
+target\release\talon.exe --version
 target\release\talon.exe repl
+```
+
+### Quick Install (All Platforms)
+
+After installing prerequisites above:
+```bash
+# Linux/macOS
+cargo install --path .
+
+# Windows
+cargo install --path .
+
+# Then run from anywhere:
+talon --version
+talon repl
 ```
 
 ---

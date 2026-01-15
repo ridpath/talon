@@ -46,7 +46,9 @@
         "runtime": "node",
         "configurationAttributes": {
           "launch": {
-            "required": ["program"],
+            "required": [
+              "program"
+            ],
             "properties": {
               "program": {
                 "type": "string",
@@ -103,8 +105,13 @@
     "languages": [
       {
         "id": "talon",
-        "aliases": ["TALON", "talon"],
-        "extensions": [".talon"],
+        "aliases": [
+          "TALON",
+          "talon"
+        ],
+        "extensions": [
+          ".talon"
+        ],
         "configuration": "./language-configuration.json"
       }
     ],
@@ -339,12 +346,18 @@
     "lint": "eslint src --ext ts"
   },
   "devDependencies": {
+    "@types/mocha": "^10.0.10",
     "@types/node": "^16.x",
     "@types/vscode": "^1.70.0",
     "@typescript-eslint/eslint-plugin": "^5.x",
     "@typescript-eslint/parser": "^5.x",
+    "@vscode/debugadapter": "^1.68.0",
+    "@vscode/debugprotocol": "^1.68.0",
     "eslint": "^8.x",
-    "typescript": "^4.9.x"
+    "mocha": "^11.7.5",
+    "typescript": "^4.9.x",
+    "vscode-languageserver": "^9.0.1",
+    "vscode-languageserver-textdocument": "^1.0.12"
   },
   "dependencies": {
     "vscode-languageclient": "^8.0.0"

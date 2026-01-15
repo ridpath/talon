@@ -150,16 +150,11 @@ export class TalonDebugSession extends DebugSession {
             
             if (result.includes('done')) {
                 const bpId = this.parseBreakpointId(result);
-                breakpoints.push({
-                    verified: true,
-                    line: line,
-                    id: bpId
-                });
+                const bp = new Breakpoint(true, line);
+                bp.setId(bpId);
+                breakpoints.push(bp);
             } else {
-                breakpoints.push({
-                    verified: false,
-                    line: line
-                });
+                breakpoints.push(new Breakpoint(false, line));
             }
         }
 
