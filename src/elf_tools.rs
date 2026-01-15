@@ -288,7 +288,7 @@ mod tests {
     #[test]
     fn test_symbol_lookup() {
         // Would need a real ELF file to test properly
-        let symbols = HashMap::new();
+        let symbols: HashMap<String, u64> = HashMap::new();
         assert!(symbols.get("main").is_none());
     }
 }
