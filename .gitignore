@@ -55,6 +55,8 @@ test_results/
 !tests/**/*.md
 !tests/*_test.rs
 !tests/common_test.rs
+!scripts/test_*.sh
+!scripts/test_*.ps1
 
 # Session/phase completion documentation (generated during development)
 # Keep: README.md, BUILTIN_FUNCTIONS_REFERENCE.md, examples/README.md, vscode-extension/README.md

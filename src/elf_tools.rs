@@ -4,7 +4,7 @@ use std::fs;
 use std::collections::HashMap;
 
 // ═══════════════════════════════════════════════════════════════════════════
-// 🔍 ELF/PE SYMBOL RESOLUTION - PWNTOOLS-STYLE BINARY CONTEXT
+// ELF/PE SYMBOL RESOLUTION - PWNTOOLS-STYLE BINARY CONTEXT
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// ELF binary context with symbol resolution

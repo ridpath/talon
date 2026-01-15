@@ -117,6 +117,9 @@ serial_test = "3.0"
 rstest = "0.18"
 insta = "1.34"
 
+# Timeout support for tests
+wait-timeout = "0.2"
+
 [features]
 default = []
 llvm = ["inkwell"]
