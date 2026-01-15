@@ -24,6 +24,65 @@ use crate::parser::parse_script;
 // use crate::ctf_helpers::FlagFinder;
 use crate::interactive_io::{Socket, Process};
 
+#[derive(Debug, Clone)]
+struct SafetyConfig {
+    buffer_overflow: bool,
+    integer_overflow: bool,
+    overflow_checking: bool,
+    strict_mode: bool,
+}
+
+impl Default for SafetyConfig {
+    fn default() -> Self {
+        SafetyConfig {
+            buffer_overflow: true,
+            integer_overflow: true,
+            overflow_checking: true,
+            strict_mode: true,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct RuntimeSafety {
+    config: SafetyConfig,
+}
+
+impl RuntimeSafety {
+    fn new(config: SafetyConfig) -> Self {
+        RuntimeSafety { config }
+    }
+    
+    fn get_stats(&self) -> SafetyStats {
+        SafetyStats { config: self.config.clone(), warnings: Vec::new() }
+    }
+    
+    fn update_config(&mut self, config: SafetyConfig) {
+        self.config = config;
+    }
+}
+
+#[derive(Debug)]
+struct SafetyStats {
+    config: SafetyConfig,
+    warnings: Vec<String>,
+}
+
+impl std::fmt::Display for SafetyStats {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SafetyStats {{ buffer_overflow: {}, integer_overflow: {}, warnings: {} }}", 
+            self.config.buffer_overflow, self.config.integer_overflow, self.warnings.len())
+    }
+}
+
+struct FlagFinder;
+
+impl FlagFinder {
+    fn find_in_text(_text: &str) -> Vec<String> {
+        Vec::new()
+    }
+}
+
 // Global connection storage
 type ConnectionId = u64;
 

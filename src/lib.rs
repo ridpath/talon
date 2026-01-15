@@ -30,6 +30,7 @@ pub mod interactive_io;
 pub mod libc_db;
 pub mod gdb_tools;
 pub mod quick_pwn;
+pub mod parallel_exploit;
 
 pub mod helpers;
 pub mod output_utils;
