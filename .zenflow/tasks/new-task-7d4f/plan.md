@@ -368,6 +368,7 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
   - Security audit results
 
 ### [ ] Step: Final Git Commit
+<!-- chat-id: d79c4a02-b894-46e7-9761-459a52592c54 -->
 - Review all changes
 - Run pre-commit hooks
 - Create feature branch: `feature/comprehensive-testing`
