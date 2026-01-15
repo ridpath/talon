@@ -48,8 +48,13 @@ tests/output/
 test_results/
 *.test
 *_test.talon
-**/test/
-**/*_test.*
+
+# Keep structured test files
+!tests/**/*.rs
+!tests/**/*.talon
+!tests/**/*.md
+!tests/*_test.rs
+!tests/common_test.rs
 
 # Session/phase completion documentation (generated during development)
 # Keep: README.md, BUILTIN_FUNCTIONS_REFERENCE.md, examples/README.md, vscode-extension/README.md
@@ -191,6 +196,14 @@ crash-*
 afl-*
 fuzzer_stats
 crash_*.log
+fuzz/corpus/
+fuzz/artifacts/
+target/criterion/
+*.profdata
+*.profraw
+coverage/
+tarpaulin-report.html
+tarpaulin-report.json
 
 # GDB and debugging artifacts
 .gdb_history
