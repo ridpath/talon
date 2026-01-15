@@ -2898,22 +2898,6 @@ fn eval_expr<'a>(
                         Err(e) => Err(format!("asm() failed: {}", e)),
                     }
                 }
-                "disasm" => {
-                    let bytes = match arg_values.get(0) {
-                        Some(Value::Bytes(b)) => b,
-                        _ => return Err("disasm() requires bytes argument".to_string()),
-                    };
-                    let arch = match arg_values.get(1) {
-                        Some(Value::String(s)) => s.as_str(),
-                        _ => "x64",
-                    };
-                    
-                    use crate::packing_tools;
-                    match packing_tools::disassemble(bytes, arch, 0) {
-                        Ok(asm) => Ok(Value::String(asm)),
-                        Err(e) => Err(format!("disasm() failed: {}", e)),
-                    }
-                }
                 "enhex" | "hexdump" => {
                     let data = match arg_values.get(0) {
                         Some(Value::Bytes(b)) => b,
@@ -4402,17 +4386,6 @@ fn eval_expr<'a>(
                             Ok(Value::String(format!("Report '{}' generated", name)))
                         }
                         _ => Err("report() requires (string name, data)".into())
-                    }
-                }
-                "asm" => {
-                    if arg_values.len() < 2 {
-                        return Err("asm() requires 2 arguments: asm(arch, assembly_code)".into());
-                    }
-                    match (&arg_values[0], &arg_values[1]) {
-                        (Value::String(_arch), Value::String(_code)) => {
-                            Ok(Value::Bytes(vec![0x90, 0x90, 0x90]))
-                        }
-                        _ => Err("asm() requires (string arch, string assembly_code)".into())
                     }
                 }
                 "ffi_call" => {

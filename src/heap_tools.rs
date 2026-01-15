@@ -748,7 +748,7 @@ impl ModernHeapExploit {
         ptr ^ (pos >> 12)
     }
     
-    fn safe_linking_demangle(&self, pos: u64, mangled: u64) -> u64 {
+    pub fn safe_linking_demangle(&self, pos: u64, mangled: u64) -> u64 {
         mangled ^ (pos >> 12)
     }
     

@@ -15,7 +15,7 @@ pub struct GdbSession {
     stdin: ChildStdin,
     stdout: BufReader<ChildStdout>,
     breakpoints: Vec<u64>,
-    registers: HashMap<String, u64>,
+    _registers: HashMap<String, u64>,
 }
 
 impl GdbSession {
@@ -57,7 +57,7 @@ impl GdbSession {
             stdin,
             stdout,
             breakpoints: Vec::new(),
-            registers: HashMap::new(),
+            _registers: HashMap::new(),
         })
     }
     

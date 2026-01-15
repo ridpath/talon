@@ -57,7 +57,7 @@ pub struct SimilarityResult {
 }
 
 pub struct SimilarityEngine {
-    function_embeddings: HashMap<String, FunctionEmbedding>,
+    _function_embeddings: HashMap<String, FunctionEmbedding>,
     known_vulnerable_patterns: HashMap<String, Vec<f32>>,
     vendor_signatures: HashMap<String, Vec<Vec<f32>>>,
 }
@@ -69,7 +69,7 @@ impl SimilarityEngine {
         println!("╚═══════════════════════════════════════════════════════════════╝");
         
         let mut engine = SimilarityEngine {
-            function_embeddings: HashMap::new(),
+            _function_embeddings: HashMap::new(),
             known_vulnerable_patterns: HashMap::new(),
             vendor_signatures: HashMap::new(),
         };

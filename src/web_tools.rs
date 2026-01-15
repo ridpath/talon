@@ -8,8 +8,8 @@ use reqwest::blocking::Client;
 
 // Constants for web exploitation
 const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 10;
-const XSS_TEST_TIMEOUT_SECS: u64 = 5;
-const SSRF_TIMEOUT_SECS: u64 = 3;
+const _XSS_TEST_TIMEOUT_SECS: u64 = 5;
+const _SSRF_TIMEOUT_SECS: u64 = 3;
 
 // ────────────────────────────────────────────────────────────────────────────
 // SQL INJECTION

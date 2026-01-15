@@ -3,16 +3,19 @@ use std::process::Command;
 use regex::Regex;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct GdbRegisterState {
     pub registers: HashMap<String, u64>,
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct GdbBacktrace {
     pub frames: Vec<GdbFrame>,
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct GdbFrame {
     pub level: usize,
     pub address: u64,
@@ -21,6 +24,7 @@ pub struct GdbFrame {
 }
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct GdbCrashInfo {
     pub signal: String,
     pub crash_address: Option<u64>,
@@ -181,6 +185,7 @@ impl GdbParser {
         frames
     }
 
+    #[allow(dead_code)]
     pub fn quick_run(binary: &str, args: &[&str]) -> Result<GdbCrashInfo, String> {
         let mut gdb_commands = vec![
             "set pagination off".to_string(),
@@ -219,6 +224,7 @@ impl GdbParser {
         Self::parse_crash_info(&full_output)
     }
 
+    #[allow(dead_code)]
     pub fn get_crash_offset(binary: &str, pattern: &[u8]) -> Result<usize, String> {
         let crash_info = Self::run_and_parse(binary, Some(pattern))?;
         
@@ -228,6 +234,7 @@ impl GdbParser {
             .ok_or_else(|| format!("Could not find offset for crash at 0x{:x}", crash_value))
     }
 
+    #[allow(dead_code)]
     pub fn extract_register(output: &str, reg_name: &str) -> Option<u64> {
         let registers = Self::parse_registers(output);
         registers.get(reg_name).copied()
@@ -238,24 +245,29 @@ pub fn gdb_run(binary: &str) -> Result<GdbCrashInfo, String> {
     GdbParser::run_and_parse(binary, None)
 }
 
+#[allow(dead_code)]
 pub fn gdb_run_with_input(binary: &str, input: &[u8]) -> Result<GdbCrashInfo, String> {
     GdbParser::run_and_parse(binary, Some(input))
 }
 
+#[allow(dead_code)]
 pub fn gdb_run_args(binary: &str, args: &[&str]) -> Result<GdbCrashInfo, String> {
     GdbParser::quick_run(binary, args)
 }
 
+#[allow(dead_code)]
 pub fn gdb_get_registers(binary: &str) -> Result<HashMap<String, u64>, String> {
     let crash_info = GdbParser::run_and_parse(binary, None)?;
     Ok(crash_info.registers)
 }
 
+#[allow(dead_code)]
 pub fn gdb_get_backtrace(binary: &str) -> Result<Vec<GdbFrame>, String> {
     let crash_info = GdbParser::run_and_parse(binary, None)?;
     Ok(crash_info.backtrace)
 }
 
+#[allow(dead_code)]
 pub fn gdb_auto_offset(binary: &str, pattern_size: usize) -> Result<usize, String> {
     let pattern = crate::cyclic_tools::cyclic(pattern_size);
     GdbParser::get_crash_offset(binary, &pattern)

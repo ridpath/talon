@@ -510,7 +510,7 @@ mod tests {
 
     #[test]
     fn test_categorization() {
-        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
+        let finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
         
         let syscall_gadget = vec!["syscall".to_string(), "ret".to_string()];
         assert_eq!(finder.categorize_gadget(&syscall_gadget), GadgetCategory::Syscall);

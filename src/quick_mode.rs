@@ -77,6 +77,7 @@ stack-pivot:  talon template stack-pivot <host> <port>
 "#, binary, binary, binary, binary, binary)
     }
 
+    #[allow(dead_code)]
     pub fn leak(conn_var: &str) -> String {
         format!(r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
@@ -172,6 +173,7 @@ Then: talon run exploit.talon
 "#, binary, host, port, host, port, binary, binary, binary, binary, binary, host, port)
     }
 
+    #[allow(dead_code)]
     pub fn heap() -> String {
         r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
@@ -212,6 +214,7 @@ talon template unsorted-bin-attack <host> <port>
 "#.to_string()
     }
 
+    #[allow(dead_code)]
     pub fn format_string() -> String {
         r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
@@ -262,6 +265,7 @@ pub fn quick_rop(binary: &str) -> String {
     QuickMode::rop(binary)
 }
 
+#[allow(dead_code)]
 pub fn quick_leak(conn: &str) -> String {
     QuickMode::leak(conn)
 }
@@ -270,10 +274,12 @@ pub fn quick_pwn(binary: &str, host: &str, port: u16) -> String {
     QuickMode::pwn(binary, host, port)
 }
 
+#[allow(dead_code)]
 pub fn quick_heap() -> String {
     QuickMode::heap()
 }
 
+#[allow(dead_code)]
 pub fn quick_fmt() -> String {
     QuickMode::format_string()
 }
