@@ -1,0 +1,122 @@
+# GitHub Dependabot configuration for automatic dependency updates
+# https://docs.github.com/en/code-security/dependabot
+
+version: 2
+updates:
+  # Rust dependencies
+  - package-ecosystem: "cargo"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    assignees:
+      - ""
+    reviewers:
+      - ""
+    labels:
+      - "dependencies"
+      - "rust"
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    ignore:
+      # Ignore patch updates for stable dependencies
+      - dependency-name: "*"
+        update-types: ["version-update:semver-patch"]
+    # Group related dependencies together
+    groups:
+      crypto:
+        patterns:
+          - "aes-*"
+          - "sha*"
+          - "secp256k1"
+          - "bip39"
+          - "hkdf"
+          - "pbkdf2"
+          - "md5"
+          - "sha1"
+      binary-analysis:
+        patterns:
+          - "capstone"
+          - "yara"
+          - "pelite"
+          - "goblin"
+      web3:
+        patterns:
+          - "web3"
+          - "ethabi"
+      tokio:
+        patterns:
+          - "tokio"
+          - "futures"
+      testing:
+        patterns:
+          - "proptest"
+          - "quickcheck*"
+          - "criterion"
+          - "mockall"
+          - "assert_cmd"
+          - "predicates"
+          - "pretty_assertions"
+          - "serial_test"
+          - "rstest"
+          - "insta"
+
+  # Fuzz target dependencies
+  - package-ecosystem: "cargo"
+    directory: "/fuzz"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "fuzzing"
+    commit-message:
+      prefix: "chore(fuzz-deps)"
+
+  # VS Code extension dependencies
+  - package-ecosystem: "npm"
+    directory: "/vscode-extension"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 10
+    labels:
+      - "dependencies"
+      - "vscode-extension"
+      - "javascript"
+    commit-message:
+      prefix: "chore(vscode-deps)"
+    ignore:
+      # Ignore patch updates for VS Code extension API
+      - dependency-name: "@types/vscode"
+        update-types: ["version-update:semver-patch"]
+    groups:
+      typescript:
+        patterns:
+          - "typescript"
+          - "@types/*"
+          - "ts-*"
+      vscode:
+        patterns:
+          - "vscode-*"
+          - "@vscode/*"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "github-actions"
+    commit-message:
+      prefix: "chore(ci)"
