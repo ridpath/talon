@@ -4,6 +4,8 @@ $ErrorActionPreference = "Stop"
 
 $TARGETS = @(
     "fuzz_parser",
+    "fuzz_interpreter",
+    "fuzz_ast",
     "fuzz_elf_parser",
     "fuzz_pe_parser",
     "fuzz_shellcode_generator",
@@ -12,7 +14,12 @@ $TARGETS = @(
     "fuzz_packing_tools",
     "fuzz_rop_gadget_finder",
     "fuzz_rop_chain_builder",
-    "fuzz_auto_solver"
+    "fuzz_auto_solver",
+    "fuzz_exploit_chain",
+    "fuzz_network_protocol",
+    "fuzz_crypto_tools",
+    "fuzz_syscall_chain",
+    "fuzz_disassembler"
 )
 
 param(

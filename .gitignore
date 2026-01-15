@@ -217,6 +217,13 @@ coverage/
 tarpaulin-report.html
 tarpaulin-report.json
 
+# Benchmark artifacts
+benchmark-results/
+*_bench_output.txt
+benchmark_*.txt
+benchmark_*.md
+.github/benchmark-baselines/
+
 # GDB and debugging artifacts
 .gdb_history
 core

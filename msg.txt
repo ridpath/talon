@@ -1,5 +1,0 @@
-Add comprehensive benchmarking and fuzzing scripts
-
-- Added benchmarks for binary analysis and interpreter performance
-- Added fuzzing configuration and continuous fuzzing scripts
-- Updated Cargo.toml with benchmark dependencies
