@@ -50,6 +50,8 @@ fuzz/
 | Target | Component | Priority | Notes |
 |--------|-----------|----------|-------|
 | `fuzz_parser` | TALON DSL Parser | ⭐⭐⭐⭐⭐ | Critical - test first |
+| `fuzz_interpreter` | Script Interpreter | ⭐⭐⭐⭐⭐ | Critical - runtime execution |
+| `fuzz_ast` | AST Operations | ⭐⭐⭐⭐ | AST validation/optimization |
 | `fuzz_elf_parser` | ELF Binary Analysis | ⭐⭐⭐⭐ | Tests goblin parsing |
 | `fuzz_pe_parser` | PE Binary Analysis | ⭐⭐⭐⭐ | Tests pelite parsing |
 | `fuzz_shellcode_generator` | Shellcode Library | ⭐⭐⭐⭐ | Multi-arch coverage |
@@ -59,6 +61,11 @@ fuzz/
 | `fuzz_rop_gadget_finder` | ROP Gadget Search | ⭐⭐⭐⭐ | Multi-arch disassembly |
 | `fuzz_rop_chain_builder` | ROP Chain Assembly | ⭐⭐⭐ | Tests chain construction |
 | `fuzz_auto_solver` | Automated ROP | ⭐⭐⭐⭐ | End-to-end automation |
+| `fuzz_exploit_chain` | Exploit Orchestration | ⭐⭐⭐⭐ | Multi-stage chains |
+| `fuzz_network_protocol` | Network Protocols | ⭐⭐⭐ | Protocol parsing |
+| `fuzz_crypto_tools` | Cryptographic Primitives | ⭐⭐⭐ | Hash/encryption |
+| `fuzz_syscall_chain` | Syscall Analysis | ⭐⭐⭐⭐ | SECCOMP bypass |
+| `fuzz_disassembler` | Disassembly Engine | ⭐⭐⭐⭐ | Multi-arch CFG |
 
 ## Usage Examples
 

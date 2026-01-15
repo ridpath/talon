@@ -24,7 +24,7 @@ cargo install cargo-fuzz
 
 ## Fuzz Targets
 
-TALON includes 10 comprehensive fuzz targets:
+TALON includes 17 comprehensive fuzz targets covering all critical subsystems:
 
 ### 1. **fuzz_parser** (Critical)
 - **Component**: TALON DSL parser
@@ -84,6 +84,48 @@ TALON includes 10 comprehensive fuzz targets:
 - **Component**: Automated ROP solver
 - **Purpose**: Tests end-to-end ROP automation
 - **Coverage**: Strategy selection, constraint handling, goal solving
+- **Priority**: ⭐⭐⭐⭐
+
+### 11. **fuzz_interpreter**
+- **Component**: TALON script interpreter
+- **Purpose**: Tests runtime execution and evaluation
+- **Coverage**: Variable binding, function calls, control flow, timeout handling
+- **Priority**: ⭐⭐⭐⭐⭐ (Critical)
+
+### 12. **fuzz_ast**
+- **Component**: Abstract Syntax Tree operations
+- **Purpose**: Tests AST construction, serialization, optimization
+- **Coverage**: AST validation, type checking, JSON serialization
+- **Priority**: ⭐⭐⭐⭐
+
+### 13. **fuzz_exploit_chain**
+- **Component**: Multi-stage exploit orchestration
+- **Purpose**: Tests exploit chaining framework
+- **Coverage**: Stage dependencies, checkpoints, dry-run validation
+- **Priority**: ⭐⭐⭐⭐
+
+### 14. **fuzz_network_protocol**
+- **Component**: Network protocol handlers
+- **Purpose**: Tests protocol parsing and encoding
+- **Coverage**: TCP, UDP, HTTP, WebSocket, packet analysis
+- **Priority**: ⭐⭐⭐
+
+### 15. **fuzz_crypto_tools**
+- **Component**: Cryptographic primitives
+- **Purpose**: Tests hashing and encryption functions
+- **Coverage**: SHA256, MD5, AES, XOR, base64, hex encoding
+- **Priority**: ⭐⭐⭐
+
+### 16. **fuzz_syscall_chain**
+- **Component**: Syscall chain analysis
+- **Purpose**: Tests syscall validation and ROP generation
+- **Coverage**: Syscall chains, SECCOMP bypass detection
+- **Priority**: ⭐⭐⭐⭐
+
+### 17. **fuzz_disassembler**
+- **Component**: Multi-architecture disassembly
+- **Purpose**: Tests disassembly engine
+- **Coverage**: x86/x64/ARM/ARM64, function detection, CFG analysis
 - **Priority**: ⭐⭐⭐⭐
 
 ## Running Fuzzers
