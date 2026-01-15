@@ -95,7 +95,7 @@ impl HeapGroom {
         let mut steps = Vec::new();
         
         // Step 1: Allocate all chunks
-        for (i, &keep) in pattern.iter().enumerate() {
+        for (i, &_keep) in pattern.iter().enumerate() {
             steps.push(AllocationStep {
                 step: i,
                 action: format!("malloc(0x{:x})", size),
@@ -106,8 +106,8 @@ impl HeapGroom {
         }
         
         // Step 2: Free chunks based on pattern
-        for (i, &keep) in pattern.iter().enumerate() {
-            if !keep {
+        for (i, &_keep) in pattern.iter().enumerate() {
+            if !_keep {
                 steps.push(AllocationStep {
                     step: pattern.len() + i,
                     action: format!("free(chunk_{})", i),
@@ -292,12 +292,12 @@ impl HeapGroom {
         vis.push_str("         HEAP LAYOUT VISUALIZATION        \n");
         vis.push_str("═══════════════════════════════════════════\n\n");
         
-        let steps = match &self.strategy {
+        match &self.strategy {
             GroomingStrategy::FengShui { layout } => {
                 for (i, block) in layout.iter().enumerate() {
                     let status = if block.keep { "[KEEP]" } else { "[FREE]" };
                     vis.push_str(&format!("Chunk {}: 0x{:04x} bytes {}\n", i, block.size, status));
-                    vis.push_str(&format!("  ┌{'─':<50}┐\n", ""));
+                    vis.push_str("  ┌────────────────────────────────────────────────────┐\n");
                     
                     let preview = if block.data.len() > 8 {
                         format!("{:02x?}...", &block.data[..8])
@@ -305,14 +305,12 @@ impl HeapGroom {
                         format!("{:02x?}", block.data)
                     };
                     vis.push_str(&format!("  │ Data: {:<43} │\n", preview));
-                    vis.push_str(&format!("  └{'─':<50}┘\n", ""));
+                    vis.push_str("  └────────────────────────────────────────────────────┘\n");
                 }
-                return vis;
+                vis
             }
-            _ => return format!("Visualization not available for {:?}", self.strategy),
-        };
-        
-        vis
+            _ => format!("Visualization not available for {:?}", self.strategy),
+        }
     }
 }
 

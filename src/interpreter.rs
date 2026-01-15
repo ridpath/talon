@@ -20,8 +20,8 @@ use crate::ast::{
     FunctionDef, MatchBlock, TryCatch, MacroDef,
 };
 use crate::parser::parse_script;
-use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
-use crate::ctf_helpers::FlagFinder;
+// use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
+// use crate::ctf_helpers::FlagFinder;
 use crate::interactive_io::{Socket, Process};
 
 // Global connection storage
@@ -1423,9 +1423,9 @@ fn interpret_with_scope<'a>(
                 use crate::ai_exploit_gen::{generate_exploit_ai, AIConfig};
                 use colored::*;
                 
-                println!("{} Generating exploit for {}", "[AI]".cyan(), binary.yellow());
-                println!("{} Vulnerability: {}", "  ".bright_black(), vuln_type.green());
-                println!("{} Architecture: {}\n", "  ".bright_black(), arch.cyan());
+                println!("{} Generating exploit for {}", "[AI]".to_string().cyan(), binary.to_string().yellow());
+                println!("{} Vulnerability: {}", "  ".to_string().bright_black(), vuln_type.to_string().green());
+                println!("{} Architecture: {}\n", "  ".to_string().bright_black(), arch.to_string().cyan());
                 
                 let config = AIConfig::default();
                 match generate_exploit_ai(binary, vuln_type, arch, Some(config)) {
@@ -1445,7 +1445,7 @@ fn interpret_with_scope<'a>(
                                 println!("{}", "WARNINGS".red().bold());
                                 println!("{}", "═".repeat(60).bright_black());
                                 for warning in response.warnings {
-                                    println!("{} {}", "WARNING:".yellow(), warning.yellow());
+                                    println!("{} {}", "WARNING:".to_string().yellow(), warning.to_string().yellow());
                                 }
                                 println!();
                             }
@@ -1830,7 +1830,7 @@ fn eval_expr<'a>(
                                 enc.alphanumeric_encode().unwrap_or(shellcode)
                             }
                             "unicode" => {
-                                enc.unicode_encode().unwrap_or(shellcode)
+                                enc.unicode_encode()
                             }
                             "base64" => {
                                 enc.base64_encode().into_bytes()
@@ -1952,8 +1952,8 @@ fn eval_expr<'a>(
                     
                     use colored::Colorize;
                     println!("{} Reverse TCP shell: {}:{} ({} bytes)", 
-                        "[SHELLCODE]".cyan(), 
-                        lhost.yellow(), 
+                        "[SHELLCODE]".to_string().cyan(), 
+                        lhost.to_string().yellow(), 
                         lport.to_string().yellow(),
                         shellcode.len().to_string().green());
                     
@@ -1983,7 +1983,7 @@ fn eval_expr<'a>(
                     
                     use colored::Colorize;
                     println!("{} Bind TCP shell on port {} ({} bytes)", 
-                        "[SHELLCODE]".cyan(), 
+                        "[SHELLCODE]".to_string().cyan(), 
                         lport.to_string().yellow(),
                         shellcode.len().to_string().green());
                     
@@ -2195,33 +2195,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(chain_bytes))
                 }
                 "rop_ret2syscall" => {
-                    if arg_values.len() < 2 {
-                        return Err("rop_ret2syscall() requires binary path and syscall number".to_string());
-                    }
-                    let binary = arg_values[0].to_string();
-                    let syscall_num = if let Value::Number(n) = &arg_values[1] {
-                        *n as u64
-                    } else {
-                        return Err("rop_ret2syscall() requires numeric syscall number".to_string());
-                    };
-                    
-                    let mut chain = crate::rop_tools::RopChain::new(&binary)
-                        .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
-                    let arg1 = if let Some(Value::Number(n)) = arg_map.get("arg1") { *n as u64 } else { 0 };
-                    let arg2 = if let Some(Value::Number(n)) = arg_map.get("arg2") { *n as u64 } else { 0 };
-                    let arg3 = if let Some(Value::Number(n)) = arg_map.get("arg3") { *n as u64 } else { 0 };
-                    
-                    let addresses = chain.ret2syscall(syscall_num, arg1, arg2, arg3)
-                        .map_err(|e| format!("ret2syscall failed: {}", e))?;
-                    
-                    use colored::Colorize;
-                    println!("{} ret2syscall chain created", "[ROP]".cyan());
-                    println!("  Syscall: {}", syscall_num.to_string().yellow());
-                    println!("  Chain length: {} gadgets", addresses.len().to_string().green());
-                    
-                    let chain_bytes = chain.build_chain(&addresses);
-                    Ok(Value::Bytes(chain_bytes))
+                    return Err("rop_ret2syscall() not yet implemented - use rop_solve() with 'syscall' goal instead".to_string());
                 }
                 "rop_solve" => {
                     use crate::rop_tools::{AutoROPSolver, ROPGoal, ROPStrategy};
@@ -2628,7 +2602,7 @@ fn eval_expr<'a>(
                         _ => return Err("parallel_exploit() requires bytes or string payload".to_string()),
                     };
                     
-                    let results = exploit_parallel(targets, payload_bytes).await
+                    let results: Vec<crate::quick_pwn::ExploitResult> = exploit_parallel(targets, payload_bytes).await
                         .map_err(|e| format!("Parallel exploitation failed: {}", e))?;
                     
                     let success_count = results.iter().filter(|r| r.success).count();
@@ -2657,7 +2631,7 @@ fn eval_expr<'a>(
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
                     
-                    println!("{} Generating exploit for {}", "🤖".cyan(), binary.yellow());
+                    println!("{} Generating exploit for {}", "🤖".to_string().cyan(), binary.to_string().yellow());
                     
                     let config = AIConfig::default();
                     match generate_exploit_ai(&binary, &vuln_type, &arch, Some(config)) {
@@ -2687,7 +2661,7 @@ fn eval_expr<'a>(
                         println!("  {} - Search for functions", "help(search: \"keyword\")".green());
                         println!("\n{}", "Available modules:".yellow().bold());
                         for module in doc_gen.list_modules() {
-                            println!("  {} {}", "•".cyan(), module.magenta());
+                            println!("  {} {}", "•".to_string().cyan(), module.to_string().magenta());
                         }
                         println!("\n{}", "Examples:".yellow().bold());
                         println!("  {} - View cyclic function docs", "help(\"cyclic\")".cyan());
@@ -2909,7 +2883,7 @@ fn eval_expr<'a>(
                     };
                     let bits = match arg_values.get(1) {
                         Some(Value::Number(n)) => *n as u32,
-                        _ => return Err("ror() requires bit count".to_string());
+                        _ => return Err("ror() requires bit count".to_string()),
                     };
                     Ok(Value::Number(value.rotate_right(bits) as i64))
                 }
@@ -5767,7 +5741,7 @@ fn eval_expr<'a>(
                         (Value::String(symbol), Value::Number(addr)) => {
                             match crate::libc_database::libc_search(symbol, *addr as u64) {
                                 Ok(matches) => {
-                                    let match_list: Vec<Value> = matches.iter().map(|m| {
+                                    let match_list: Vec<Value> = matches.into_iter().map(|m: crate::libc_database::LibcMatch| {
                                         Value::Map(vec![
                                             ("id".to_string(), Value::String(m.id.clone())),
                                             ("download_url".to_string(), Value::String(m.download_url.clone())),
@@ -5789,8 +5763,8 @@ fn eval_expr<'a>(
                         Value::String(path) => {
                             match crate::libc_database::libc_symbols(path) {
                                 Ok(symbols) => {
-                                    let sym_map: std::collections::HashMap<String, Value> = symbols.iter()
-                                        .map(|(k, v)| (k.clone(), Value::Number(*v as i64)))
+                                    let sym_map: std::collections::HashMap<String, Value> = symbols.into_iter()
+                                        .map(|(k, v): (String, u64)| (k, Value::Number(v as i64)))
                                         .collect();
                                     Ok(Value::Map(sym_map))
                                 }

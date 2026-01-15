@@ -33,3 +33,4 @@ pub mod quick_pwn;
 
 pub mod helpers;
 pub mod output_utils;
+pub mod ctf_quick_helpers;

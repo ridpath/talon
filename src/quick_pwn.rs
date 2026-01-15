@@ -269,7 +269,7 @@ pub fn quick_shell(host: &str, port: u16, binary: &str, libc_name: &str) -> Resu
     
     // Get one-gadget
     let gadgets = pwn.one_gadgets(libc_name)?;
-    let one_gadget = gadgets[0];
+    let _one_gadget = gadgets[0];
     
     // Build ret2libc chain
     let chain = pwn.rop_chain(libc_name)?;
@@ -288,7 +288,7 @@ pub fn quick_heap(
     host: &str,
     port: u16,
     binary: &str,
-    libc_name: &str,
+    _libc_name: &str,
     glibc_version: &str,
 ) -> Result<(), String> {
     let mut pwn = QuickPwn::remote(host, port, binary);
