@@ -1833,10 +1833,10 @@ fn eval_expr<'a>(
                                 enc.unicode_encode().unwrap_or(shellcode)
                             }
                             "base64" => {
-                                enc.base64_encode()
+                                enc.base64_encode().into_bytes()
                             }
                             "url" => {
-                                enc.url_encode()
+                                enc.url_encode().into_bytes()
                             }
                             _ => shellcode,
                         };
@@ -1850,8 +1850,8 @@ fn eval_expr<'a>(
                     
                     use colored::Colorize;
                     println!("{} Generated {} shellcode ({} bytes)", 
-                        "[SHELLCODE]".cyan(), 
-                        payload_str.yellow(), 
+                        "[SHELLCODE]".to_string().cyan(), 
+                        payload_str.to_string().yellow(), 
                         shellcode.len().to_string().green());
                     
                     Ok(Value::Bytes(shellcode))
@@ -1899,29 +1899,24 @@ fn eval_expr<'a>(
                             encoder.xor_encode(key)?
                         }
                         "alphanumeric" | "alnum" => encoder.alphanumeric_encode()?,
-                        "unicode" => encoder.unicode_encode()?,
-                        "base64" => encoder.base64_encode(),
-                        "url" => encoder.url_encode(),
+                        "unicode" => encoder.unicode_encode(),
+                        "base64" => encoder.base64_encode().into_bytes(),
+                        "url" => encoder.url_encode().into_bytes(),
                         "polymorphic" => {
-                            let min_nop = if let Some(Value::Number(n)) = arg_map.get("min_nop") {
-                                *n as usize
+                            let density = if let Some(Value::Number(n)) = arg_map.get("density") {
+                                (*n as f64 / 100.0) as f32
                             } else {
-                                1
+                                0.3
                             };
-                            let max_nop = if let Some(Value::Number(n)) = arg_map.get("max_nop") {
-                                *n as usize
-                            } else {
-                                5
-                            };
-                            encoder.polymorphic_encode(min_nop, max_nop)
+                            crate::shellcode_encoders::polymorphic_encode(&shellcode, density)
                         }
                         _ => return Err(format!("Unknown encoder type: {}", encoder_type)),
                     };
                     
                     use colored::Colorize;
                     println!("{} Encoded shellcode using {} ({} → {} bytes)", 
-                        "[ENCODE]".cyan(), 
-                        encoder_type.yellow(), 
+                        "[ENCODE]".to_string().cyan(), 
+                        encoder_type.to_string().yellow(), 
                         shellcode.len().to_string().red(),
                         encoded.len().to_string().green());
                     
@@ -2008,16 +2003,17 @@ fn eval_expr<'a>(
                     
                     use crate::shellcode_encoders;
                     let nops = if polymorphic {
-                        shellcode_encoders::polymorphic_nop_sled(size, 1, 3)
+                        shellcode_encoders::polymorphic_nop_sled(size)
                     } else {
                         shellcode_encoders::nop_sled(size)
                     };
                     
                     use colored::Colorize;
+                    let mode_str = if polymorphic { "polymorphic".to_string().yellow() } else { "static".to_string().white() };
                     println!("{} NOP sled: {} bytes ({})", 
-                        "[NOP]".cyan(), 
+                        "[NOP]".to_string().cyan(), 
                         size.to_string().green(),
-                        if polymorphic { "polymorphic".yellow() } else { "static".white() });
+                        mode_str);
                     
                     Ok(Value::Bytes(nops))
                 }
@@ -2027,15 +2023,15 @@ fn eval_expr<'a>(
                     let all = shellcode_db::list_all_shellcodes();
                     
                     use colored::Colorize;
-                    println!("{} Available shellcodes:", "[SHELLCODE]".cyan());
+                    println!("{} Available shellcodes:", "[SHELLCODE]".to_string().cyan());
                     println!();
                     for name in all {
                         if let Some(entry) = db.get(&name) {
                             println!("  {} - {} ({} bytes, {})",
-                                name.yellow(),
-                                entry.description.white(),
+                                name.to_string().yellow(),
+                                entry.description.to_string().white(),
                                 entry.bytes.len().to_string().green(),
-                                format!("{:?}", entry.arch).blue());
+                                format!("{:?}", entry.arch).to_string().blue());
                         }
                     }
                     
@@ -2262,7 +2258,7 @@ fn eval_expr<'a>(
                             let addr = if let Some(Value::Number(n)) = arg_map.get("addr") { *n as u64 } else { 0x600000 };
                             let size = if let Some(Value::Number(n)) = arg_map.get("size") { *n as u64 } else { 0x1000 };
                             let perms = if let Some(Value::Number(n)) = arg_map.get("perms") { *n as u64 } else { 7 };
-                            ROPGoal::Mprotect(addr, size, perms)
+                            ROPGoal::Mprotect(addr, size as usize, perms as u32)
                         }
                         _ => return Err(format!("Unknown goal type: {}", goal_type)),
                     };

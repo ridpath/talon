@@ -3,17 +3,51 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Provides pwntools-style pack/unpack primitives for exploit development
 
-/// Pack a 64-bit value to little-endian bytes
+/// Pack a 64-bit value to little-endian bytes.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::pack64;
+///
+/// let packed = pack64(0xdeadbeef);
+/// assert_eq!(packed, vec![0xef, 0xbe, 0xad, 0xde, 0x00, 0x00, 0x00, 0x00]);
+///
+/// let addr = pack64(0x00007ffff7a0d000);
+/// assert_eq!(addr.len(), 8);
+/// ```
 pub fn pack64(value: u64) -> Vec<u8> {
     value.to_le_bytes().to_vec()
 }
 
-/// Pack a 64-bit value to big-endian bytes
+/// Pack a 64-bit value to big-endian bytes.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::pack64_be;
+///
+/// let packed = pack64_be(0xdeadbeef);
+/// assert_eq!(packed, vec![0x00, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef]);
+/// ```
 pub fn pack64_be(value: u64) -> Vec<u8> {
     value.to_be_bytes().to_vec()
 }
 
-/// Unpack little-endian bytes to 64-bit value
+/// Unpack little-endian bytes to 64-bit value.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::unpack64;
+///
+/// let bytes = vec![0xef, 0xbe, 0xad, 0xde, 0x00, 0x00, 0x00, 0x00];
+/// let value = unpack64(&bytes).unwrap();
+/// assert_eq!(value, 0xdeadbeef);
+///
+/// let short_bytes = vec![0x01, 0x02];
+/// assert!(unpack64(&short_bytes).is_err());
+/// ```
 pub fn unpack64(bytes: &[u8]) -> Result<u64, String> {
     if bytes.len() < 8 {
         return Err(format!("Need 8 bytes for u64, got {}", bytes.len()));
@@ -23,7 +57,17 @@ pub fn unpack64(bytes: &[u8]) -> Result<u64, String> {
     Ok(u64::from_le_bytes(arr))
 }
 
-/// Unpack big-endian bytes to 64-bit value
+/// Unpack big-endian bytes to 64-bit value.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::unpack64_be;
+///
+/// let bytes = vec![0x00, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef];
+/// let value = unpack64_be(&bytes).unwrap();
+/// assert_eq!(value, 0xdeadbeef);
+/// ```
 pub fn unpack64_be(bytes: &[u8]) -> Result<u64, String> {
     if bytes.len() < 8 {
         return Err(format!("Need 8 bytes for u64, got {}", bytes.len()));
@@ -33,17 +77,45 @@ pub fn unpack64_be(bytes: &[u8]) -> Result<u64, String> {
     Ok(u64::from_be_bytes(arr))
 }
 
-/// Pack a 32-bit value to little-endian bytes
+/// Pack a 32-bit value to little-endian bytes.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::pack32;
+///
+/// let packed = pack32(0x12345678);
+/// assert_eq!(packed, vec![0x78, 0x56, 0x34, 0x12]);
+/// ```
 pub fn pack32(value: u32) -> Vec<u8> {
     value.to_le_bytes().to_vec()
 }
 
-/// Pack a 32-bit value to big-endian bytes
+/// Pack a 32-bit value to big-endian bytes.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::pack32_be;
+///
+/// let packed = pack32_be(0x12345678);
+/// assert_eq!(packed, vec![0x12, 0x34, 0x56, 0x78]);
+/// ```
 pub fn pack32_be(value: u32) -> Vec<u8> {
     value.to_be_bytes().to_vec()
 }
 
-/// Unpack little-endian bytes to 32-bit value
+/// Unpack little-endian bytes to 32-bit value.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::unpack32;
+///
+/// let bytes = vec![0x78, 0x56, 0x34, 0x12];
+/// let value = unpack32(&bytes).unwrap();
+/// assert_eq!(value, 0x12345678);
+/// ```
 pub fn unpack32(bytes: &[u8]) -> Result<u32, String> {
     if bytes.len() < 4 {
         return Err(format!("Need 4 bytes for u32, got {}", bytes.len()));
@@ -53,7 +125,17 @@ pub fn unpack32(bytes: &[u8]) -> Result<u32, String> {
     Ok(u32::from_le_bytes(arr))
 }
 
-/// Unpack big-endian bytes to 32-bit value
+/// Unpack big-endian bytes to 32-bit value.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::unpack32_be;
+///
+/// let bytes = vec![0x12, 0x34, 0x56, 0x78];
+/// let value = unpack32_be(&bytes).unwrap();
+/// assert_eq!(value, 0x12345678);
+/// ```
 pub fn unpack32_be(bytes: &[u8]) -> Result<u32, String> {
     if bytes.len() < 4 {
         return Err(format!("Need 4 bytes for u32, got {}", bytes.len()));
@@ -63,17 +145,45 @@ pub fn unpack32_be(bytes: &[u8]) -> Result<u32, String> {
     Ok(u32::from_be_bytes(arr))
 }
 
-/// Pack a 16-bit value to little-endian bytes
+/// Pack a 16-bit value to little-endian bytes.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::pack16;
+///
+/// let packed = pack16(0x1234);
+/// assert_eq!(packed, vec![0x34, 0x12]);
+/// ```
 pub fn pack16(value: u16) -> Vec<u8> {
     value.to_le_bytes().to_vec()
 }
 
-/// Pack a 16-bit value to big-endian bytes
+/// Pack a 16-bit value to big-endian bytes.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::pack16_be;
+///
+/// let packed = pack16_be(0x1234);
+/// assert_eq!(packed, vec![0x12, 0x34]);
+/// ```
 pub fn pack16_be(value: u16) -> Vec<u8> {
     value.to_be_bytes().to_vec()
 }
 
-/// Unpack little-endian bytes to 16-bit value
+/// Unpack little-endian bytes to 16-bit value.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::unpack16;
+///
+/// let bytes = vec![0x34, 0x12];
+/// let value = unpack16(&bytes).unwrap();
+/// assert_eq!(value, 0x1234);
+/// ```
 pub fn unpack16(bytes: &[u8]) -> Result<u16, String> {
     if bytes.len() < 2 {
         return Err(format!("Need 2 bytes for u16, got {}", bytes.len()));
@@ -83,7 +193,17 @@ pub fn unpack16(bytes: &[u8]) -> Result<u16, String> {
     Ok(u16::from_le_bytes(arr))
 }
 
-/// Unpack big-endian bytes to 16-bit value
+/// Unpack big-endian bytes to 16-bit value.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::unpack16_be;
+///
+/// let bytes = vec![0x12, 0x34];
+/// let value = unpack16_be(&bytes).unwrap();
+/// assert_eq!(value, 0x1234);
+/// ```
 pub fn unpack16_be(bytes: &[u8]) -> Result<u16, String> {
     if bytes.len() < 2 {
         return Err(format!("Need 2 bytes for u16, got {}", bytes.len()));
@@ -93,7 +213,16 @@ pub fn unpack16_be(bytes: &[u8]) -> Result<u16, String> {
     Ok(u16::from_be_bytes(arr))
 }
 
-/// Pack a single byte
+/// Pack a single byte.
+///
+/// # Examples
+///
+/// ```
+/// use talon::packing_tools::pack8;
+///
+/// let packed = pack8(0x42);
+/// assert_eq!(packed, vec![0x42]);
+/// ```
 pub fn pack8(value: u8) -> Vec<u8> {
     vec![value]
 }

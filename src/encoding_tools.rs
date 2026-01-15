@@ -13,19 +13,65 @@ use std::collections::HashMap;
 pub struct BaseEncoder;
 
 impl BaseEncoder {
+    /// Encode data to base64.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use talon::encoding_tools::BaseEncoder;
+    ///
+    /// let data = b"Hello, World!";
+    /// let encoded = BaseEncoder::base64_encode(data);
+    /// assert_eq!(encoded, "SGVsbG8sIFdvcmxkIQ==");
+    /// ```
     pub fn base64_encode(data: &[u8]) -> String {
         base64::encode(data)
     }
     
+    /// Decode base64 string to bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use talon::encoding_tools::BaseEncoder;
+    ///
+    /// let encoded = "SGVsbG8sIFdvcmxkIQ==";
+    /// let decoded = BaseEncoder::base64_decode(encoded).unwrap();
+    /// assert_eq!(decoded, b"Hello, World!");
+    /// ```
     pub fn base64_decode(encoded: &str) -> Result<Vec<u8>, String> {
         base64::decode(encoded)
             .map_err(|e| format!("Base64 decode error: {}", e))
     }
     
+    /// Encode data to URL-safe base64.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use talon::encoding_tools::BaseEncoder;
+    ///
+    /// let data = b"Test data with special chars: +/=";
+    /// let encoded = BaseEncoder::base64_url_encode(data);
+    /// assert!(!encoded.contains('+'));
+    /// assert!(!encoded.contains('/'));
+    /// ```
     pub fn base64_url_encode(data: &[u8]) -> String {
         base64::encode_config(data, base64::URL_SAFE)
     }
     
+    /// Decode URL-safe base64 string to bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use talon::encoding_tools::BaseEncoder;
+    ///
+    /// let data = b"test";
+    /// let encoded = BaseEncoder::base64_url_encode(data);
+    /// let decoded = BaseEncoder::base64_url_decode(&encoded).unwrap();
+    /// assert_eq!(decoded, b"test");
+    /// ```
     pub fn base64_url_decode(encoded: &str) -> Result<Vec<u8>, String> {
         base64::decode_config(encoded, base64::URL_SAFE)
             .map_err(|e| format!("Base64 URL decode error: {}", e))
@@ -91,10 +137,32 @@ impl BaseEncoder {
         Ok(result)
     }
     
+    /// Encode data to hexadecimal string.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use talon::encoding_tools::BaseEncoder;
+    ///
+    /// let data = b"\xde\xad\xbe\xef";
+    /// let encoded = BaseEncoder::hex_encode(data);
+    /// assert_eq!(encoded, "deadbeef");
+    /// ```
     pub fn hex_encode(data: &[u8]) -> String {
         hex::encode(data)
     }
     
+    /// Decode hexadecimal string to bytes.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use talon::encoding_tools::BaseEncoder;
+    ///
+    /// let encoded = "deadbeef";
+    /// let decoded = BaseEncoder::hex_decode(encoded).unwrap();
+    /// assert_eq!(decoded, b"\xde\xad\xbe\xef");
+    /// ```
     pub fn hex_decode(encoded: &str) -> Result<Vec<u8>, String> {
         hex::decode(encoded)
             .map_err(|e| format!("Hex decode error: {}", e))

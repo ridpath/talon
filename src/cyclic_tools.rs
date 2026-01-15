@@ -7,7 +7,10 @@ const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
 const ALPHABET_SIZE: usize = 26;
 const SUBSEQUENCE_LENGTH: usize = 4; // 4-byte patterns for 32/64-bit addresses
 
-/// Generate a De Bruijn sequence (cyclic pattern)
+/// Generate a De Bruijn sequence (cyclic pattern).
+/// 
+/// Creates a unique pattern useful for determining buffer overflow offsets.
+/// Each 4-byte subsequence appears exactly once in the pattern.
 /// 
 /// # Arguments
 /// * `length` - Desired length of the pattern
@@ -15,10 +18,16 @@ const SUBSEQUENCE_LENGTH: usize = 4; // 4-byte patterns for 32/64-bit addresses
 /// # Returns
 /// A byte vector containing the cyclic pattern
 /// 
-/// # Example
+/// # Examples
 /// ```
-/// let pattern = cyclic(200);
-/// // pattern = "aaaabaaacaaadaaa..."
+/// use talon::cyclic_tools::cyclic;
+///
+/// let pattern = cyclic(20);
+/// assert_eq!(pattern.len(), 20);
+/// assert_eq!(&pattern[0..4], b"aaaa");
+///
+/// let long_pattern = cyclic(1000);
+/// assert_eq!(long_pattern.len(), 1000);
 /// ```
 pub fn cyclic(length: usize) -> Vec<u8> {
     let mut result = Vec::with_capacity(length);
@@ -36,18 +45,25 @@ pub fn cyclic(length: usize) -> Vec<u8> {
     result
 }
 
-/// Find the offset of a pattern in a cyclic sequence
+/// Find the offset of a pattern in a cyclic sequence.
+/// 
+/// Given a value from a crashed register, determine at what offset
+/// in the cyclic pattern it appears.
 /// 
 /// # Arguments
 /// * `value` - The 4-byte value found at crash (e.g., from register)
 /// 
 /// # Returns
-/// The offset where this pattern appears
+/// The offset where this pattern appears, or None if not found
 /// 
-/// # Example
+/// # Examples
 /// ```
-/// let offset = cyclic_find(0x61616162); // "baaa" in little-endian
-/// // offset = 4
+/// use talon::cyclic_tools::{cyclic, cyclic_find};
+///
+/// let pattern = cyclic(100);
+/// let value = u32::from_le_bytes([pattern[8], pattern[9], pattern[10], pattern[11]]);
+/// let offset = cyclic_find(value as u64);
+/// assert_eq!(offset, Some(8));
 /// ```
 pub fn cyclic_find(value: u64) -> Option<usize> {
     // Convert value to bytes (little-endian)
