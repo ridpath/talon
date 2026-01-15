@@ -269,6 +269,7 @@ Save to `{@artifacts_path}/plan.md`. If the feature is trivial and doesn't warra
 - See: .zenflow/tasks/new-task-7d4f/qa_manual_testing_summary.md for complete details
 
 ### [ ] Step: Pre-commit Hooks & Development Tools
+<!-- chat-id: a00925d5-a2b8-44c5-9837-0fb86deb4856 -->
 - Create .pre-commit-config.yaml or scripts/pre-commit.sh
 - Create scripts/install_hooks.sh
 - Verify: Hooks run on git commit

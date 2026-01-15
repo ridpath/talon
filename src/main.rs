@@ -111,7 +111,7 @@ mod ai_exploit_gen;          // AI-powered exploit generation (local & cloud)
 mod module_system;           // Import/export module system for code organization
 mod debugger_engine;         // Integrated debugger with step-through capabilities
 mod binary_analyzer;         // Automatic binary analysis and exploit strategy generation
-mod test_framework;          // Unit testing framework with annotations
+// mod test_framework;          // Unit testing framework with annotations
 mod macro_system;            // Macro system for code generation
 mod hot_reload;              // Hot reload for live code updates
 
@@ -137,7 +137,7 @@ mod tool_integration;        // Ghidra/radare2 integration for reverse engineeri
 mod one_liners;              // One-liner primitives for common tasks
 mod tutorial_system;         // Interactive guided tutorial system
 mod challenge_marketplace;   // Community challenge marketplace
-mod collaborative_session;   // Real-time collaborative exploitation sessions
+// mod collaborative_session;   // Real-time collaborative exploitation sessions
 mod adversary_playbook;      // Adversary emulation playbook simulator
 mod script_translator;       // Pwntools/Metasploit script translation
 

@@ -113,7 +113,7 @@ impl QuickHelpers {
     }
     
     // Quick format string payload builders
-    pub fn fmtstr_write_what_where(target_addr: u64, value: u64, offset: usize) -> String {
+    pub fn fmtstr_write_what_where(_target_addr: u64, _value: u64, offset: usize) -> String {
         // Simplified format string write primitive
         let mut payload = String::new();
         

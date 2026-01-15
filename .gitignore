@@ -326,3 +326,9 @@ lcov.info
 *.profdata
 *.gcda
 *.gcno
+
+# Pre-commit and git hooks
+.pre-commit-cache/
+.git/hooks/*.backup.*
+.git/hooks/*.sample
+**/.pre-commit-*

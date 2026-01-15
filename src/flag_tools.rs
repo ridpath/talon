@@ -160,7 +160,7 @@ impl FlagSubmitter {
             .send()
             .map_err(|e| format!("Failed to submit flag: {}", e))?;
 
-        let status = response.status();
+        let _status = response.status();
         let json: serde_json::Value = response.json()
             .map_err(|e| format!("Failed to parse response: {}", e))?;
 

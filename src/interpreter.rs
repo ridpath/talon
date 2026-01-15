@@ -30,6 +30,11 @@ struct SafetyConfig {
     integer_overflow: bool,
     overflow_checking: bool,
     strict_mode: bool,
+    type_checking: bool,
+    bounds_checking: bool,
+    max_execution_time_ms: u64,
+    max_memory_bytes: u64,
+    max_recursion_depth: usize,
 }
 
 impl Default for SafetyConfig {
@@ -39,6 +44,11 @@ impl Default for SafetyConfig {
             integer_overflow: true,
             overflow_checking: true,
             strict_mode: true,
+            type_checking: true,
+            bounds_checking: true,
+            max_execution_time_ms: 60000,
+            max_memory_bytes: 1024 * 1024 * 1024,
+            max_recursion_depth: 100,
         }
     }
 }
@@ -1422,7 +1432,7 @@ fn interpret_with_scope<'a>(
             
             Command::SetMemoryLimit { megabytes } => {
                 let mut config = safety.read().await.get_stats().config;
-                config.max_memory_bytes = megabytes * 1024 * 1024;
+                config.max_memory_bytes = (*megabytes as u64) * 1024 * 1024;
                 safety.write().await.update_config(config);
                 println!("[SAFETY] Memory limit set to {}MB", megabytes);
             }
@@ -2079,19 +2089,17 @@ fn eval_expr<'a>(
                 "shellcode_list" => {
                     use crate::shellcode_db;
                     let db = shellcode_db::get_shellcode_db();
-                    let all = shellcode_db::list_all_shellcodes();
+                    let all = db.list();
                     
                     use colored::Colorize;
                     println!("{} Available shellcodes:", "[SHELLCODE]".to_string().cyan());
                     println!();
-                    for name in all {
-                        if let Some(entry) = db.get(&name) {
-                            println!("  {} - {} ({} bytes, {})",
-                                name.to_string().yellow(),
-                                entry.description.to_string().white(),
-                                entry.bytes.len().to_string().green(),
-                                format!("{:?}", entry.arch).to_string().blue());
-                        }
+                    for entry in all {
+                        println!("  {} - {} ({} bytes, {})",
+                            entry.name.to_string().cyan(),
+                            entry.description.to_string().white(),
+                            entry.bytes.len().to_string().green(),
+                            format!("{:?}", entry.arch).to_string().blue());
                     }
                     
                     Ok(Value::Null)
@@ -2661,7 +2669,7 @@ fn eval_expr<'a>(
                         _ => return Err("parallel_exploit() requires bytes or string payload".to_string()),
                     };
                     
-                    let results: Vec<crate::quick_pwn::ExploitResult> = exploit_parallel(targets, payload_bytes).await
+                    let results: Vec<crate::parallel_exploit::ExploitResult> = exploit_parallel(targets, payload_bytes).await
                         .map_err(|e| format!("Parallel exploitation failed: {}", e))?;
                     
                     let success_count = results.iter().filter(|r| r.success).count();
@@ -5943,7 +5951,7 @@ fn eval_expr<'a>(
                                 local_vars.write().await.insert(param_name.clone(), val.clone());
                             }
                         }
-                        let result = interpret_with_scope(&func.body, local_vars, Arc::new(RwLock::new(HashMap::new())), funcs.clone(), macros.clone(), Arc::new(RwLock::new(None)), Arc::new(RwLock::new(crate::runtime_safety::RuntimeSafety::new(crate::runtime_safety::SafetyConfig::default())))).await?;
+                        let result = interpret_with_scope(&func.body, local_vars, Arc::new(RwLock::new(HashMap::new())), funcs.clone(), macros.clone(), Arc::new(RwLock::new(None)), Arc::new(RwLock::new(RuntimeSafety::new(SafetyConfig::default())))).await?;
                         Ok(result.unwrap_or(Value::Null))
                     } else {
                         Err(format!("Unknown function: {}", name))

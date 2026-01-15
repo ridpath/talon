@@ -9,7 +9,7 @@ use crate::heap_tools::{HeapExploit, ModernHeapExploit, GlibcVersion, HeapTechni
 use crate::heap_grooming::{HeapGroom, GroomingStrategy};
 use crate::libc_db::LibcDatabase;
 use crate::gdb_tools::GdbSession;
-use crate::packing_tools::{p64, u64 as unpack64};
+use crate::packing_tools::{pack64 as p64, unpack64};
 use crate::rop_tools::RopChain;
 use std::collections::HashMap;
 
