@@ -200,6 +200,59 @@ See `README.md in vscode-extensions directory` for IDE features, debugging, and 
 
 ---
 
+## Testing & Quality Assurance
+
+### Fuzzing
+
+TALON includes comprehensive fuzzing infrastructure using cargo-fuzz (libFuzzer):
+
+```bash
+# Quick fuzzing (5 minutes per target)
+./scripts/run_fuzz.sh 300
+
+# Run specific target
+cargo +nightly fuzz run fuzz_parser -- -max_total_time=600
+
+# Windows
+.\scripts\run_fuzz.ps1 -Duration 300
+```
+
+**Fuzz Targets**:
+- Parser (TALON DSL)
+- ELF/PE binary parsers
+- Shellcode generator
+- Format string exploits
+- Heap tools
+- ROP gadget finder
+- Packing/encoding tools
+
+See `docs/FUZZING.md` for complete documentation.
+
+### Running Tests
+
+```bash
+# Run all tests
+cargo test --all-features
+
+# Run specific test suite
+cargo test --test parser_test
+cargo test --test stdlib_test
+
+# With coverage
+cargo install cargo-tarpaulin
+cargo tarpaulin --out Html --all-features
+```
+
+### Continuous Integration
+
+All commits are tested via GitHub Actions:
+- Build on Linux + Windows
+- Full test suite
+- Security audit (cargo-audit)
+- Daily fuzzing campaigns
+
+---
+
 ## License
 
 MIT License

