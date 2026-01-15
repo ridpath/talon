@@ -1,0 +1,70 @@
+codecov:
+  require_ci_to_pass: yes
+  notify:
+    wait_for_ci: yes
+
+coverage:
+  precision: 2
+  round: down
+  range: "70...100"
+  status:
+    project:
+      default:
+        target: 80%
+        threshold: 2%
+        if_ci_failed: error
+    patch:
+      default:
+        target: 80%
+        threshold: 5%
+
+comment:
+  layout: "header, diff, flags, components, files, footer"
+  behavior: default
+  require_changes: false
+
+ignore:
+  - "tests/**/*"
+  - "benches/**/*"
+  - "examples/**/*"
+  - "scripts/**/*"
+  - "vscode-extension/**/*"
+  - "fuzz/**/*"
+  - "**/*_test.rs"
+  - "**/test_*.rs"
+
+component_management:
+  default_rules:
+    statuses:
+      - type: project
+        target: 80%
+  individual_components:
+    - component_id: core
+      name: "Core Interpreter"
+      paths:
+        - "src/interpreter.rs"
+        - "src/parser.rs"
+        - "src/ast.rs"
+        - "src/types.rs"
+        - "src/builtins.rs"
+      
+    - component_id: exploitation
+      name: "Exploitation Modules"
+      paths:
+        - "src/rop_tools.rs"
+        - "src/heap_tools.rs"
+        - "src/shellcode_library.rs"
+        - "src/exploit_chaining.rs"
+      
+    - component_id: binary_analysis
+      name: "Binary Analysis"
+      paths:
+        - "src/elf_tools.rs"
+        - "src/binary_analyzer.rs"
+        - "src/binary_patch.rs"
+        - "src/pe_parser.rs"
+      
+    - component_id: lsp
+      name: "LSP Server"
+      paths:
+        - "src/lsp_server.rs"

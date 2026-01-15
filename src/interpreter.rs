@@ -2781,6 +2781,170 @@ fn eval_expr<'a>(
                     let value = unpack16(&bytes)?;
                     Ok(Value::Number(value as i64))
                 }
+                "flat" | "flat_pack" => {
+                    if arg_values.is_empty() {
+                        return Err("flat() requires list argument".to_string());
+                    }
+                    let items = match &arg_values[0] {
+                        Value::List(items) => items,
+                        _ => return Err(format!("flat() requires list, got {:?}", arg_values[0])),
+                    };
+                    
+                    use crate::packing_tools::pack64;
+                    let mut result = Vec::new();
+                    for item in items {
+                        match item {
+                            Value::Number(n) => result.extend_from_slice(&pack64(*n as u64)),
+                            Value::Bytes(b) => result.extend_from_slice(b),
+                            Value::String(s) => result.extend_from_slice(s.as_bytes()),
+                            _ => return Err(format!("flat() cannot pack {:?}", item)),
+                        }
+                    }
+                    Ok(Value::Bytes(result))
+                }
+                "fit" => {
+                    let data = match arg_values.get(0) {
+                        Some(Value::Bytes(b)) => b.clone(),
+                        Some(Value::String(s)) => s.as_bytes().to_vec(),
+                        _ => return Err("fit() requires data argument".to_string()),
+                    };
+                    let size = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as usize,
+                        _ => return Err("fit() requires size argument".to_string()),
+                    };
+                    let filler = match arg_values.get(2) {
+                        Some(Value::Number(n)) => *n as u8,
+                        Some(Value::String(s)) if s.len() == 1 => s.as_bytes()[0],
+                        _ => b'A',
+                    };
+                    
+                    let mut result = data;
+                    if result.len() < size {
+                        result.resize(size, filler);
+                    } else if result.len() > size {
+                        result.truncate(size);
+                    }
+                    Ok(Value::Bytes(result))
+                }
+                "xor" => {
+                    let data = match arg_values.get(0) {
+                        Some(Value::Bytes(b)) => b.clone(),
+                        Some(Value::String(s)) => s.as_bytes().to_vec(),
+                        _ => return Err("xor() requires data argument".to_string()),
+                    };
+                    let key = match arg_values.get(1) {
+                        Some(Value::Number(n)) => vec![*n as u8],
+                        Some(Value::Bytes(b)) => b.clone(),
+                        Some(Value::String(s)) => s.as_bytes().to_vec(),
+                        _ => return Err("xor() requires key argument".to_string()),
+                    };
+                    
+                    let mut result = Vec::new();
+                    for (i, byte) in data.iter().enumerate() {
+                        result.push(byte ^ key[i % key.len()]);
+                    }
+                    Ok(Value::Bytes(result))
+                }
+                "asm" => {
+                    let code = match arg_values.get(0) {
+                        Some(Value::String(s)) => s,
+                        _ => return Err("asm() requires assembly code string".to_string()),
+                    };
+                    let arch = match arg_values.get(1) {
+                        Some(Value::String(s)) => s.as_str(),
+                        _ => "x64",
+                    };
+                    
+                    use crate::packing_tools;
+                    match packing_tools::assemble(code, arch) {
+                        Ok(bytes) => Ok(Value::Bytes(bytes)),
+                        Err(e) => Err(format!("asm() failed: {}", e)),
+                    }
+                }
+                "disasm" => {
+                    let bytes = match arg_values.get(0) {
+                        Some(Value::Bytes(b)) => b,
+                        _ => return Err("disasm() requires bytes argument".to_string()),
+                    };
+                    let arch = match arg_values.get(1) {
+                        Some(Value::String(s)) => s.as_str(),
+                        _ => "x64",
+                    };
+                    
+                    use crate::packing_tools;
+                    match packing_tools::disassemble(bytes, arch, 0) {
+                        Ok(asm) => Ok(Value::String(asm)),
+                        Err(e) => Err(format!("disasm() failed: {}", e)),
+                    }
+                }
+                "enhex" | "hexdump" => {
+                    let data = match arg_values.get(0) {
+                        Some(Value::Bytes(b)) => b,
+                        Some(Value::String(s)) => s.as_bytes(),
+                        _ => return Err("enhex() requires data argument".to_string()),
+                    };
+                    Ok(Value::String(hex::encode(data)))
+                }
+                "unhex" | "fromhex" => {
+                    let hex_str = match arg_values.get(0) {
+                        Some(Value::String(s)) => s.trim().replace(" ", "").replace("0x", ""),
+                        _ => return Err("unhex() requires hex string argument".to_string()),
+                    };
+                    match hex::decode(&hex_str) {
+                        Ok(bytes) => Ok(Value::Bytes(bytes)),
+                        Err(e) => Err(format!("unhex() failed: {}", e)),
+                    }
+                }
+                "rol" | "rotate_left" => {
+                    let value = match arg_values.get(0) {
+                        Some(Value::Number(n)) => *n as u64,
+                        _ => return Err("rol() requires numeric value".to_string()),
+                    };
+                    let bits = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as u32,
+                        _ => return Err("rol() requires bit count".to_string()),
+                    };
+                    Ok(Value::Number(value.rotate_left(bits) as i64))
+                }
+                "ror" | "rotate_right" => {
+                    let value = match arg_values.get(0) {
+                        Some(Value::Number(n)) => *n as u64,
+                        _ => return Err("ror() requires numeric value".to_string()),
+                    };
+                    let bits = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as u32,
+                        _ => return Err("ror() requires bit count".to_string());
+                    };
+                    Ok(Value::Number(value.rotate_right(bits) as i64))
+                }
+                "bits" | "to_bits" => {
+                    let value = match arg_values.get(0) {
+                        Some(Value::Number(n)) => *n as u64,
+                        _ => return Err("bits() requires numeric value".to_string()),
+                    };
+                    let num_bits = match arg_values.get(1) {
+                        Some(Value::Number(n)) => *n as usize,
+                        _ => 64,
+                    };
+                    let bit_str = format!("{:0width$b}", value, width = num_bits);
+                    Ok(Value::String(bit_str))
+                }
+                "unbits" | "from_bits" => {
+                    let bit_str = match arg_values.get(0) {
+                        Some(Value::String(s)) => s,
+                        _ => return Err("unbits() requires bit string".to_string()),
+                    };
+                    match u64::from_str_radix(bit_str, 2) {
+                        Ok(value) => Ok(Value::Number(value as i64)),
+                        Err(e) => Err(format!("unbits() failed: {}", e)),
+                    }
+                }
+                "pause" => {
+                    println!("[PAUSE] Press Enter to continue...");
+                    let mut input = String::new();
+                    std::io::stdin().read_line(&mut input).ok();
+                    Ok(Value::Null)
+                }
                 "parse_elf" | "ELF" => {
                     if arg_values.is_empty() {
                         return Err("parse_elf() requires binary path argument".to_string());

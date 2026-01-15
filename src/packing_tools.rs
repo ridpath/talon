@@ -178,6 +178,125 @@ pub fn bytes_to_hex(bytes: &[u8]) -> String {
     format!("0x{}", hex::encode(bytes))
 }
 
+/// Assemble code to bytes
+pub fn assemble(code: &str, arch: &str) -> Result<Vec<u8>, String> {
+    match arch {
+        "x64" | "x86_64" => {
+            let mut result = Vec::new();
+            for line in code.lines() {
+                let line = line.trim();
+                if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
+                    continue;
+                }
+                
+                let instr = line.split_whitespace().next().unwrap_or("");
+                match instr {
+                    "nop" => result.push(0x90),
+                    "ret" => result.push(0xc3),
+                    "syscall" => result.extend_from_slice(&[0x0f, 0x05]),
+                    "int3" => result.push(0xcc),
+                    "push" => {
+                        let operand = line.split_whitespace().nth(1).ok_or("Missing operand")?;
+                        match operand {
+                            "rax" => result.push(0x50),
+                            "rcx" => result.push(0x51),
+                            "rdx" => result.push(0x52),
+                            "rbx" => result.push(0x53),
+                            "rsp" => result.push(0x54),
+                            "rbp" => result.push(0x55),
+                            "rsi" => result.push(0x56),
+                            "rdi" => result.push(0x57),
+                            _ => {
+                                if let Ok(val) = operand.trim_start_matches("0x").parse::<u8>() {
+                                    result.extend_from_slice(&[0x6a, val]);
+                                } else {
+                                    return Err(format!("Unknown push operand: {}", operand));
+                                }
+                            }
+                        }
+                    }
+                    "pop" => {
+                        let operand = line.split_whitespace().nth(1).ok_or("Missing operand")?;
+                        match operand {
+                            "rax" => result.push(0x58),
+                            "rcx" => result.push(0x59),
+                            "rdx" => result.push(0x5a),
+                            "rbx" => result.push(0x5b),
+                            "rsp" => result.push(0x5c),
+                            "rbp" => result.push(0x5d),
+                            "rsi" => result.push(0x5e),
+                            "rdi" => result.push(0x5f),
+                            _ => return Err(format!("Unknown pop operand: {}", operand)),
+                        }
+                    }
+                    "xor" => {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() >= 3 {
+                            let dst = parts[1].trim_end_matches(',');
+                            let src = parts[2];
+                            if dst == "eax" && src == "eax" {
+                                result.extend_from_slice(&[0x31, 0xc0]);
+                            } else if dst == "ecx" && src == "ecx" {
+                                result.extend_from_slice(&[0x31, 0xc9]);
+                            } else if dst == "edx" && src == "edx" {
+                                result.extend_from_slice(&[0x31, 0xd2]);
+                            } else if dst == "rax" && src == "rax" {
+                                result.extend_from_slice(&[0x48, 0x31, 0xc0]);
+                            } else if dst == "rcx" && src == "rcx" {
+                                result.extend_from_slice(&[0x48, 0x31, 0xc9]);
+                            } else if dst == "rdx" && src == "rdx" {
+                                result.extend_from_slice(&[0x48, 0x31, 0xd2]);
+                            } else {
+                                return Err(format!("Unsupported xor: {} {}", dst, src));
+                            }
+                        }
+                    }
+                    _ => return Err(format!("Unsupported instruction: {}", instr)),
+                }
+            }
+            Ok(result)
+        }
+        _ => Err(format!("Unsupported architecture: {}", arch)),
+    }
+}
+
+/// Disassemble bytes to assembly
+pub fn disassemble(bytes: &[u8], arch: &str, addr: u64) -> Result<String, String> {
+    use capstone::prelude::*;
+    
+    let cs = match arch {
+        "x64" | "x86_64" => Capstone::new()
+            .x86()
+            .mode(arch::x86::ArchMode::Mode64)
+            .syntax(arch::x86::ArchSyntax::Intel)
+            .detail(true)
+            .build()
+            .map_err(|e| format!("Capstone init error: {:?}", e))?,
+        "x86" | "i386" => Capstone::new()
+            .x86()
+            .mode(arch::x86::ArchMode::Mode32)
+            .syntax(arch::x86::ArchSyntax::Intel)
+            .detail(true)
+            .build()
+            .map_err(|e| format!("Capstone init error: {:?}", e))?,
+        _ => return Err(format!("Unsupported architecture: {}", arch)),
+    };
+    
+    let insns = cs.disasm_all(bytes, addr)
+        .map_err(|e| format!("Disassembly error: {:?}", e))?;
+    
+    let mut result = String::new();
+    for insn in insns.iter() {
+        result.push_str(&format!("0x{:x}: {} {}\n",
+            insn.address(),
+            insn.mnemonic().unwrap_or(""),
+            insn.op_str().unwrap_or("")
+        ));
+    }
+    
+    Ok(result)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
