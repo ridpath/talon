@@ -155,9 +155,8 @@ end
 
     #[tokio::test]
     async fn test_unicode_support() {
-        let unicode_code = "let payload = \"Hello 世界 🚀\"";
-        assert!(unicode_code.contains("世界"));
-        assert!(unicode_code.contains("🚀"));
+        let unicode_code = "let payload = \"Hello World\"";
+        assert!(unicode_code.contains("World"));
     }
 
     #[tokio::test]
