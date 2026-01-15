@@ -91,6 +91,32 @@ mach2 = { version = "0.4", optional = true }
 procfs = { version = "0.15", optional = true }
 retour = { version = "0.3", optional = true }
 
+[dev-dependencies]
+# Property-based testing
+proptest = "1.4"
+quickcheck = "1.0"
+quickcheck_macros = "1.0"
+
+# Benchmarking
+criterion = { version = "0.5", features = ["html_reports"] }
+
+# Mocking
+mockall = "0.12"
+
+# CLI testing
+assert_cmd = "2.0"
+predicates = "3.0"
+
+# Better test assertions
+pretty_assertions = "1.4"
+
+# Serial test execution
+serial_test = "3.0"
+
+# Additional test utilities
+rstest = "0.18"
+insta = "1.34"
+
 [features]
 default = []
 llvm = ["inkwell"]
@@ -99,3 +125,31 @@ game-hacking = ["retour"]
 game-hacking-windows = ["windows", "game-hacking"]
 game-hacking-linux = ["procfs", "game-hacking"]
 game-hacking-macos = ["mach2", "game-hacking"]
+test-utils = []
+
+[profile.test]
+opt-level = 1
+debug = true
+overflow-checks = true
+
+[profile.bench]
+opt-level = 3
+debug = false
+lto = "thin"
+codegen-units = 1
+
+[[bench]]
+name = "parser_bench"
+harness = false
+
+[[bench]]
+name = "interpreter_bench"
+harness = false
+
+[[bench]]
+name = "binary_analysis_bench"
+harness = false
+
+[[bench]]
+name = "rop_bench"
+harness = false
