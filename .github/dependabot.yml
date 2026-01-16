@@ -1,22 +1,95 @@
 version: 2
 updates:
   - package-ecosystem: cargo
-    directory: "/"  # Root Cargo.toml
+    directory: "/"
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
     rebase-strategy: auto
+    allow:
+      - dependency-type: direct
     ignore:
-      - dependency-name: capstone
-        versions: [">=0.14"]
+      # Crates with potential breaking changes or downstream failures
       - dependency-name: goblin
-        versions: [">=0.10.4"]
+        versions: [">=0.8"]
+      - dependency-name: capstone
+        versions: [">=0.13"]
       - dependency-name: colored
         versions: [">=3.0"]
       - dependency-name: rand
         versions: [">=0.9"]
+      - dependency-name: windows
+        versions: [">=0.53"]
+      - dependency-name: indicatif
+        versions: [">=0.18"]
+      - dependency-name: reqwest
+        versions: [">=0.12"]
       - dependency-name: yara
-        versions: [">=0.31"]
-    labels:
-      - dependencies
-      - security
+        versions: [">=0.26"]
+      - dependency-name: criterion
+        versions: [">=0.6"]
+    groups:
+      binary-analysis:
+        patterns:
+          - "goblin"
+          - "capstone"
+          - "pelite"
+          - "yara"
+      crypto:
+        patterns:
+          - "aes-gcm"
+          - "sha2"
+          - "base64"
+          - "hex"
+          - "rand"
+          - "md5"
+          - "sha1"
+          - "secp256k1"
+          - "hkdf"
+          - "pbkdf2"
+          - "bip39"
+      dev-tools:
+        patterns:
+          - "proptest"
+          - "criterion"
+          - "mockall"
+          - "assert_cmd"
+          - "serial_test"
+          - "pretty_assertions"
+          - "rstest"
+          - "wait-timeout"
+          - "insta"
+      pentest:
+        patterns:
+          - "regex"
+          - "urlencoding"
+          - "flate2"
+          - "zip"
+      platform:
+        patterns:
+          - "windows"
+          - "mach2"
+          - "procfs"
+          - "retour"
+      ux:
+        patterns:
+          - "indicatif"
+          - "colored"
+          - "toml"
+          - "directories"
+          - "chrono"
+          - "rustyline"
+      net:
+        patterns:
+          - "reqwest"
+          - "tokio"
+          - "futures"
+          - "nix"
+          - "walkdir"
+          - "tempfile"
+          - "glob"
+          
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: weekly
