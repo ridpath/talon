@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: "/"  # Root Cargo.toml
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    rebase-strategy: auto
+    ignore:
+      - dependency-name: capstone
+        versions: [">=0.14"]
+      - dependency-name: goblin
+        versions: [">=0.10.4"]
+      - dependency-name: colored
+        versions: [">=3.0"]
+      - dependency-name: rand
+        versions: [">=0.9"]
+      - dependency-name: yara
+        versions: [">=0.31"]
+    labels:
+      - dependencies
+      - security
