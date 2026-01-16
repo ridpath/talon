@@ -30,7 +30,7 @@ hkdf = "0.12"
 pbkdf2 = "0.11"
 
 # Binary Analysis
-capstone = "0.12"
+capstone = "0.13"
 yara = { version = "0.25", optional = true }
 pelite = "0.10"
 goblin = "0.7"
