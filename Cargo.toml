@@ -101,7 +101,7 @@ quickcheck_macros = "1.0"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 # Mocking
-mockall = "0.12"
+mockall = "0.14"
 
 # CLI testing
 assert_cmd = "2.0"
