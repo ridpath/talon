@@ -78,7 +78,7 @@ flate2 = "1.0"
 
 # UX Enhancements
 indicatif = "0.17"
-toml = "0.8"
+toml = "0.9"
 directories = "5.0"
 rustyline = "13.0"
 chrono = "0.4"
