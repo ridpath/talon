@@ -343,27 +343,27 @@ See **`docs/SECURITY_AUDITING.md`** for security audit procedures.
 All commits are automatically tested via **GitHub Actions**:
 
 **`.github/workflows/ci.yml`**:
-- ✅ Build on Linux and Windows
-- ✅ Full test suite execution
-- ✅ Code coverage generation
-- ✅ Coverage upload to Codecov
-- ✅ Clippy linting
-- ✅ Format checking
+- Build on Linux and Windows
+- Full test suite execution
+- Code coverage generation
+- Coverage upload to Codecov
+- Clippy linting
+- Format checking
 
 **`.github/workflows/security.yml`**:
-- ✅ Cargo-audit vulnerability scanning
-- ✅ Cargo-deny policy enforcement
-- ✅ Daily scheduled security checks
+- Cargo-audit vulnerability scanning
+- Cargo-deny policy enforcement
+- Daily scheduled security checks
 
 **`.github/workflows/fuzzing.yml`**:
-- ✅ Daily fuzzing campaigns (1hr per target)
-- ✅ Corpus artifact preservation
-- ✅ Crash report generation
+- Daily fuzzing campaigns (1hr per target)
+- Corpus artifact preservation
+- Crash report generation
 
 **`.github/workflows/benchmarks.yml`**:
-- ✅ Performance regression detection
-- ✅ Benchmark result archiving
-- ✅ Performance trend tracking
+- Performance regression detection
+- Benchmark result archiving
+- Performance trend tracking
 
 ### Quality Metrics
 
