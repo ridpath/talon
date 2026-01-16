@@ -39,7 +39,7 @@ statrs = "0.16"
 # Threads / IO
 byteorder = "1.5"
 reqwest = { version = "0.11", features = ["blocking", "json"] }
-nix = "0.27"
+nix = "0.30"
 libc = "0.2"
 walkdir = "2.4"
 tempfile = "3.9"
