@@ -10,7 +10,7 @@ pest_derive = "2.7"
 
 # LLVM & Codegen (optional - not needed for CTF modules)
 inkwell = { version = "0.2", features = ["llvm16-0"], optional = true }
-walrus = "0.20"
+walrus = "0.24"
 
 # Web3 / Blockchain
 web3 = { version = "0.19", features = ["http-rustls-tls"] }
