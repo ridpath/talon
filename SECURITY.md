@@ -28,10 +28,6 @@ Instead, please report security issues via one of the following methods:
    - Click "Report a vulnerability"
    - Fill out the private vulnerability report form
 
-2. **Email**
-   - Send details to: [security@talon-project.example] (Update with actual contact)
-   - Use PGP encryption if possible (key available on request)
-
 ### What to Include in Your Report
 
 Please provide as much information as possible:
@@ -189,7 +185,6 @@ For security-related inquiries:
 
 - **Security Issues**: Use GitHub Security Advisories (preferred)
 - **General Security Questions**: Open a discussion in the GitHub Discussions tab
-- **Urgent Security Matters**: Email [security@talon-project.example]
 
 ## Acknowledgments
 
@@ -197,7 +192,7 @@ We appreciate responsible security researchers who help make TALON more secure. 
 
 - SECURITY.md (this file)
 - Release notes for the fixed version
-- Hall of Fame section (if applicable)
+
 
 Thank you for helping keep TALON and its users safe!
 
@@ -207,5 +202,3 @@ TALON is provided "as is" without warranty of any kind. Users are solely respons
 
 ---
 
-**Last Updated**: January 15, 2026  
-**Version**: 1.0.0
