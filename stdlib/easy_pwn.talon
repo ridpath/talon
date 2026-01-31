@@ -3,12 +3,12 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 define function easy_connect(host, port)
-    print("🔌 Connecting to", host, "on port", port)
+    print(" Connecting to", host, "on port", port)
     return host
 end
 
 define function easy_overflow(padding_size, return_address)
-    print("💥 Creating buffer overflow exploit")
+    print(" Creating buffer overflow exploit")
     print("   Padding:", padding_size, "bytes")
     print("   Return address: 0x", return_address)
     let payload = cyclic(padding_size)
@@ -16,7 +16,7 @@ define function easy_overflow(padding_size, return_address)
 end
 
 define function easy_rop_chain(gadgets)
-    print("⚙️  Building ROP chain with", len(gadgets), "gadgets")
+    print("️  Building ROP chain with", len(gadgets), "gadgets")
     let chain = []
     for gadget in gadgets
         print("   Adding gadget:", gadget)
@@ -26,7 +26,7 @@ define function easy_rop_chain(gadgets)
 end
 
 define function easy_shellcode(type, ip, port)
-    print("🐚 Generating", type, "shellcode")
+    print(" Generating", type, "shellcode")
     if type == "reverse"
         print("   Connecting back to", ip, ":", port)
     end
@@ -37,28 +37,28 @@ define function easy_shellcode(type, ip, port)
 end
 
 define function easy_leak(response, offset, size)
-    print("🔍 Extracting leak from response")
+    print(" Extracting leak from response")
     print("   Offset:", offset, "Size:", size, "bytes")
     return 0xdeadbeef
 end
 
 define function easy_send(connection, data)
-    print("📤 Sending", len(data), "bytes")
+    print(" Sending", len(data), "bytes")
     return "sent"
 end
 
 define function easy_receive(connection, delimiter)
-    print("📥 Receiving until:", delimiter)
+    print(" Receiving until:", delimiter)
     return "response_data"
 end
 
 define function easy_pattern(size)
-    print("🔤 Generating cyclic pattern of size", size)
+    print(" Generating cyclic pattern of size", size)
     return cyclic(size)
 end
 
 define function easy_find_offset(pattern, crash_value)
-    print("🎯 Finding offset for crash value:", crash_value)
+    print(" Finding offset for crash value:", crash_value)
     return 42
 end
 
@@ -67,7 +67,7 @@ define function show_help()
     print("   TALON EASY PWN HELPER")
     print("═══════════════════════════════════════")
     print("")
-    print("📚 Available Functions:")
+    print(" Available Functions:")
     print("")
     print("  Connection:")
     print("    easy_connect(host, port)")

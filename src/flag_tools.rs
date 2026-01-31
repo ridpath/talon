@@ -31,8 +31,7 @@ impl FlagFinder {
 
     #[allow(dead_code)]
     pub fn with_custom_pattern(mut self, pattern: &str) -> Result<Self, String> {
-        let regex = Regex::new(pattern)
-            .map_err(|e| format!("Invalid regex pattern: {}", e))?;
+        let regex = Regex::new(pattern).map_err(|e| format!("Invalid regex pattern: {}", e))?;
         self.patterns.push(regex);
         Ok(self)
     }
@@ -55,8 +54,7 @@ impl FlagFinder {
 
     #[allow(dead_code)]
     pub fn search_file(&self, filepath: &str) -> Result<Vec<String>, String> {
-        let data = std::fs::read(filepath)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
+        let data = std::fs::read(filepath).map_err(|e| format!("Failed to read file: {}", e))?;
         Ok(self.search(&data))
     }
 
@@ -106,7 +104,8 @@ impl FlagSubmitter {
 
     #[allow(dead_code)]
     pub fn with_token(mut self, token: String) -> Self {
-        self.headers.insert("Authorization".to_string(), format!("Bearer {}", token));
+        self.headers
+            .insert("Authorization".to_string(), format!("Bearer {}", token));
         self
     }
 
@@ -123,19 +122,21 @@ impl FlagSubmitter {
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
         let mut request = client.post(&self.url);
-        
+
         for (key, value) in &self.headers {
             request = request.header(key, value);
         }
 
         let body = serde_json::json!({ "flag": flag });
-        
-        let response = request.json(&body)
+
+        let response = request
+            .json(&body)
             .send()
             .map_err(|e| format!("Failed to submit flag: {}", e))?;
 
         let status = response.status();
-        let body_text = response.text()
+        let body_text = response
+            .text()
             .map_err(|e| format!("Failed to read response: {}", e))?;
 
         if status.is_success() {
@@ -159,7 +160,7 @@ impl FlagSubmitter {
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
         let mut request = client.post(format!("{}/api/v1/challenges/attempt", self.url));
-        
+
         for (key, value) in &self.headers {
             request = request.header(key, value);
         }
@@ -168,13 +169,15 @@ impl FlagSubmitter {
             "challenge_id": challenge_id,
             "submission": flag
         });
-        
-        let response = request.json(&body)
+
+        let response = request
+            .json(&body)
             .send()
             .map_err(|e| format!("Failed to submit flag: {}", e))?;
 
         let _status = response.status();
-        let json: serde_json::Value = response.json()
+        let json: serde_json::Value = response
+            .json()
             .map_err(|e| format!("Failed to parse response: {}", e))?;
 
         Ok(SubmitResponse {
@@ -215,14 +218,23 @@ pub fn flag_submit(url: &str, flag: &str) -> Result<SubmitResponse, String> {
 }
 
 #[allow(dead_code)]
-pub fn flag_submit_with_token(url: &str, flag: &str, token: &str) -> Result<SubmitResponse, String> {
+pub fn flag_submit_with_token(
+    url: &str,
+    flag: &str,
+    token: &str,
+) -> Result<SubmitResponse, String> {
     FlagSubmitter::new(url.to_string())
         .with_token(token.to_string())
         .submit(flag)
 }
 
 #[allow(dead_code)]
-pub fn flag_submit_ctfd(url: &str, flag: &str, challenge_id: i64, token: &str) -> Result<SubmitResponse, String> {
+pub fn flag_submit_ctfd(
+    url: &str,
+    flag: &str,
+    challenge_id: i64,
+    token: &str,
+) -> Result<SubmitResponse, String> {
     FlagSubmitter::new(url.to_string())
         .with_token(token.to_string())
         .submit_ctfd(flag, challenge_id)

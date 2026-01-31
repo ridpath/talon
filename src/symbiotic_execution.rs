@@ -1,8 +1,8 @@
+use crate::memory_tools;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use crate::memory_tools;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SymbolicLink {
@@ -77,9 +77,17 @@ impl SysbioticExecutor {
             target_pid: self.target_pid,
         };
 
-        log::info!("Created symlink '{}' -> 0x{:x} (type: {:?}, pid: {:?})", 
-                  name, address, parsed_type, self.target_pid);
-        self.symlinks.write().await.insert(name.to_string(), symlink);
+        log::info!(
+            "Created symlink '{}' -> 0x{:x} (type: {:?}, pid: {:?})",
+            name,
+            address,
+            parsed_type,
+            self.target_pid
+        );
+        self.symlinks
+            .write()
+            .await
+            .insert(name.to_string(), symlink);
         Ok(())
     }
 
@@ -90,7 +98,7 @@ impl SysbioticExecutor {
                 let segment = parts[0].trim_matches(|c| c == '$' || c == '[' || c == ']');
                 let offset_str = parts[1].trim_matches(|c| c == '[' || c == ']');
                 let offset = self.parse_hex_or_dec(offset_str)?;
-                
+
                 let segment_base = self.resolve_segment(segment).await?;
                 return Ok(segment_base + offset);
             }
@@ -121,7 +129,10 @@ impl SysbioticExecutor {
             _ => return Err(format!("Unknown segment: {}", segment)),
         };
 
-        self.segment_cache.write().await.insert(segment.to_string(), base_addr);
+        self.segment_cache
+            .write()
+            .await
+            .insert(segment.to_string(), base_addr);
         Ok(base_addr)
     }
 
@@ -180,7 +191,10 @@ impl SysbioticExecutor {
     async fn resolve_symbol(&self, symbol_expr: &str) -> Result<u64, String> {
         let parts: Vec<&str> = symbol_expr.trim_start_matches('@').split('!').collect();
         if parts.len() != 2 {
-            return Err(format!("Invalid symbol format: {}. Expected @lib!symbol", symbol_expr));
+            return Err(format!(
+                "Invalid symbol format: {}. Expected @lib!symbol",
+                symbol_expr
+            ));
         }
 
         let _library = parts[0];
@@ -191,8 +205,7 @@ impl SysbioticExecutor {
 
     fn parse_hex_or_dec(&self, s: &str) -> Result<u64, String> {
         if s.starts_with("0x") || s.starts_with("0X") {
-            u64::from_str_radix(&s[2..], 16)
-                .map_err(|e| format!("Failed to parse hex: {}", e))
+            u64::from_str_radix(&s[2..], 16).map_err(|e| format!("Failed to parse hex: {}", e))
         } else {
             s.parse::<u64>()
                 .map_err(|e| format!("Failed to parse number: {}", e))
@@ -201,38 +214,62 @@ impl SysbioticExecutor {
 
     pub async fn read_symlink(&self, name: &str) -> Result<Vec<u8>, String> {
         let symlinks = self.symlinks.read().await;
-        let symlink = symlinks.get(name)
+        let symlink = symlinks
+            .get(name)
             .ok_or_else(|| format!("Symlink not found: {}", name))?;
 
-        let pid = symlink.target_pid.or(self.target_pid)
+        let pid = symlink
+            .target_pid
+            .or(self.target_pid)
             .ok_or_else(|| "No target PID set for symlink".to_string())?;
-        
+
         let data = memory_tools::read_process_memory(pid, symlink.address as usize, 8)?;
-        log::debug!("Read {} bytes from PID {} at 0x{:x}", data.len(), pid, symlink.address);
+        log::debug!(
+            "Read {} bytes from PID {} at 0x{:x}",
+            data.len(),
+            pid,
+            symlink.address
+        );
         Ok(data)
     }
 
     pub async fn write_symlink(&self, name: &str, value: &[u8]) -> Result<(), String> {
         let symlinks = self.symlinks.read().await;
-        let symlink = symlinks.get(name)
+        let symlink = symlinks
+            .get(name)
             .ok_or_else(|| format!("Symlink not found: {}", name))?;
 
-        let pid = symlink.target_pid.or(self.target_pid)
+        let pid = symlink
+            .target_pid
+            .or(self.target_pid)
             .ok_or_else(|| "No target PID set for symlink".to_string())?;
         let address = symlink.address;
-        
+
         drop(symlinks);
-        
+
         memory_tools::write_process_memory(pid, address as usize, value)?;
 
-        self.symlinks.write().await.get_mut(name).unwrap().cached_value = value.to_vec();
-        log::info!("Wrote {} bytes to PID {} at 0x{:x} via symlink '{}'", 
-                  value.len(), pid, address, name);
+        self.symlinks
+            .write()
+            .await
+            .get_mut(name)
+            .unwrap()
+            .cached_value = value.to_vec();
+        log::info!(
+            "Wrote {} bytes to PID {} at 0x{:x} via symlink '{}'",
+            value.len(),
+            pid,
+            address,
+            name
+        );
         Ok(())
     }
 
     pub async fn remove_symlink(&self, name: &str) -> Result<(), String> {
-        self.symlinks.write().await.remove(name)
+        self.symlinks
+            .write()
+            .await
+            .remove(name)
             .ok_or_else(|| format!("Symlink not found: {}", name))?;
         Ok(())
     }
@@ -249,9 +286,16 @@ impl SysbioticExecutor {
             if symlink.is_active {
                 let pid = symlink.target_pid.or(self.target_pid);
                 if let Some(pid) = pid {
-                    if let Ok(current_value) = memory_tools::read_process_memory(pid, symlink.address as usize, 8) {
+                    if let Ok(current_value) =
+                        memory_tools::read_process_memory(pid, symlink.address as usize, 8)
+                    {
                         if current_value != symlink.cached_value {
-                            log::debug!("Symlink '{}' changed: {:?} -> {:?}", name, symlink.cached_value, current_value);
+                            log::debug!(
+                                "Symlink '{}' changed: {:?} -> {:?}",
+                                name,
+                                symlink.cached_value,
+                                current_value
+                            );
                             changes.push((name.clone(), current_value.clone()));
                         }
                     }
@@ -267,7 +311,8 @@ impl SysbioticExecutor {
 
     pub async fn get_symlink_info(&self, name: &str) -> Result<SymbolicLink, String> {
         let symlinks = self.symlinks.read().await;
-        symlinks.get(name)
+        symlinks
+            .get(name)
             .cloned()
             .ok_or_else(|| format!("Symlink not found: {}", name))
     }

@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use crate::ast::Command;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DefenseProfile {
@@ -120,10 +120,7 @@ impl DefenseSimulator {
                     confidence: 0.93,
                 },
             ],
-            response_actions: vec![
-                "deny_access".to_string(),
-                "log_violation".to_string(),
-            ],
+            response_actions: vec!["deny_access".to_string(), "log_violation".to_string()],
         };
 
         let anticheat = DefenseProfile {
@@ -157,15 +154,15 @@ impl DefenseSimulator {
                     confidence: 0.70,
                 },
             ],
-            response_actions: vec![
-                "terminate_game".to_string(),
-                "ban_account".to_string(),
-            ],
+            response_actions: vec!["terminate_game".to_string(), "ban_account".to_string()],
         };
 
-        self.profiles.insert("Windows_11_HVCI".to_string(), windows_hvci);
-        self.profiles.insert("SELinux_Enforcing".to_string(), selinux);
-        self.profiles.insert("GameGuard_AntiCheat".to_string(), anticheat);
+        self.profiles
+            .insert("Windows_11_HVCI".to_string(), windows_hvci);
+        self.profiles
+            .insert("SELinux_Enforcing".to_string(), selinux);
+        self.profiles
+            .insert("GameGuard_AntiCheat".to_string(), anticheat);
     }
 
     pub fn stress_test(
@@ -174,7 +171,9 @@ impl DefenseSimulator {
         exploit_commands: &[Command],
         iterations: usize,
     ) -> Result<StressTestResult, String> {
-        let profile = self.profiles.get(profile_name)
+        let profile = self
+            .profiles
+            .get(profile_name)
             .ok_or_else(|| format!("Defense profile not found: {}", profile_name))?;
 
         let mut successful = 0;
@@ -182,8 +181,9 @@ impl DefenseSimulator {
         let mut blocked = 0;
 
         for _ in 0..iterations {
-            let (success, was_detected, was_blocked) = self.simulate_attack(profile, exploit_commands);
-            
+            let (success, was_detected, was_blocked) =
+                self.simulate_attack(profile, exploit_commands);
+
             if success {
                 successful += 1;
             }
@@ -198,7 +198,11 @@ impl DefenseSimulator {
         let success_rate = successful as f64 / iterations as f64;
         let detection_rate = detected as f64 / iterations as f64;
 
-        let recommendations = self.generate_recommendations(profile, detection_rate, blocked as f64 / iterations as f64);
+        let recommendations = self.generate_recommendations(
+            profile,
+            detection_rate,
+            blocked as f64 / iterations as f64,
+        );
 
         Ok(StressTestResult {
             total_attempts: iterations,
@@ -232,8 +236,11 @@ impl DefenseSimulator {
                     let detection_threshold = (dangerous_operations as f64 * 0.15).min(1.0);
                     if detection_threshold >= (1.0 - mitigation.effectiveness) {
                         blocked = true;
-                        log::debug!("Mitigation '{}' blocked operation (threshold: {:.2})", 
-                                   mitigation.name, detection_threshold);
+                        log::debug!(
+                            "Mitigation '{}' blocked operation (threshold: {:.2})",
+                            mitigation.name,
+                            detection_threshold
+                        );
                     }
                 }
             }
@@ -244,15 +251,19 @@ impl DefenseSimulator {
                     let detection_score = (suspicious_syscalls as f64 * 0.1).min(1.0);
                     if detection_score >= (1.0 - rule.confidence) {
                         detected = true;
-                        log::debug!("Detection rule '{}' triggered (score: {:.2}, severity: {:?})", 
-                                   rule.pattern, detection_score, rule.severity);
+                        log::debug!(
+                            "Detection rule '{}' triggered (score: {:.2}, severity: {:?})",
+                            rule.pattern,
+                            detection_score,
+                            rule.severity
+                        );
                     }
                 }
             }
         }
 
         let success = !blocked;
-        log::info!("Attack simulation: {} suspicious syscalls, {} dangerous operations, blocked={}, detected={}", 
+        log::info!("Attack simulation: {} suspicious syscalls, {} dangerous operations, blocked={}, detected={}",
                   suspicious_syscalls, dangerous_operations, blocked, detected);
         (success, detected, blocked)
     }
@@ -260,20 +271,21 @@ impl DefenseSimulator {
     fn triggers_mitigation(&self, cmd: &Command, mitigation_name: &str) -> bool {
         match mitigation_name {
             "Hypervisor-Protected Code Integrity" => {
-                matches!(cmd, Command::WriteFile { .. } | 
-                         Command::DumpMemory { .. } |
-                         Command::RunCommand { .. })
+                matches!(
+                    cmd,
+                    Command::WriteFile { .. }
+                        | Command::DumpMemory { .. }
+                        | Command::RunCommand { .. }
+                )
             }
             "Kernel Control Flow Guard" => {
-                matches!(cmd, Command::RunCommand { .. } |
-                         Command::Connect { .. })
+                matches!(cmd, Command::RunCommand { .. } | Command::Connect { .. })
             }
             "Kernel Data Execution Prevention" => {
                 matches!(cmd, Command::RunCommand { .. } | Command::ExecuteShellcode)
             }
             "Mandatory Access Control" => {
-                matches!(cmd, Command::WriteFile { .. } |
-                         Command::ReadFile { .. })
+                matches!(cmd, Command::WriteFile { .. } | Command::ReadFile { .. })
             }
             "Type Enforcement" => {
                 matches!(cmd, Command::RunCommand { .. })
@@ -311,9 +323,11 @@ impl DefenseSimulator {
             "memory_scanner" => {
                 matches!(cmd, Command::DumpMemory { .. })
             }
-            _ => pattern.contains("memory") && matches!(cmd, Command::DumpMemory { .. }) ||
-                 pattern.contains("debugger") && matches!(cmd, Command::AntiDebugCheck) ||
-                 pattern.contains("file_access") && matches!(cmd, Command::WriteFile { .. })
+            _ => {
+                pattern.contains("memory") && matches!(cmd, Command::DumpMemory { .. })
+                    || pattern.contains("debugger") && matches!(cmd, Command::AntiDebugCheck)
+                    || pattern.contains("file_access") && matches!(cmd, Command::WriteFile { .. })
+            }
         }
     }
 
@@ -331,17 +345,22 @@ impl DefenseSimulator {
                 block_rate * 100.0,
                 profile.name
             ));
-            
+
             for mitigation in &profile.mitigations {
                 if mitigation.enabled && mitigation.effectiveness > 0.8 {
-                    recs.push(format!("  - {} (effectiveness: {:.0}%) is blocking operations",
-                                    mitigation.name, mitigation.effectiveness * 100.0));
+                    recs.push(format!(
+                        "  - {} (effectiveness: {:.0}%) is blocking operations",
+                        mitigation.name,
+                        mitigation.effectiveness * 100.0
+                    ));
                 }
             }
-            
+
             recs.push("\nRecommended mitigations:".to_string());
             recs.push("1. Implement timing delays (100-500ms) between operations".to_string());
-            recs.push("2. Use return-oriented programming (ROP) instead of direct shellcode".to_string());
+            recs.push(
+                "2. Use return-oriented programming (ROP) instead of direct shellcode".to_string(),
+            );
             recs.push("3. Chain legitimate system calls to avoid detection patterns".to_string());
         } else if block_rate > 0.5 {
             recs.push(format!(
@@ -360,20 +379,32 @@ impl DefenseSimulator {
         }
 
         if detection_rate > 0.8 {
-            recs.push(format!("\nHigh detection rate ({:.0}%) - Exploit will be noticed:", detection_rate * 100.0));
+            recs.push(format!(
+                "\nHigh detection rate ({:.0}%) - Exploit will be noticed:",
+                detection_rate * 100.0
+            ));
             for rule in &profile.detection_rules {
                 if rule.confidence > 0.8 {
-                    recs.push(format!("  - '{}' rule (confidence: {:.0}%, severity: {:?})",
-                                    rule.pattern, rule.confidence * 100.0, rule.severity));
+                    recs.push(format!(
+                        "  - '{}' rule (confidence: {:.0}%, severity: {:?})",
+                        rule.pattern,
+                        rule.confidence * 100.0,
+                        rule.severity
+                    ));
                 }
             }
             recs.push("\nEvasion techniques:".to_string());
             recs.push("- Obfuscate memory access patterns".to_string());
             recs.push("- Mimic legitimate process behavior".to_string());
         } else if detection_rate > 0.3 {
-            recs.push(format!("\nModerate detection rate ({:.0}%). Stealth could be improved.", detection_rate * 100.0));
+            recs.push(format!(
+                "\nModerate detection rate ({:.0}%). Stealth could be improved.",
+                detection_rate * 100.0
+            ));
         } else {
-            recs.push("\nLow detection rate. Exploit operates below detection thresholds.".to_string());
+            recs.push(
+                "\nLow detection rate. Exploit operates below detection thresholds.".to_string(),
+            );
         }
 
         recs

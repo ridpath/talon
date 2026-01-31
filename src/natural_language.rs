@@ -43,7 +43,9 @@ impl NaturalLanguageProcessor {
             return Some(self.generate_format_string_exploit(&input_lower));
         }
 
-        if input_lower.contains("heap") && (input_lower.contains("spray") || input_lower.contains("feng shui")) {
+        if input_lower.contains("heap")
+            && (input_lower.contains("spray") || input_lower.contains("feng shui"))
+        {
             return Some(self.generate_heap_exploit(&input_lower));
         }
 
@@ -62,7 +64,8 @@ impl NaturalLanguageProcessor {
         let binary = self.extract_binary_name(input).unwrap_or("target");
         let port = self.extract_port(input).unwrap_or(4444);
 
-        format!(r#"# Auto-generated buffer overflow exploit
+        format!(
+            r#"# Auto-generated buffer overflow exploit
 analyze binary "{binary}"
 find vulnerability type=buffer_overflow
 
@@ -75,13 +78,17 @@ let exploit = padding + p64(ret_addr) + shellcode
 connect to "target.com" on port 9999
 send exploit
 interactive
-"#, binary = binary, port = port)
+"#,
+            binary = binary,
+            port = port
+        )
     }
 
     fn generate_rop_exploit(&self, input: &str) -> String {
         let binary = self.extract_binary_name(input).unwrap_or("binary");
 
-        format!(r#"# Auto-generated ROP chain exploit
+        format!(
+            r#"# Auto-generated ROP chain exploit
 resolve rop chain in "{binary}"
 
 let pop_rdi = find_gadget("{binary}", "pop rdi; ret")
@@ -100,13 +107,16 @@ let rop_chain = [
 ]
 
 let payload = cyclic(264) + rop_chain
-"#, binary = binary)
+"#,
+            binary = binary
+        )
     }
 
     fn generate_format_string_exploit(&self, input: &str) -> String {
         let binary = self.extract_binary_name(input).unwrap_or("vuln");
 
-        format!(r#"# Auto-generated format string exploit
+        format!(
+            r#"# Auto-generated format string exploit
 find format offset for "{binary}"
 
 let offset = 6
@@ -117,11 +127,13 @@ let writes = {{
 }}
 
 let payload = generate_format_string(offset, writes)
-"#, binary = binary)
+"#,
+            binary = binary
+        )
     }
 
     fn generate_heap_exploit(&self, _input: &str) -> String {
-        format!(r#"# Auto-generated heap exploitation
+        r#"# Auto-generated heap exploitation
 heap_groom target: 0x603000
     spray size=0x100 count=100
     free indices=[50, 51, 52]
@@ -129,25 +141,29 @@ heap_groom target: 0x603000
 end
 
 let tcache_poison = craft_tcache_poison(target=0x601000)
-"#)
+"#.to_string()
     }
 
     fn generate_symbolic_execution(&self, input: &str) -> String {
         let target_addr = self.extract_address(input).unwrap_or(0x08048abc);
 
-        format!(r#"# Auto-generated symbolic execution
+        format!(
+            r#"# Auto-generated symbolic execution
 symbolic let buffer = bytes(256)
 constrain buffer[0] != 0x00
 constrain buffer[1..4] == "FLAG"
 
 solve to reach 0x{:x}
-"#, target_addr)
+"#,
+            target_addr
+        )
     }
 
     fn generate_smart_contract_audit(&self, input: &str) -> String {
         let contract = self.extract_contract_name(input).unwrap_or("contract.sol");
 
-        format!(r#"# Auto-generated smart contract audit
+        format!(
+            r#"# Auto-generated smart contract audit
 audit solidity "{contract}"
     detect: [reentrancy, integer_overflow, unchecked_call]
     auto_exploit: true
@@ -157,7 +173,9 @@ flashloan attack
     borrow 100000 ETH
     reentrancy on withdraw()
 end
-"#, contract = contract)
+"#,
+            contract = contract
+        )
     }
 
     async fn ai_translate(&self, input: &str) -> Result<String, String> {
@@ -180,7 +198,7 @@ Talon code:"#,
         );
 
         let talon_code = self.ai_generator.complete_text(&prompt, 500).await?;
-        
+
         Ok(talon_code.trim().to_string())
     }
 

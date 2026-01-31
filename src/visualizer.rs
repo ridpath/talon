@@ -6,7 +6,9 @@ fn print_node(cmd: &Command, parent_id: usize, counter: &mut usize) {
     let current_id = *counter;
 
     let label = match cmd {
-        Command::GenerateShellcode(ShellcodeSpec { os, payload_type, .. }) => {
+        Command::GenerateShellcode(ShellcodeSpec {
+            os, payload_type, ..
+        }) => {
             format!("shellcode\\nOS: {}\\nType: {}", os, payload_type)
         }
         Command::DefineFunction(func_def) => format!("function {}", func_def.name),
@@ -15,7 +17,11 @@ fn print_node(cmd: &Command, parent_id: usize, counter: &mut usize) {
         Command::Assignment { name, .. } => format!("assign {}", name),
         Command::Control(Control::If { .. }) => "if".to_string(),
         Command::Control(Control::For { .. }) => "for".to_string(),
-        _ => format!("{:?}", cmd).split_once('(').map(|(a, _)| a).unwrap_or("cmd").to_string(),
+        _ => format!("{:?}", cmd)
+            .split_once('(')
+            .map(|(a, _)| a)
+            .unwrap_or("cmd")
+            .to_string(),
     };
 
     println!("  node{} [label=\"{}\"];", current_id, label);
@@ -28,7 +34,11 @@ fn print_node(cmd: &Command, parent_id: usize, counter: &mut usize) {
                 print_node(sub, current_id, counter);
             }
         }
-        Command::Control(Control::If { then_body, else_body, .. }) => {
+        Command::Control(Control::If {
+            then_body,
+            else_body,
+            ..
+        }) => {
             for sub in then_body {
                 print_node(sub, current_id, counter);
             }

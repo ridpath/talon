@@ -1,11 +1,11 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use crate::ai_exploit_gen::{AIExploitGenerator, AIConfig, AIProvider, ExploitRequest};
-use crate::exploit_db::{ExploitDatabase, ExploitEntry};
-use crate::environment_graph::EnvironmentGraph;
-use crate::campaign::Strategy;
+use crate::ai_exploit_gen::{AIConfig, AIExploitGenerator, AIProvider, ExploitRequest};
 use crate::ai_planner::AIPlanner;
 use crate::binary_analyzer::BinaryAnalyzer;
+use crate::campaign::Strategy;
+use crate::environment_graph::EnvironmentGraph;
+use crate::exploit_db::{ExploitDatabase, ExploitEntry};
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::sync::Arc;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,10 +78,10 @@ impl SuggestionEngine {
 
     pub fn analyze_binary(&self, binary_path: &str) -> Result<BinaryFingerprint, String> {
         let analysis = BinaryAnalyzer::analyze(binary_path)?;
-        
+
         let arch = analysis.architecture.clone();
         let os = analysis.os.clone();
-        
+
         let mut protections = Vec::new();
         if analysis.protections.nx {
             protections.push("NX".to_string());
@@ -94,10 +94,12 @@ impl SuggestionEngine {
         }
         match analysis.protections.relro {
             crate::binary_analyzer::RelroLevel::Full => protections.push("Full RELRO".to_string()),
-            crate::binary_analyzer::RelroLevel::Partial => protections.push("Partial RELRO".to_string()),
+            crate::binary_analyzer::RelroLevel::Partial => {
+                protections.push("Partial RELRO".to_string())
+            }
             crate::binary_analyzer::RelroLevel::None => {}
         }
-        
+
         let vulnerabilities = self.scan_vulnerabilities_from_analysis(&analysis)?;
         let interesting_functions = BinaryAnalyzer::find_interesting_functions(&analysis.symbols);
         let writable_sections = BinaryAnalyzer::find_writable_sections(&analysis.sections);
@@ -154,10 +156,7 @@ impl SuggestionEngine {
                 constraints: suggestion.prerequisites.clone(),
             };
 
-            match ai_gen.generate_exploit(&request) {
-                Ok(response) => return Ok(response.exploit_code),
-                Err(_) => {}
-            }
+            if let Ok(response) = ai_gen.generate_exploit(&request) { return Ok(response.exploit_code) }
         }
 
         Ok(suggestion.talon_template.clone())
@@ -213,16 +212,19 @@ impl SuggestionEngine {
         analysis: &crate::binary_analyzer::BinaryAnalysis,
     ) -> Result<Vec<VulnerabilityInfo>, String> {
         let mut vulnerabilities = Vec::new();
-        
+
         let dangerous_funcs = BinaryAnalyzer::find_dangerous_functions(&analysis.symbols);
-        
+
         for func in dangerous_funcs {
             if func.contains("strcpy") || func.contains("gets") || func.contains("sprintf") {
                 vulnerabilities.push(VulnerabilityInfo {
                     vuln_type: "buffer_overflow".to_string(),
                     severity: "high".to_string(),
                     location: format!("{} function", func),
-                    description: format!("Dangerous function {} detected - potential buffer overflow", func),
+                    description: format!(
+                        "Dangerous function {} detected - potential buffer overflow",
+                        func
+                    ),
                     exploitability: if !analysis.protections.nx && !analysis.protections.canary {
                         0.95
                     } else if !analysis.protections.nx {
@@ -234,14 +236,21 @@ impl SuggestionEngine {
                     },
                 });
             }
-            
+
             if func.contains("printf") || func.contains("scanf") || func.contains("fprintf") {
                 vulnerabilities.push(VulnerabilityInfo {
                     vuln_type: "format_string".to_string(),
                     severity: "high".to_string(),
                     location: format!("{} function", func),
-                    description: format!("Format string function {} - potential arbitrary write", func),
-                    exploitability: if !analysis.protections.relro.eq(&crate::binary_analyzer::RelroLevel::Full) {
+                    description: format!(
+                        "Format string function {} - potential arbitrary write",
+                        func
+                    ),
+                    exploitability: if !analysis
+                        .protections
+                        .relro
+                        .eq(&crate::binary_analyzer::RelroLevel::Full)
+                    {
                         0.80
                     } else {
                         0.50
@@ -250,12 +259,17 @@ impl SuggestionEngine {
             }
         }
 
-        if analysis.symbols.iter().any(|s| s.name.contains("malloc") || s.name.contains("free")) {
+        if analysis
+            .symbols
+            .iter()
+            .any(|s| s.name.contains("malloc") || s.name.contains("free"))
+        {
             vulnerabilities.push(VulnerabilityInfo {
                 vuln_type: "heap_overflow".to_string(),
                 severity: "medium".to_string(),
                 location: "heap management functions".to_string(),
-                description: "Heap allocation functions present - potential heap exploitation".to_string(),
+                description: "Heap allocation functions present - potential heap exploitation"
+                    .to_string(),
                 exploitability: 0.40,
             });
         }
@@ -265,7 +279,8 @@ impl SuggestionEngine {
                 vuln_type: "unknown".to_string(),
                 severity: "low".to_string(),
                 location: "general".to_string(),
-                description: "No obvious vulnerabilities detected - manual analysis recommended".to_string(),
+                description: "No obvious vulnerabilities detected - manual analysis recommended"
+                    .to_string(),
                 exploitability: 0.20,
             });
         }
@@ -427,7 +442,11 @@ session.interactive()
         for vuln in &fingerprint.vulnerabilities {
             let results = self
                 .exploit_db
-                .query(&vuln.vuln_type, &fingerprint.os, fingerprint.protections.clone())
+                .query(
+                    &vuln.vuln_type,
+                    &fingerprint.os,
+                    fingerprint.protections.clone(),
+                )
                 .await;
 
             if !results.is_empty() {

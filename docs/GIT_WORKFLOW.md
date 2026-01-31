@@ -753,7 +753,7 @@ git submodule update --init --recursive
 
 ## Best Practices Summary
 
-✅ **DO**:
+ **DO**:
 - Use descriptive branch names
 - Write clear commit messages (conventional commits)
 - Keep commits atomic and focused
@@ -762,7 +762,7 @@ git submodule update --init --recursive
 - Respond to PR feedback promptly
 - Use `--force-with-lease` instead of `--force`
 
-❌ **DON'T**:
+ **DON'T**:
 - Commit secrets/keys
 - Force push to shared branches (`main`, `develop`)
 - Merge your own PRs (wait for approval)
@@ -790,4 +790,4 @@ git submodule update --init --recursive
 - **Discussions**: Use [GitHub Discussions](https://github.com/ridpath/talon/discussions)
 - **Security**: See `SECURITY.md` for security-related questions
 
-Happy contributing! 🚀
+Happy contributing! 

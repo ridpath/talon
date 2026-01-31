@@ -1,6 +1,6 @@
+use regex::Regex;
 use std::collections::HashMap;
 use std::process::Command;
-use regex::Regex;
 
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
@@ -87,7 +87,8 @@ impl GdbParser {
         let signal = Self::parse_signal(output)?;
         let crash_address = Self::parse_crash_address(output);
         let registers = Self::parse_registers(output);
-        let instruction_pointer = registers.get("rip")
+        let instruction_pointer = registers
+            .get("rip")
             .or_else(|| registers.get("eip"))
             .or_else(|| registers.get("pc"))
             .copied()
@@ -122,7 +123,7 @@ impl GdbParser {
 
     fn parse_crash_address(output: &str) -> Option<u64> {
         let addr_re = Regex::new(r"0x([0-9a-fA-F]+)").ok()?;
-        
+
         for line in output.lines() {
             if line.contains("Segmentation fault") || line.contains("SIGSEGV") {
                 if let Some(cap) = addr_re.captures(line) {
@@ -138,17 +139,20 @@ impl GdbParser {
     pub fn parse_registers(output: &str) -> HashMap<String, u64> {
         let mut registers = HashMap::new();
         let reg_re = Regex::new(r"(\w+)\s+0x([0-9a-fA-F]+)").unwrap();
-        
+
         let mut in_registers = false;
         for line in output.lines() {
-            if line.contains("info registers") || line.trim().starts_with("rax") || line.trim().starts_with("eax") {
+            if line.contains("info registers")
+                || line.trim().starts_with("rax")
+                || line.trim().starts_with("eax")
+            {
                 in_registers = true;
             }
-            
+
             if line.contains("backtrace") || line.starts_with("#") {
                 in_registers = false;
             }
-            
+
             if in_registers {
                 for cap in reg_re.captures_iter(line) {
                     let reg_name = cap[1].to_lowercase();
@@ -158,20 +162,19 @@ impl GdbParser {
                 }
             }
         }
-        
+
         registers
     }
 
     pub fn parse_backtrace(output: &str) -> Vec<GdbFrame> {
         let mut frames = Vec::new();
         let frame_re = Regex::new(r"#(\d+)\s+0x([0-9a-fA-F]+)\s+in\s+([^\s(]+)").unwrap();
-        
+
         for line in output.lines() {
             if let Some(cap) = frame_re.captures(line) {
-                if let (Ok(level), Ok(addr)) = (
-                    cap[1].parse::<usize>(),
-                    u64::from_str_radix(&cap[2], 16)
-                ) {
+                if let (Ok(level), Ok(addr)) =
+                    (cap[1].parse::<usize>(), u64::from_str_radix(&cap[2], 16))
+                {
                     frames.push(GdbFrame {
                         level,
                         address: addr,
@@ -181,7 +184,7 @@ impl GdbParser {
                 }
             }
         }
-        
+
         frames
     }
 
@@ -227,9 +230,9 @@ impl GdbParser {
     #[allow(dead_code)]
     pub fn get_crash_offset(binary: &str, pattern: &[u8]) -> Result<usize, String> {
         let crash_info = Self::run_and_parse(binary, Some(pattern))?;
-        
+
         let crash_value = crash_info.instruction_pointer;
-        
+
         crate::cyclic_tools::cyclic_find(crash_value)
             .ok_or_else(|| format!("Could not find offset for crash at 0x{:x}", crash_value))
     }

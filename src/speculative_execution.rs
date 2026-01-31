@@ -1,9 +1,9 @@
+use crate::ast::Command;
+use crate::interpreter::Value;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use crate::ast::Command;
-use crate::interpreter::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SpeculativeResult {
@@ -47,9 +47,14 @@ impl SpeculativeExecutor {
             *counter
         };
 
-        let result = self.execute_in_sandbox(sandbox_id, commands, current_state).await?;
+        let result = self
+            .execute_in_sandbox(sandbox_id, commands, current_state)
+            .await?;
 
-        self.futures.write().await.insert(format!("sandbox_{}", sandbox_id), result.clone());
+        self.futures
+            .write()
+            .await
+            .insert(format!("sandbox_{}", sandbox_id), result.clone());
 
         Ok(result)
     }
@@ -90,61 +95,61 @@ impl SpeculativeExecutor {
         #[cfg(unix)]
         {
             use std::os::unix::process::ExitStatusExt;
-            
+
             let commands_clone = commands.to_vec();
             let timeout_ms = 5000;
-            
+
             let (tx, rx) = std::sync::mpsc::channel();
-            
-            std::thread::spawn(move || {
-                unsafe {
-                    let pid = libc::fork();
-                    
-                    if pid == 0 {
-                        let result = Self::execute_in_child(&commands_clone);
-                        std::process::exit(if result.is_ok() { 0 } else { 1 });
-                    } else if pid > 0 {
-                        let start = Instant::now();
-                        loop {
-                            let mut status: libc::c_int = 0;
-                            let result = libc::waitpid(pid, &mut status, libc::WNOHANG);
-                            
-                            if result == pid {
-                                if libc::WIFEXITED(status) {
-                                    let exit_code = libc::WEXITSTATUS(status);
-                                    tx.send(if exit_code == 0 {
-                                        ExecutionOutcome::Success
-                                    } else {
-                                        ExecutionOutcome::Unknown
-                                    }).ok();
-                                } else if libc::WIFSIGNALED(status) {
-                                    let signal = libc::WTERMSIG(status);
-                                    tx.send(if signal == libc::SIGSEGV || signal == libc::SIGBUS {
-                                        ExecutionOutcome::Crash
-                                    } else {
-                                        ExecutionOutcome::SecurityViolation
-                                    }).ok();
-                                }
-                                break;
-                            } else if result == 0 {
-                                if start.elapsed().as_millis() > timeout_ms as u128 {
-                                    libc::kill(pid, libc::SIGKILL);
-                                    libc::waitpid(pid, &mut status, 0);
-                                    tx.send(ExecutionOutcome::Hang).ok();
-                                    break;
-                                }
-                                std::thread::sleep(Duration::from_millis(10));
-                            } else {
-                                tx.send(ExecutionOutcome::Unknown).ok();
+
+            std::thread::spawn(move || unsafe {
+                let pid = libc::fork();
+
+                if pid == 0 {
+                    let result = Self::execute_in_child(&commands_clone);
+                    std::process::exit(if result.is_ok() { 0 } else { 1 });
+                } else if pid > 0 {
+                    let start = Instant::now();
+                    loop {
+                        let mut status: libc::c_int = 0;
+                        let result = libc::waitpid(pid, &mut status, libc::WNOHANG);
+
+                        if result == pid {
+                            if libc::WIFEXITED(status) {
+                                let exit_code = libc::WEXITSTATUS(status);
+                                tx.send(if exit_code == 0 {
+                                    ExecutionOutcome::Success
+                                } else {
+                                    ExecutionOutcome::Unknown
+                                })
+                                .ok();
+                            } else if libc::WIFSIGNALED(status) {
+                                let signal = libc::WTERMSIG(status);
+                                tx.send(if signal == libc::SIGSEGV || signal == libc::SIGBUS {
+                                    ExecutionOutcome::Crash
+                                } else {
+                                    ExecutionOutcome::SecurityViolation
+                                })
+                                .ok();
+                            }
+                            break;
+                        } else if result == 0 {
+                            if start.elapsed().as_millis() > timeout_ms as u128 {
+                                libc::kill(pid, libc::SIGKILL);
+                                libc::waitpid(pid, &mut status, 0);
+                                tx.send(ExecutionOutcome::Hang).ok();
                                 break;
                             }
+                            std::thread::sleep(Duration::from_millis(10));
+                        } else {
+                            tx.send(ExecutionOutcome::Unknown).ok();
+                            break;
                         }
-                    } else {
-                        tx.send(ExecutionOutcome::Unknown).ok();
                     }
+                } else {
+                    tx.send(ExecutionOutcome::Unknown).ok();
                 }
             });
-            
+
             match rx.recv_timeout(Duration::from_millis(timeout_ms + 1000)) {
                 Ok(outcome) => {
                     log::info!("Speculative execution completed: {:?}", outcome);
@@ -156,16 +161,14 @@ impl SpeculativeExecutor {
                 }
             }
         }
-        
+
         #[cfg(not(unix))]
         {
             log::warn!("Fork-based speculation not available on this platform");
             for cmd in commands {
-                if let Command::Expr(expr) = cmd {
-                    if let crate::ast::Expr::Call { name, .. } = expr {
-                        if name.contains("crash") || name.contains("segfault") {
-                            return Ok(ExecutionOutcome::Crash);
-                        }
+                if let Command::Expr(crate::ast::Expr::Call { name, .. }) = cmd {
+                    if name.contains("crash") || name.contains("segfault") {
+                        return Ok(ExecutionOutcome::Crash);
                     }
                 }
             }
@@ -203,7 +206,11 @@ impl SpeculativeExecutor {
         effects
     }
 
-    async fn generate_suggestion(&self, outcome: &ExecutionOutcome, side_effects: &[String]) -> Option<String> {
+    async fn generate_suggestion(
+        &self,
+        outcome: &ExecutionOutcome,
+        side_effects: &[String],
+    ) -> Option<String> {
         match outcome {
             ExecutionOutcome::Crash => {
                 Some("This sequence will likely crash. Consider: 1) Check memory alignment 2) Validate addresses 3) Add null checks".to_string())
@@ -236,7 +243,7 @@ impl SpeculativeExecutor {
             ExecutionOutcome::SecurityViolation => 0.85,
             ExecutionOutcome::Unknown => 0.60,
         };
-        
+
         #[cfg(not(unix))]
         let base_probability = match outcome {
             ExecutionOutcome::Success => 0.70,
@@ -248,9 +255,13 @@ impl SpeculativeExecutor {
 
         let complexity_factor = 1.0 - (commands.len() as f64 * 0.005).min(0.15);
         let probability = base_probability * complexity_factor;
-        
-        log::debug!("Probability calculation: {:?} outcome with {} commands = {:.2}%", 
-                   outcome, commands.len(), probability * 100.0);
+
+        log::debug!(
+            "Probability calculation: {:?} outcome with {} commands = {:.2}%",
+            outcome,
+            commands.len(),
+            probability * 100.0
+        );
 
         probability
     }

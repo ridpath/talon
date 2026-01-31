@@ -1,7 +1,7 @@
-use std::time::Instant;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
 use std::fs;
+use std::time::Instant;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProfileEntry {
@@ -38,41 +38,41 @@ impl Profiler {
             memory_baseline: 0,
         }
     }
-    
+
     pub fn enable(&mut self) {
         self.enabled = true;
         self.start_time = Instant::now();
     }
-    
+
     pub fn disable(&mut self) {
         self.enabled = false;
     }
-    
+
     pub fn is_enabled(&self) -> bool {
         self.enabled
     }
-    
+
     pub fn start_region(&mut self, name: &str) {
         if !self.enabled {
             return;
         }
-        
+
         self.entries.push((name.to_string(), Instant::now(), None));
         self.call_stack.push(name.to_string());
     }
-    
+
     pub fn end_region(&mut self, name: &str) {
         if !self.enabled {
             return;
         }
-        
-        if let Some((entry_name, start, _)) = self.entries.iter().rev()
-            .find(|(n, _, _)| n == name) {
-            
+
+        if let Some((entry_name, start, _)) = self.entries.iter().rev().find(|(n, _, _)| n == name)
+        {
             let duration = start.elapsed();
             let entry_name = entry_name.clone();
-            
-            self.completed.entry(entry_name.clone())
+
+            self.completed
+                .entry(entry_name.clone())
                 .and_modify(|e| {
                     e.duration_us += duration.as_micros();
                     e.call_count += 1;
@@ -85,88 +85,97 @@ impl Profiler {
                     children: Vec::new(),
                 });
         }
-        
+
         if let Some(idx) = self.call_stack.iter().rposition(|n| n == name) {
             self.call_stack.remove(idx);
         }
     }
-    
+
     pub fn get_results(&self) -> Vec<ProfileEntry> {
         let mut results: Vec<_> = self.completed.values().cloned().collect();
         results.sort_by(|a, b| b.duration_us.cmp(&a.duration_us));
         results
     }
-    
+
     pub fn get_call_graph(&self) -> Option<CallGraph> {
         if self.completed.is_empty() {
             return None;
         }
-        
+
         let root = self.completed.keys().next()?.clone();
-        
+
         Some(CallGraph {
             nodes: self.completed.clone(),
             root,
         })
     }
-    
+
     pub fn print_report(&self) {
         println!("\n╔═══════════════════════════════════════════════════════════════════════════╗");
         println!("║                        PERFORMANCE PROFILE                                ║");
         println!("╚═══════════════════════════════════════════════════════════════════════════╝\n");
-        
+
         let total_duration = self.start_time.elapsed();
-        println!("Total execution time: {:.3}ms\n", total_duration.as_secs_f64() * 1000.0);
-        
-        println!("{:<40} {:>12} {:>10} {:>12}", "Region", "Time (ms)", "Calls", "Avg (μs)");
+        println!(
+            "Total execution time: {:.3}ms\n",
+            total_duration.as_secs_f64() * 1000.0
+        );
+
+        println!(
+            "{:<40} {:>12} {:>10} {:>12}",
+            "Region", "Time (ms)", "Calls", "Avg (μs)"
+        );
         println!("{}", "─".repeat(78));
-        
+
         let results = self.get_results();
         for entry in &results {
             let avg_us = entry.duration_us / entry.call_count as u128;
             let time_ms = entry.duration_us as f64 / 1000.0;
-            println!("{:<40} {:>12.3} {:>10} {:>12}", 
-                     entry.name, 
-                     time_ms, 
-                     entry.call_count,
-                     avg_us);
+            println!(
+                "{:<40} {:>12.3} {:>10} {:>12}",
+                entry.name, time_ms, entry.call_count, avg_us
+            );
         }
-        
+
         if !results.is_empty() {
             println!("\nHotspots (Top 5):");
             for (i, entry) in results.iter().take(5).enumerate() {
-                let percentage = (entry.duration_us as f64 / total_duration.as_micros() as f64) * 100.0;
-                println!("  {}. {} - {:.2}% of total time", i + 1, entry.name, percentage);
+                let percentage =
+                    (entry.duration_us as f64 / total_duration.as_micros() as f64) * 100.0;
+                println!(
+                    "  {}. {} - {:.2}% of total time",
+                    i + 1,
+                    entry.name,
+                    percentage
+                );
             }
         }
-        
+
         println!();
     }
-    
+
     pub fn export_json(&self, path: &str) -> Result<(), String> {
         let results = self.get_results();
         let json = serde_json::to_string_pretty(&results)
             .map_err(|e| format!("Failed to serialize: {}", e))?;
-        
-        fs::write(path, json)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
-        
+
+        fs::write(path, json).map_err(|e| format!("Failed to write file: {}", e))?;
+
         Ok(())
     }
-    
+
     pub fn export_flamegraph(&self, path: &str) -> Result<(), String> {
         let mut output = String::new();
-        
+
         for entry in &self.get_results() {
             output.push_str(&format!("{} {}\n", entry.name, entry.duration_us));
         }
-        
-        fs::write(path, output)
-            .map_err(|e| format!("Failed to write flamegraph: {}", e))?;
-        
+
+        fs::write(path, output).map_err(|e| format!("Failed to write flamegraph: {}", e))?;
+
         Ok(())
     }
-    
+
     pub fn clear(&mut self) {
         self.entries.clear();
         self.completed.clear();
@@ -204,16 +213,15 @@ impl<'a> Drop for ScopedProfile<'a> {
 
 #[macro_export]
 macro_rules! profile {
-    ($profiler:expr, $name:expr, $block:block) => {
-        {
-            let _scope = $crate::profiler::ScopedProfile::new($profiler, $name);
-            $block
-        }
-    };
+    ($profiler:expr, $name:expr, $block:block) => {{
+        let _scope = $crate::profiler::ScopedProfile::new($profiler, $name);
+        $block
+    }};
 }
 
 pub fn print_usage_guide() {
-    println!(r#"
+    println!(
+        r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                        PERFORMANCE PROFILING                              ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -270,5 +278,6 @@ perform_scan()
 profiler.end_region("scan")
 
 For more information: talon man profiler
-"#);
+"#
+    );
 }

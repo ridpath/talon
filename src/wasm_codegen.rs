@@ -1,7 +1,5 @@
-use walrus::{
-    FunctionBuilder, MemoryId, Module, ValType, DataKind,
-};
 use crate::ast::Command;
+use walrus::{DataKind, FunctionBuilder, MemoryId, Module, ValType};
 
 /// Emit WebAssembly module based on parsed DSL
 pub fn emit_wasm(commands: &[Command], output_path: &str) {
@@ -71,12 +69,7 @@ pub fn emit_wasm(commands: &[Command], output_path: &str) {
 }
 
 /// Emit a string to memory
-fn emit_string(
-    module: &mut Module,
-    mem_id: MemoryId,
-    offset: u32,
-    text: &str,
-) -> u32 {
+fn emit_string(module: &mut Module, mem_id: MemoryId, offset: u32, text: &str) -> u32 {
     let bytes = text.as_bytes();
     let len = bytes.len() as u32;
 
@@ -90,4 +83,3 @@ fn emit_string(
 
     len + 4 // Alignment buffer
 }
-

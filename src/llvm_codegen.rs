@@ -1,14 +1,13 @@
+use crate::ast::{Command, Control};
 use inkwell::{
     builder::Builder,
     context::Context,
     module::Module,
-    types::{BasicTypeEnum},
-    values::{FunctionValue, BasicValueEnum},
-    targets::{InitializationConfig, Target, TargetMachine, FileType},
-    OptimizationLevel,
-    IntPredicate,
+    targets::{FileType, InitializationConfig, Target, TargetMachine},
+    types::BasicTypeEnum,
+    values::{BasicValueEnum, FunctionValue},
+    IntPredicate, OptimizationLevel,
 };
-use crate::ast::{Command, Control};
 use std::path::Path;
 
 pub fn emit_executable(commands: &[Command], output_path: &str) {
@@ -79,19 +78,19 @@ fn compile_commands(
             }
 
             Command::Connect { ip, port } => {
-                let msg = format!("🔌 Connecting to {}:{}\\n", ip, port);
+                let msg = format!(" Connecting to {}:{}\\n", ip, port);
                 let ptr = builder.build_global_string_ptr(&msg, "connect_msg");
                 builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
             }
 
             Command::Download { url, path } => {
-                let msg = format!("📥 Download: {} → {}\\n", url, path);
+                let msg = format!(" Download: {} → {}\\n", url, path);
                 let ptr = builder.build_global_string_ptr(&msg, "download_msg");
                 builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
             }
 
             Command::Beacon { url, interval } => {
-                let msg = format!("📡 Beacon to {} every {}s\\n", url, interval);
+                let msg = format!(" Beacon to {} every {}s\\n", url, interval);
                 let str_ptr = builder.build_global_string_ptr(&msg, "beacon_msg");
 
                 let func = builder.get_insert_block().unwrap().get_parent().unwrap();
@@ -113,9 +112,13 @@ fn compile_commands(
             }
 
             Command::Control(ctrl) => match ctrl {
-                Control::If { condition, then_body, else_body } => {
+                Control::If {
+                    condition,
+                    then_body,
+                    else_body,
+                } => {
                     // NOTE: This is a stub. You may compile `condition` expressions later.
-                    let msg = format!("🔀 IF CONDITION: {}\\n", condition);
+                    let msg = format!(" IF CONDITION: {}\\n", condition);
                     let ptr = builder.build_global_string_ptr(&msg, "if_msg");
                     builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
 
@@ -126,7 +129,11 @@ fn compile_commands(
                     }
                 }
 
-                Control::For { var, iterable, body } => {
+                Control::For {
+                    var,
+                    iterable,
+                    body,
+                } => {
                     let func = builder.get_insert_block().unwrap().get_parent().unwrap();
                     let loop_bb = context.append_basic_block(func, "for_loop");
                     let after_bb = context.append_basic_block(func, "after_loop");
@@ -139,9 +146,10 @@ fn compile_commands(
 
                     builder.position_at_end(loop_bb);
                     let curr_val = builder.build_load(var_ptr, "curr").into_int_value();
-                    let limit_val = i32_type.const_int(10, false);  // Placeholder
+                    let limit_val = i32_type.const_int(10, false); // Placeholder
 
-                    let cond = builder.build_int_compare(IntPredicate::ULT, curr_val, limit_val, "cond");
+                    let cond =
+                        builder.build_int_compare(IntPredicate::ULT, curr_val, limit_val, "cond");
                     let body_bb = context.append_basic_block(func, "for_body");
                     let inc_bb = context.append_basic_block(func, "for_inc");
 
@@ -152,7 +160,8 @@ fn compile_commands(
                     builder.build_unconditional_branch(inc_bb);
 
                     builder.position_at_end(inc_bb);
-                    let inc_val = builder.build_int_add(curr_val, i32_type.const_int(1, false), "next");
+                    let inc_val =
+                        builder.build_int_add(curr_val, i32_type.const_int(1, false), "next");
                     builder.build_store(var_ptr, inc_val);
                     builder.build_unconditional_branch(loop_bb);
 
@@ -161,7 +170,7 @@ fn compile_commands(
             },
 
             _ => {
-                let stub = format!("⚠️ LLVM: Unhandled command: {:?}\\n", cmd);
+                let stub = format!("WARNING LLVM: Unhandled command: {:?}\\n", cmd);
                 let ptr = builder.build_global_string_ptr(&stub, "stub");
                 builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
             }

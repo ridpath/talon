@@ -11,8 +11,13 @@ pub struct ResilientExecutor {
 #[derive(Debug, Clone)]
 pub enum RetryStrategy {
     Immediate,
-    ExponentialBackoff { initial_delay_ms: u64, max_delay_ms: u64 },
-    Linear { delay_ms: u64 },
+    ExponentialBackoff {
+        initial_delay_ms: u64,
+        max_delay_ms: u64,
+    },
+    Linear {
+        delay_ms: u64,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -149,9 +154,9 @@ impl ResilientExecutor {
 
         for (idx, operation) in operations.into_iter().enumerate() {
             let attempt_config = block.attempts.get(idx).ok_or("Missing attempt config")?;
-            
+
             let checkpoint = session.checkpoint().await?;
-            
+
             match operation().await {
                 Ok(value) => {
                     results.push(value);
@@ -189,7 +194,10 @@ impl ResilientExecutor {
         let delay = match self.strategy {
             RetryStrategy::Immediate => return,
             RetryStrategy::Linear { delay_ms } => delay_ms,
-            RetryStrategy::ExponentialBackoff { initial_delay_ms, max_delay_ms } => {
+            RetryStrategy::ExponentialBackoff {
+                initial_delay_ms,
+                max_delay_ms,
+            } => {
                 let delay = initial_delay_ms * 2_u64.pow(attempt as u32 - 1);
                 delay.min(max_delay_ms)
             }
@@ -224,10 +232,10 @@ impl RecoveryManager {
         context: String,
     ) -> Result<u64, String> {
         let session_checkpoint = session.checkpoint().await?;
-        
+
         let mut checkpoints = self.checkpoints.write().await;
         let id = checkpoints.len() as u64 + 1;
-        
+
         checkpoints.push(RecoveryPoint {
             id,
             session_checkpoint,
@@ -244,7 +252,7 @@ impl RecoveryManager {
         point_id: u64,
     ) -> Result<(), String> {
         let checkpoints = self.checkpoints.read().await;
-        
+
         let point = checkpoints
             .iter()
             .find(|p| p.id == point_id)
@@ -269,12 +277,15 @@ where
     F: std::future::Future<Output = Result<T, String>>,
 {
     let checkpoint = session.checkpoint_labeled(label.to_string()).await?;
-    
+
     match operation.await {
         Ok(result) => Ok(result),
         Err(e) => {
             session.rewind(checkpoint).await?;
-            Err(format!("Operation '{}' failed and rolled back: {}", label, e))
+            Err(format!(
+                "Operation '{}' failed and rolled back: {}",
+                label, e
+            ))
         }
     }
 }
@@ -289,7 +300,7 @@ where
     F2: std::future::Future<Output = Result<T, String>>,
 {
     let checkpoint = session.checkpoint().await?;
-    
+
     match primary.await {
         Ok(result) => Ok(result),
         Err(_) => {
@@ -307,22 +318,24 @@ mod tests {
     async fn test_resilient_executor() {
         use std::sync::atomic::{AtomicUsize, Ordering};
         use std::sync::Arc;
-        
+
         let executor = ResilientExecutor::new();
         let session = ExploitSession::new();
-        
+
         let call_count = Arc::new(AtomicUsize::new(0));
         let call_count_clone = Arc::clone(&call_count);
-        let result = executor.execute_resilient(&session, move || {
-            let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
-            Box::pin(async move {
-                if count < 1 {
-                    Err("Simulated failure".to_string())
-                } else {
-                    Ok(42)
-                }
+        let result = executor
+            .execute_resilient(&session, move || {
+                let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
+                Box::pin(async move {
+                    if count < 1 {
+                        Err("Simulated failure".to_string())
+                    } else {
+                        Ok(42)
+                    }
+                })
             })
-        }).await;
+            .await;
 
         assert!(result.success);
         assert_eq!(result.result, Some(42));
@@ -333,13 +346,16 @@ mod tests {
     async fn test_recovery_manager() {
         let manager = RecoveryManager::new();
         let session = ExploitSession::new();
-        
+
         session.set_libc_base(0x1000).await;
-        let point_id = manager.create_recovery_point(&session, "test".to_string()).await.unwrap();
-        
+        let point_id = manager
+            .create_recovery_point(&session, "test".to_string())
+            .await
+            .unwrap();
+
         session.set_libc_base(0x2000).await;
         assert_eq!(session.get_libc_base().await, Some(0x2000));
-        
+
         manager.recover_to_point(&session, point_id).await.unwrap();
         assert_eq!(session.get_libc_base().await, Some(0x1000));
     }

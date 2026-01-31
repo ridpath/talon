@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
-use serde::{Deserialize, Serialize};
 
 const LIBC_RIP_API: &str = "https://libc.rip/api";
 const _LIBC_BLUKAT_API: &str = "https://libc.blukat.me/d";
@@ -28,10 +28,10 @@ impl LibcDatabase {
             .home_dir()
             .to_path_buf();
         let cache_dir = home.join(".talon").join("libc");
-        
+
         fs::create_dir_all(&cache_dir)
             .map_err(|e| format!("Failed to create libc cache directory: {}", e))?;
-        
+
         Ok(LibcDatabase { cache_dir })
     }
 
@@ -46,8 +46,9 @@ impl LibcDatabase {
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
         let url = format!("{}/find", LIBC_RIP_API);
-        
-        let response = client.post(&url)
+
+        let response = client
+            .post(&url)
             .json(&symbols)
             .send()
             .map_err(|e| format!("Failed to query libc.rip: {}", e))?;
@@ -56,10 +57,12 @@ impl LibcDatabase {
             return Err(format!("libc.rip returned status: {}", response.status()));
         }
 
-        let results: Vec<LibcRipResult> = response.json()
+        let results: Vec<LibcRipResult> = response
+            .json()
             .map_err(|e| format!("Failed to parse libc.rip response: {}", e))?;
 
-        let matches: Vec<LibcMatch> = results.into_iter()
+        let matches: Vec<LibcMatch> = results
+            .into_iter()
             .map(|r| LibcMatch {
                 id: r.id.clone(),
                 md5: r.md5.clone(),
@@ -75,10 +78,10 @@ impl LibcDatabase {
 
     pub fn search_one(&self, symbol: &str, address: u64) -> Result<Vec<LibcMatch>, String> {
         let mut symbols = HashMap::new();
-        
+
         let offset = address & 0xFFF;
         symbols.insert(symbol.to_string(), offset);
-        
+
         self.search(symbols)
     }
 
@@ -98,15 +101,20 @@ impl LibcDatabase {
             .build()
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-        let response = client.get(&libc_match.download_url)
+        let response = client
+            .get(&libc_match.download_url)
             .send()
             .map_err(|e| format!("Failed to download libc: {}", e))?;
 
         if !response.status().is_success() {
-            return Err(format!("Download failed with status: {}", response.status()));
+            return Err(format!(
+                "Download failed with status: {}",
+                response.status()
+            ));
         }
 
-        let bytes = response.bytes()
+        let bytes = response
+            .bytes()
             .map_err(|e| format!("Failed to read response bytes: {}", e))?;
 
         fs::write(&local_path, &bytes)
@@ -118,15 +126,13 @@ impl LibcDatabase {
 
     pub fn get_symbols(&self, libc_path: &str) -> Result<HashMap<String, u64>, String> {
         use goblin::elf::Elf;
-        
-        let data = fs::read(libc_path)
-            .map_err(|e| format!("Failed to read libc file: {}", e))?;
-        
-        let elf = Elf::parse(&data)
-            .map_err(|e| format!("Failed to parse ELF: {}", e))?;
-        
+
+        let data = fs::read(libc_path).map_err(|e| format!("Failed to read libc file: {}", e))?;
+
+        let elf = Elf::parse(&data).map_err(|e| format!("Failed to parse ELF: {}", e))?;
+
         let mut symbols = HashMap::new();
-        
+
         for sym in &elf.syms {
             if sym.st_value > 0 {
                 if let Some(name) = elf.strtab.get_at(sym.st_name) {
@@ -134,14 +140,15 @@ impl LibcDatabase {
                 }
             }
         }
-        
+
         Ok(symbols)
     }
 
     pub fn find_symbol(&self, libc_path: &str, symbol_name: &str) -> Result<u64, String> {
         let symbols = self.get_symbols(libc_path)?;
-        
-        symbols.get(symbol_name)
+
+        symbols
+            .get(symbol_name)
             .copied()
             .ok_or_else(|| format!("Symbol '{}' not found in libc", symbol_name))
     }
@@ -169,7 +176,7 @@ pub fn libc_search_multi(symbols: HashMap<String, u64>) -> Result<Vec<LibcMatch>
 
 pub fn libc_download(id_or_url: &str) -> Result<PathBuf, String> {
     let db = LibcDatabase::new()?;
-    
+
     if id_or_url.starts_with("http://") || id_or_url.starts_with("https://") {
         let libc_match = LibcMatch {
             id: "custom".to_string(),

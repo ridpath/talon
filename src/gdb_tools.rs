@@ -4,10 +4,10 @@
 // World-class GDB integration for live heap inspection, leak extraction,
 // and dynamic exploit development
 
-use std::process::{Command, Stdio, Child, ChildStdin, ChildStdout};
-use std::io::{Write, BufRead, BufReader};
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 /// GDB session for exploit development
 pub struct GdbSession {
@@ -23,35 +23,36 @@ impl GdbSession {
     pub fn attach(pid: u32) -> Result<Self, String> {
         Self::start(&format!("--pid={}", pid))
     }
-    
+
     /// Start GDB with a binary
     pub fn start(args: &str) -> Result<Self, String> {
         let mut cmd = Command::new("gdb");
         cmd.arg("-q") // Quiet mode
-           .arg("-batch-silent")
-           .arg("-ex").arg("set pagination off")
-           .arg("-ex").arg("set confirm off");
-        
+            .arg("-batch-silent")
+            .arg("-ex")
+            .arg("set pagination off")
+            .arg("-ex")
+            .arg("set confirm off");
+
         if !args.is_empty() {
             for arg in args.split_whitespace() {
                 cmd.arg(arg);
             }
         }
-        
+
         cmd.stdin(Stdio::piped())
-           .stdout(Stdio::piped())
-           .stderr(Stdio::null());
-        
-        let mut process = cmd.spawn()
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+
+        let mut process = cmd
+            .spawn()
             .map_err(|e| format!("Failed to start GDB: {}", e))?;
-        
-        let stdin = process.stdin.take()
-            .ok_or("Failed to open GDB stdin")?;
-        let stdout = BufReader::new(process.stdout.take()
-            .ok_or("Failed to open GDB stdout")?);
-        
+
+        let stdin = process.stdin.take().ok_or("Failed to open GDB stdin")?;
+        let stdout = BufReader::new(process.stdout.take().ok_or("Failed to open GDB stdout")?);
+
         log::info!("Started GDB session");
-        
+
         Ok(GdbSession {
             process,
             stdin,
@@ -60,15 +61,14 @@ impl GdbSession {
             _registers: HashMap::new(),
         })
     }
-    
+
     /// Execute GDB command and get output
     pub fn execute(&mut self, cmd: &str) -> Result<String, String> {
-        writeln!(self.stdin, "{}", cmd)
-            .map_err(|e| format!("Failed to write command: {}", e))?;
-        
+        writeln!(self.stdin, "{}", cmd).map_err(|e| format!("Failed to write command: {}", e))?;
+
         let mut output = String::new();
         let mut line = String::new();
-        
+
         loop {
             line.clear();
             match self.stdout.read_line(&mut line) {
@@ -82,15 +82,15 @@ impl GdbSession {
                 Err(e) => return Err(format!("Failed to read output: {}", e)),
             }
         }
-        
+
         Ok(output.trim().to_string())
     }
-    
+
     /// Read memory at address
     pub fn read_memory(&mut self, addr: u64, size: usize) -> Result<Vec<u8>, String> {
         let cmd = format!("x/{}xb 0x{:x}", size, addr);
         let output = self.execute(&cmd)?;
-        
+
         let mut bytes = Vec::new();
         for line in output.lines() {
             if let Some(hex_part) = line.split(':').nth(1) {
@@ -101,24 +101,28 @@ impl GdbSession {
                 }
             }
         }
-        
+
         Ok(bytes)
     }
-    
+
     /// Write memory at address
     pub fn write_memory(&mut self, addr: u64, data: &[u8]) -> Result<(), String> {
         for (i, &byte) in data.iter().enumerate() {
-            let cmd = format!("set {{unsigned char}}0x{:x}=0x{:02x}", addr + i as u64, byte);
+            let cmd = format!(
+                "set {{unsigned char}}0x{:x}=0x{:02x}",
+                addr + i as u64,
+                byte
+            );
             self.execute(&cmd)?;
         }
         Ok(())
     }
-    
+
     /// Get register value
     pub fn get_register(&mut self, reg: &str) -> Result<u64, String> {
         let cmd = format!("info register {}", reg);
         let output = self.execute(&cmd)?;
-        
+
         for line in output.lines() {
             if let Some(hex_str) = line.split_whitespace().nth(1) {
                 let value = u64::from_str_radix(hex_str.trim_start_matches("0x"), 16)
@@ -126,10 +130,10 @@ impl GdbSession {
                 return Ok(value);
             }
         }
-        
+
         Err(format!("Failed to get register {}", reg))
     }
-    
+
     /// Set breakpoint
     pub fn breakpoint(&mut self, addr: u64) -> Result<(), String> {
         let cmd = format!("break *0x{:x}", addr);
@@ -138,35 +142,35 @@ impl GdbSession {
         log::info!("Set breakpoint at 0x{:x}", addr);
         Ok(())
     }
-    
+
     /// Continue execution
     pub fn continue_exec(&mut self) -> Result<String, String> {
         self.execute("continue")
     }
-    
+
     /// Single step
     pub fn step(&mut self) -> Result<String, String> {
         self.execute("stepi")
     }
-    
+
     /// Get heap info (glibc-specific)
     pub fn heap_info(&mut self) -> Result<HeapInfo, String> {
         let arena_output = self.execute("p main_arena")?;
         let chunks_output = self.execute("heap chunks")?;
-        
+
         Ok(HeapInfo {
             arena_address: Self::extract_address(&arena_output).unwrap_or(0),
             chunks: Self::parse_heap_chunks(&chunks_output),
             tcache: None,
         })
     }
-    
+
     /// Get tcache bins
     pub fn tcache_bins(&mut self) -> Result<Vec<TcacheBin>, String> {
         let output = self.execute("tcache")?;
         Ok(Self::parse_tcache_bins(&output))
     }
-    
+
     /// Leak libc base address
     pub fn leak_libc_base(&mut self) -> Result<u64, String> {
         // Try common methods
@@ -175,7 +179,7 @@ impl GdbSession {
             "p &system",
             "x/gx &__libc_start_main",
         ];
-        
+
         for method in &methods {
             if let Ok(output) = self.execute(method) {
                 if let Some(addr) = Self::extract_address(&output) {
@@ -186,43 +190,49 @@ impl GdbSession {
                 }
             }
         }
-        
+
         Err("Failed to leak libc base".to_string())
     }
-    
+
     /// Leak heap base address
     pub fn leak_heap_base(&mut self) -> Result<u64, String> {
         let output = self.execute("info proc mappings | grep heap")?;
-        
+
         if let Some(addr) = Self::extract_address(&output) {
             log::info!("Leaked heap base: 0x{:x}", addr);
             return Ok(addr);
         }
-        
+
         Err("Failed to leak heap base".to_string())
     }
-    
+
     /// Find ROP gadgets in memory range
-    pub fn find_gadgets(&mut self, start: u64, end: u64, pattern: &str) -> Result<Vec<u64>, String> {
+    pub fn find_gadgets(
+        &mut self,
+        start: u64,
+        end: u64,
+        pattern: &str,
+    ) -> Result<Vec<u64>, String> {
         let cmd = format!("find /b 0x{:x}, 0x{:x}, {}", start, end, pattern);
         let output = self.execute(&cmd)?;
-        
+
         let mut gadgets = Vec::new();
         for line in output.lines() {
             if let Some(addr) = Self::extract_address(line) {
                 gadgets.push(addr);
             }
         }
-        
+
         Ok(gadgets)
     }
-    
+
     // Helper: Extract hex address from string
     fn extract_address(s: &str) -> Option<u64> {
         for word in s.split_whitespace() {
             if let Some(hex) = word.strip_prefix("0x") {
                 if let Ok(addr) = u64::from_str_radix(hex, 16) {
-                    if addr > 0x1000 { // Sanity check
+                    if addr > 0x1000 {
+                        // Sanity check
                         return Some(addr);
                     }
                 }
@@ -230,11 +240,11 @@ impl GdbSession {
         }
         None
     }
-    
+
     // Helper: Parse heap chunks output
     fn parse_heap_chunks(output: &str) -> Vec<HeapChunkInfo> {
         let mut chunks = Vec::new();
-        
+
         for line in output.lines() {
             if line.contains("Chunk") {
                 if let Some(addr) = Self::extract_address(line) {
@@ -246,15 +256,15 @@ impl GdbSession {
                 }
             }
         }
-        
+
         chunks
     }
-    
+
     // Helper: Parse tcache bins output
     fn parse_tcache_bins(output: &str) -> Vec<TcacheBin> {
         let mut bins = Vec::new();
         let mut current_size = 0;
-        
+
         for line in output.lines() {
             if line.contains("tcache_entry[") {
                 if let Some(size_str) = line.split('[').nth(1).and_then(|s| s.split(']').next()) {
@@ -267,7 +277,7 @@ impl GdbSession {
                 });
             }
         }
-        
+
         bins
     }
 }
@@ -310,10 +320,10 @@ pub struct TcacheBin {
 /// Quick attach to process and leak addresses
 pub fn quick_leak(pid: u32) -> Result<(u64, u64), String> {
     let mut gdb = GdbSession::attach(pid)?;
-    
+
     let libc_base = gdb.leak_libc_base()?;
     let heap_base = gdb.leak_heap_base()?;
-    
+
     Ok((libc_base, heap_base))
 }
 
@@ -329,11 +339,13 @@ pub fn dump_heap(pid: u32) -> Result<HeapInfo, String> {
 pub fn find_pop_rdi(pid: u32) -> Result<u64, String> {
     let mut gdb = GdbSession::attach(pid)?;
     let libc_base = gdb.leak_libc_base()?;
-    
+
     // Search for pop rdi (0x5f) + ret (0xc3)
     let gadgets = gdb.find_gadgets(libc_base, libc_base + 0x200000, "0x5f, 0xc3")?;
-    
-    gadgets.first().copied()
+
+    gadgets
+        .first()
+        .copied()
         .ok_or("pop rdi gadget not found".to_string())
 }
 
@@ -353,7 +365,7 @@ mod tests {
         );
         assert_eq!(GdbSession::extract_address("no address here"), None);
     }
-    
+
     #[test]
     fn test_heap_chunk_info_creation() {
         let chunk = HeapChunkInfo {
@@ -364,7 +376,7 @@ mod tests {
         assert_eq!(chunk.address, 0x555555554290);
         assert!(chunk.in_use);
     }
-    
+
     #[test]
     fn test_tcache_bin_creation() {
         let bin = TcacheBin {

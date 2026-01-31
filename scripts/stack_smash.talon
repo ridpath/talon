@@ -1,4 +1,4 @@
-# 🎯 Classic stack overflow with controlled return address
+#  Classic stack overflow with controlled return address
 # This simulates a buffer overflow on a binary that accepts input from stdin
 
 include "exploit/stack_smash.my"

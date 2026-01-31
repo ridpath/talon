@@ -52,7 +52,8 @@ pub fn unpack64(bytes: &[u8]) -> Result<u64, String> {
     if bytes.len() < 8 {
         return Err(format!("Need 8 bytes for u64, got {}", bytes.len()));
     }
-    let arr: [u8; 8] = bytes[0..8].try_into()
+    let arr: [u8; 8] = bytes[0..8]
+        .try_into()
         .map_err(|_| "Failed to convert to array".to_string())?;
     Ok(u64::from_le_bytes(arr))
 }
@@ -72,7 +73,8 @@ pub fn unpack64_be(bytes: &[u8]) -> Result<u64, String> {
     if bytes.len() < 8 {
         return Err(format!("Need 8 bytes for u64, got {}", bytes.len()));
     }
-    let arr: [u8; 8] = bytes[0..8].try_into()
+    let arr: [u8; 8] = bytes[0..8]
+        .try_into()
         .map_err(|_| "Failed to convert to array".to_string())?;
     Ok(u64::from_be_bytes(arr))
 }
@@ -120,7 +122,8 @@ pub fn unpack32(bytes: &[u8]) -> Result<u32, String> {
     if bytes.len() < 4 {
         return Err(format!("Need 4 bytes for u32, got {}", bytes.len()));
     }
-    let arr: [u8; 4] = bytes[0..4].try_into()
+    let arr: [u8; 4] = bytes[0..4]
+        .try_into()
         .map_err(|_| "Failed to convert to array".to_string())?;
     Ok(u32::from_le_bytes(arr))
 }
@@ -140,7 +143,8 @@ pub fn unpack32_be(bytes: &[u8]) -> Result<u32, String> {
     if bytes.len() < 4 {
         return Err(format!("Need 4 bytes for u32, got {}", bytes.len()));
     }
-    let arr: [u8; 4] = bytes[0..4].try_into()
+    let arr: [u8; 4] = bytes[0..4]
+        .try_into()
         .map_err(|_| "Failed to convert to array".to_string())?;
     Ok(u32::from_be_bytes(arr))
 }
@@ -188,7 +192,8 @@ pub fn unpack16(bytes: &[u8]) -> Result<u16, String> {
     if bytes.len() < 2 {
         return Err(format!("Need 2 bytes for u16, got {}", bytes.len()));
     }
-    let arr: [u8; 2] = bytes[0..2].try_into()
+    let arr: [u8; 2] = bytes[0..2]
+        .try_into()
         .map_err(|_| "Failed to convert to array".to_string())?;
     Ok(u16::from_le_bytes(arr))
 }
@@ -208,7 +213,8 @@ pub fn unpack16_be(bytes: &[u8]) -> Result<u16, String> {
     if bytes.len() < 2 {
         return Err(format!("Need 2 bytes for u16, got {}", bytes.len()));
     }
-    let arr: [u8; 2] = bytes[0..2].try_into()
+    let arr: [u8; 2] = bytes[0..2]
+        .try_into()
         .map_err(|_| "Failed to convert to array".to_string())?;
     Ok(u16::from_be_bytes(arr))
 }
@@ -267,33 +273,37 @@ pub fn u32(bytes: &[u8]) -> Result<u32, String> {
 pub fn pack_struct(format: &str, values: &[u64]) -> Result<Vec<u8>, String> {
     let mut result = Vec::new();
     let mut val_idx = 0;
-    
+
     for ch in format.chars() {
         if val_idx >= values.len() {
             return Err("Not enough values for format string".to_string());
         }
-        
+
         match ch {
-            'Q' => { // 64-bit little-endian
+            'Q' => {
+                // 64-bit little-endian
                 result.extend_from_slice(&pack64(values[val_idx]));
                 val_idx += 1;
             }
-            'I' => { // 32-bit little-endian
+            'I' => {
+                // 32-bit little-endian
                 result.extend_from_slice(&pack32(values[val_idx] as u32));
                 val_idx += 1;
             }
-            'H' => { // 16-bit little-endian
+            'H' => {
+                // 16-bit little-endian
                 result.extend_from_slice(&pack16(values[val_idx] as u16));
                 val_idx += 1;
             }
-            'B' => { // 8-bit
+            'B' => {
+                // 8-bit
                 result.push(values[val_idx] as u8);
                 val_idx += 1;
             }
             _ => return Err(format!("Unknown format character: {}", ch)),
         }
     }
-    
+
     Ok(result)
 }
 
@@ -341,7 +351,7 @@ pub fn assemble(code: &str, arch: &str) -> Result<Vec<u8>, String> {
                 if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
                     continue;
                 }
-                
+
                 let instr = line.split_whitespace().next().unwrap_or("");
                 match instr {
                     "nop" => result.push(0x90),
@@ -416,7 +426,7 @@ pub fn assemble(code: &str, arch: &str) -> Result<Vec<u8>, String> {
 /// Disassemble bytes to assembly
 pub fn disassemble(bytes: &[u8], arch: &str, addr: u64) -> Result<String, String> {
     use capstone::prelude::*;
-    
+
     let cs = match arch {
         "x64" | "x86_64" => Capstone::new()
             .x86()
@@ -434,19 +444,21 @@ pub fn disassemble(bytes: &[u8], arch: &str, addr: u64) -> Result<String, String
             .map_err(|e| format!("Capstone init error: {:?}", e))?,
         _ => return Err(format!("Unsupported architecture: {}", arch)),
     };
-    
-    let insns = cs.disasm_all(bytes, addr)
+
+    let insns = cs
+        .disasm_all(bytes, addr)
         .map_err(|e| format!("Disassembly error: {:?}", e))?;
-    
+
     let mut result = String::new();
     for insn in insns.iter() {
-        result.push_str(&format!("0x{:x}: {} {}\n",
+        result.push_str(&format!(
+            "0x{:x}: {} {}\n",
             insn.address(),
             insn.mnemonic().unwrap_or(""),
             insn.op_str().unwrap_or("")
         ));
     }
-    
+
     Ok(result)
 }
 
@@ -456,8 +468,14 @@ mod tests {
 
     #[test]
     fn test_pack64() {
-        assert_eq!(pack64(0xdeadbeef), vec![0xef, 0xbe, 0xad, 0xde, 0x00, 0x00, 0x00, 0x00]);
-        assert_eq!(pack64(0x4142434445464748), vec![0x48, 0x47, 0x46, 0x45, 0x44, 0x43, 0x42, 0x41]);
+        assert_eq!(
+            pack64(0xdeadbeef),
+            vec![0xef, 0xbe, 0xad, 0xde, 0x00, 0x00, 0x00, 0x00]
+        );
+        assert_eq!(
+            pack64(0x4142434445464748),
+            vec![0x48, 0x47, 0x46, 0x45, 0x44, 0x43, 0x42, 0x41]
+        );
     }
 
     #[test]

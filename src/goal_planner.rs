@@ -1,8 +1,8 @@
-use std::collections::{HashMap, HashSet, VecDeque};
-use serde::{Deserialize, Serialize};
 use crate::ast::{Command, Expr, Literal};
-use crate::z3_solver::{Z3Solver, Z3Constraint, Z3Type};
-use crate::rop_gadget_finder::{ROPGadgetFinder, GadgetCategory, Architecture};
+use crate::rop_gadget_finder::{Architecture, GadgetCategory, ROPGadgetFinder};
+use crate::z3_solver::{Z3Constraint, Z3Solver, Z3Type};
+use serde::{Deserialize, Serialize};
+use std::collections::{HashMap, HashSet, VecDeque};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Goal {
@@ -58,61 +58,85 @@ impl GoalPlanner {
     }
 
     fn initialize_primitives(&mut self) {
-        self.primitives.insert("write4".to_string(), Primitive {
-            name: "write4".to_string(),
-            capability: "write_4_bytes".to_string(),
-            cost: 1,
-            prerequisites: vec!["control_flow".to_string()],
-            effects: vec!["arbitrary_write".to_string()],
-        });
+        self.primitives.insert(
+            "write4".to_string(),
+            Primitive {
+                name: "write4".to_string(),
+                capability: "write_4_bytes".to_string(),
+                cost: 1,
+                prerequisites: vec!["control_flow".to_string()],
+                effects: vec!["arbitrary_write".to_string()],
+            },
+        );
 
-        self.primitives.insert("read8".to_string(), Primitive {
-            name: "read8".to_string(),
-            capability: "read_8_bytes".to_string(),
-            cost: 1,
-            prerequisites: vec![],
-            effects: vec!["information_leak".to_string()],
-        });
+        self.primitives.insert(
+            "read8".to_string(),
+            Primitive {
+                name: "read8".to_string(),
+                capability: "read_8_bytes".to_string(),
+                cost: 1,
+                prerequisites: vec![],
+                effects: vec!["information_leak".to_string()],
+            },
+        );
 
-        self.primitives.insert("stack_pivot".to_string(), Primitive {
-            name: "stack_pivot".to_string(),
-            capability: "control_stack_pointer".to_string(),
-            cost: 2,
-            prerequisites: vec!["buffer_overflow".to_string()],
-            effects: vec!["control_flow".to_string()],
-        });
+        self.primitives.insert(
+            "stack_pivot".to_string(),
+            Primitive {
+                name: "stack_pivot".to_string(),
+                capability: "control_stack_pointer".to_string(),
+                cost: 2,
+                prerequisites: vec!["buffer_overflow".to_string()],
+                effects: vec!["control_flow".to_string()],
+            },
+        );
 
-        self.primitives.insert("rop_gadget".to_string(), Primitive {
-            name: "rop_gadget".to_string(),
-            capability: "execute_gadget".to_string(),
-            cost: 1,
-            prerequisites: vec!["control_flow".to_string()],
-            effects: vec!["arbitrary_code_execution".to_string()],
-        });
+        self.primitives.insert(
+            "rop_gadget".to_string(),
+            Primitive {
+                name: "rop_gadget".to_string(),
+                capability: "execute_gadget".to_string(),
+                cost: 1,
+                prerequisites: vec!["control_flow".to_string()],
+                effects: vec!["arbitrary_code_execution".to_string()],
+            },
+        );
 
-        self.primitives.insert("format_string".to_string(), Primitive {
-            name: "format_string".to_string(),
-            capability: "format_string_exploit".to_string(),
-            cost: 1,
-            prerequisites: vec![],
-            effects: vec!["arbitrary_write".to_string(), "information_leak".to_string()],
-        });
+        self.primitives.insert(
+            "format_string".to_string(),
+            Primitive {
+                name: "format_string".to_string(),
+                capability: "format_string_exploit".to_string(),
+                cost: 1,
+                prerequisites: vec![],
+                effects: vec![
+                    "arbitrary_write".to_string(),
+                    "information_leak".to_string(),
+                ],
+            },
+        );
 
-        self.primitives.insert("heap_spray".to_string(), Primitive {
-            name: "heap_spray".to_string(),
-            capability: "spray_heap".to_string(),
-            cost: 3,
-            prerequisites: vec![],
-            effects: vec!["controlled_memory_layout".to_string()],
-        });
+        self.primitives.insert(
+            "heap_spray".to_string(),
+            Primitive {
+                name: "heap_spray".to_string(),
+                capability: "spray_heap".to_string(),
+                cost: 3,
+                prerequisites: vec![],
+                effects: vec!["controlled_memory_layout".to_string()],
+            },
+        );
 
-        self.primitives.insert("uaf_trigger".to_string(), Primitive {
-            name: "uaf_trigger".to_string(),
-            capability: "use_after_free".to_string(),
-            cost: 2,
-            prerequisites: vec!["controlled_memory_layout".to_string()],
-            effects: vec!["arbitrary_write".to_string()],
-        });
+        self.primitives.insert(
+            "uaf_trigger".to_string(),
+            Primitive {
+                name: "uaf_trigger".to_string(),
+                capability: "use_after_free".to_string(),
+                cost: 2,
+                prerequisites: vec!["controlled_memory_layout".to_string()],
+                effects: vec!["arbitrary_write".to_string()],
+            },
+        );
     }
 
     pub async fn synthesize_plan(&self, goal: &Goal) -> Result<Vec<String>, String> {
@@ -124,7 +148,7 @@ impl GoalPlanner {
         };
 
         let plan = self.backward_search(target_capability, &goal.constraints)?;
-        
+
         if plan.is_empty() {
             return Err(format!("No plan found for goal: {}", goal.goal_type));
         }
@@ -136,7 +160,7 @@ impl GoalPlanner {
         let mut plan = Vec::new();
         let mut current_goals = VecDeque::new();
         let mut satisfied = HashSet::new();
-        
+
         current_goals.push_back(target.to_string());
 
         while let Some(goal) = current_goals.pop_front() {
@@ -144,7 +168,8 @@ impl GoalPlanner {
                 continue;
             }
 
-            let applicable_primitives: Vec<&Primitive> = self.primitives
+            let applicable_primitives: Vec<&Primitive> = self
+                .primitives
                 .values()
                 .filter(|p| p.effects.contains(&goal) && self.meets_constraints(p, constraints))
                 .collect();
@@ -159,7 +184,10 @@ impl GoalPlanner {
                     }
                 }
             } else if goal == target {
-                return Err(format!("Cannot satisfy goal: {} with given constraints", goal));
+                return Err(format!(
+                    "Cannot satisfy goal: {} with given constraints",
+                    goal
+                ));
             }
         }
 
@@ -191,10 +219,16 @@ impl GoalPlanner {
         true
     }
 
-    pub async fn generate_exploit_code(&self, plan: &[String], goal: &Goal) -> Result<Vec<Command>, String> {
+    pub async fn generate_exploit_code(
+        &self,
+        plan: &[String],
+        goal: &Goal,
+    ) -> Result<Vec<Command>, String> {
         let mut commands = Vec::new();
 
-        let finder = self.gadget_finder.as_ref()
+        let finder = self
+            .gadget_finder
+            .as_ref()
             .ok_or_else(|| "No binary loaded. Call set_binary() first".to_string())?;
 
         for step in plan {
@@ -223,14 +257,18 @@ impl GoalPlanner {
             }
         }
 
-        log::info!("Generated {} commands from plan with {} steps", commands.len(), plan.len());
+        log::info!(
+            "Generated {} commands from plan with {} steps",
+            commands.len(),
+            plan.len()
+        );
         Ok(commands)
     }
 
     fn generate_format_string_commands(&self, goal: &Goal) -> Result<Vec<Command>, String> {
         let target = goal.target_address.unwrap_or(0xdeadbeef);
         let value = goal.target_value.unwrap_or(0xcafebabe);
-        
+
         let mut solver = Z3Solver::new();
         solver.add_variable("offset".to_string(), Z3Type::Integer, 32);
         for constraint in &goal.constraints {
@@ -254,25 +292,35 @@ impl GoalPlanner {
         Ok(commands)
     }
 
-    fn generate_stack_pivot_commands(&self, _goal: &Goal, finder: &ROPGadgetFinder) -> Result<Vec<Command>, String> {
+    fn generate_stack_pivot_commands(
+        &self,
+        _goal: &Goal,
+        finder: &ROPGadgetFinder,
+    ) -> Result<Vec<Command>, String> {
         let pivot_gadgets = finder.find_gadgets_by_category(GadgetCategory::StackPivot);
-        
+
         if pivot_gadgets.is_empty() {
             return Err("No stack pivot gadgets found in binary".to_string());
         }
 
         let gadget = &pivot_gadgets[0];
-        log::info!("Using stack pivot gadget at 0x{:x}: {:?}", gadget.address, gadget.instructions);
+        log::info!(
+            "Using stack pivot gadget at 0x{:x}: {:?}",
+            gadget.address,
+            gadget.instructions
+        );
 
-        Ok(vec![
-            Command::VarDecl {
-                name: "pivot_gadget".to_string(),
-                value: Expr::Literal(Literal::Number(gadget.address as i64)),
-            },
-        ])
+        Ok(vec![Command::VarDecl {
+            name: "pivot_gadget".to_string(),
+            value: Expr::Literal(Literal::Number(gadget.address as i64)),
+        }])
     }
 
-    fn generate_write4_commands(&self, goal: &Goal, finder: &ROPGadgetFinder) -> Result<Vec<Command>, String> {
+    fn generate_write4_commands(
+        &self,
+        goal: &Goal,
+        finder: &ROPGadgetFinder,
+    ) -> Result<Vec<Command>, String> {
         let target = goal.target_address.unwrap_or(0xdeadbeef);
         let value = goal.target_value.unwrap_or(0xcafebabe);
 
@@ -283,8 +331,11 @@ impl GoalPlanner {
             return Err("Insufficient gadgets for write4 primitive".to_string());
         }
 
-        log::info!("Building write4 chain with {} load and {} store gadgets", 
-                  load_gadgets.len(), store_gadgets.len());
+        log::info!(
+            "Building write4 chain with {} load and {} store gadgets",
+            load_gadgets.len(),
+            store_gadgets.len()
+        );
 
         Ok(vec![
             Command::VarDecl {
@@ -306,21 +357,26 @@ impl GoalPlanner {
         ])
     }
 
-    fn generate_rop_commands(&self, _goal: &Goal, finder: &ROPGadgetFinder) -> Result<Vec<Command>, String> {
+    fn generate_rop_commands(
+        &self,
+        _goal: &Goal,
+        finder: &ROPGadgetFinder,
+    ) -> Result<Vec<Command>, String> {
         let control_flow = finder.find_gadgets_by_category(GadgetCategory::ControlFlow);
-        
+
         if control_flow.is_empty() {
             return Err("No control flow gadgets found".to_string());
         }
 
-        log::info!("Building ROP chain with {} control flow gadgets", control_flow.len());
+        log::info!(
+            "Building ROP chain with {} control flow gadgets",
+            control_flow.len()
+        );
 
-        Ok(vec![
-            Command::VarDecl {
-                name: "rop_gadget".to_string(),
-                value: Expr::Literal(Literal::Number(control_flow[0].address as i64)),
-            },
-        ])
+        Ok(vec![Command::VarDecl {
+            name: "rop_gadget".to_string(),
+            value: Expr::Literal(Literal::Number(control_flow[0].address as i64)),
+        }])
     }
 
     fn generate_heap_spray_commands(&self, _goal: &Goal) -> Result<Vec<Command>, String> {
@@ -337,12 +393,10 @@ impl GoalPlanner {
     }
 
     fn generate_uaf_commands(&self, _goal: &Goal) -> Result<Vec<Command>, String> {
-        Ok(vec![
-            Command::VarDecl {
-                name: "chunk_size".to_string(),
-                value: Expr::Literal(Literal::Number(256)),
-            },
-        ])
+        Ok(vec![Command::VarDecl {
+            name: "chunk_size".to_string(),
+            value: Expr::Literal(Literal::Number(256)),
+        }])
     }
 
     pub fn add_primitive(&mut self, primitive: Primitive) {

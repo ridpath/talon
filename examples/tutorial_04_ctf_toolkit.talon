@@ -251,12 +251,12 @@ define function pwn_challenges()
     # Assume we leaked a libc function address first
     let leaked_addr = 0x7ffff7a60f70  # Example leaked address
     let libc_template = Libc("ubuntu20.04")
-    let leaked_func_offset = libc_template["symbols"]["printf"]
+    let leaked_func_offset = libc_template.symbols.printf
     let libc_base = leaked_addr - leaked_func_offset
     
     # Resolve addresses dynamically
     let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
-    let binsh = libc_resolved["strings"]["bin_sh"]
+    let binsh = libc_resolved.strings.bin_sh
     let rop = ret2libc(libc_base, binsh)
     
     # Step 5: Execute
@@ -430,7 +430,7 @@ end
 # - Shodan (IoT/exposed services)
 # - Maltego (OSINT framework)
 
-# 🏆 PRO TIPS
+#  PRO TIPS
 # ────────────────────────────────────────────────────────────────
 # 1. Always start with 'file', 'strings', 'binwalk'
 # 2. Keep a collection of wordlists (rockyou.txt is essential)
@@ -443,7 +443,7 @@ end
 # 9. In Attack-Defense CTFs, patch vulnerabilities first!
 # 10. Have fun and never stop learning!
 
-# 🎓 CONTINUE YOUR JOURNEY
+#  CONTINUE YOUR JOURNEY
 # ────────────────────────────────────────────────────────────────
 # You now have a complete CTF toolkit in Talon DSL!
 # - All 10 new modules are at your fingertips
@@ -451,4 +451,4 @@ end
 # - Production-ready code for real competitions
 # - User-friendly helpers and cheatsheets
 #
-# Go forth and capture those flags! 🚩
+# Go forth and capture those flags! 

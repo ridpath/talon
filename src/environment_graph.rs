@@ -25,14 +25,39 @@ pub struct Node {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum NodeType {
-    Host { ip: String, hostname: Option<String> },
-    Service { host_id: NodeId, port: u16, protocol: String },
-    User { username: String, domain: Option<String> },
-    Credential { cred_type: String },
-    Vulnerability { cve: String, severity: f64 },
-    File { path: String, host_id: NodeId },
-    Process { pid: u32, name: String, host_id: NodeId },
-    TrustRelationship { from_domain: String, to_domain: String },
+    Host {
+        ip: String,
+        hostname: Option<String>,
+    },
+    Service {
+        host_id: NodeId,
+        port: u16,
+        protocol: String,
+    },
+    User {
+        username: String,
+        domain: Option<String>,
+    },
+    Credential {
+        cred_type: String,
+    },
+    Vulnerability {
+        cve: String,
+        severity: f64,
+    },
+    File {
+        path: String,
+        host_id: NodeId,
+    },
+    Process {
+        pid: u32,
+        name: String,
+        host_id: NodeId,
+    },
+    TrustRelationship {
+        from_domain: String,
+        to_domain: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -78,7 +103,11 @@ impl EnvironmentGraph {
         }
     }
 
-    pub async fn add_node(&self, node_type: NodeType, properties: HashMap<String, String>) -> NodeId {
+    pub async fn add_node(
+        &self,
+        node_type: NodeType,
+        properties: HashMap<String, String>,
+    ) -> NodeId {
         let node_id = {
             let mut next = self.next_node_id.write().await;
             let id = *next;
@@ -156,10 +185,15 @@ impl EnvironmentGraph {
         edges.get(&edge_id).cloned()
     }
 
-    pub async fn find_paths(&self, start: NodeId, goal: NodeId, max_depth: usize) -> Vec<AttackPath> {
+    pub async fn find_paths(
+        &self,
+        start: NodeId,
+        goal: NodeId,
+        max_depth: usize,
+    ) -> Vec<AttackPath> {
         let mut paths = Vec::new();
         let mut queue = VecDeque::new();
-        
+
         queue.push_back((start, vec![start], vec![], 0.0));
 
         while let Some((current, node_path, edge_path, total_weight)) = queue.pop_front() {
@@ -181,16 +215,16 @@ impl EnvironmentGraph {
             let adjacency = self.adjacency.read().await;
             if let Some(outgoing) = adjacency.get(&current) {
                 let edges = self.edges.read().await;
-                
+
                 for edge_id in outgoing {
                     if let Some(edge) = edges.get(edge_id) {
                         if !node_path.contains(&edge.to) {
                             let mut new_node_path = node_path.clone();
                             new_node_path.push(edge.to);
-                            
+
                             let mut new_edge_path = edge_path.clone();
                             new_edge_path.push(*edge_id);
-                            
+
                             queue.push_back((
                                 edge.to,
                                 new_node_path,
@@ -239,7 +273,10 @@ impl EnvironmentGraph {
         }
     }
 
-    pub async fn find_nodes_by_type(&self, node_type_filter: impl Fn(&NodeType) -> bool) -> Vec<NodeId> {
+    pub async fn find_nodes_by_type(
+        &self,
+        node_type_filter: impl Fn(&NodeType) -> bool,
+    ) -> Vec<NodeId> {
         let nodes = self.nodes.read().await;
         nodes
             .values()
@@ -253,9 +290,13 @@ impl EnvironmentGraph {
         paths.into_iter().next()
     }
 
-    pub async fn update_node_properties(&self, node_id: NodeId, properties: HashMap<String, String>) -> Result<(), String> {
+    pub async fn update_node_properties(
+        &self,
+        node_id: NodeId,
+        properties: HashMap<String, String>,
+    ) -> Result<(), String> {
         let mut nodes = self.nodes.write().await;
-        
+
         if let Some(node) = nodes.get_mut(&node_id) {
             for (key, value) in properties {
                 node.properties.insert(key, value);
@@ -270,7 +311,9 @@ impl EnvironmentGraph {
     pub async fn remove_node(&self, node_id: NodeId) -> Result<(), String> {
         {
             let mut nodes = self.nodes.write().await;
-            nodes.remove(&node_id).ok_or_else(|| format!("Node {} not found", node_id))?;
+            nodes
+                .remove(&node_id)
+                .ok_or_else(|| format!("Node {} not found", node_id))?;
         }
 
         {
@@ -317,13 +360,16 @@ impl EnvironmentDiscovery {
                 ("status".to_string(), "alive".to_string()),
             ]);
 
-            let node_id = self.graph.add_node(
-                NodeType::Host {
-                    ip: host_info.ip,
-                    hostname: host_info.hostname,
-                },
-                props,
-            ).await;
+            let node_id = self
+                .graph
+                .add_node(
+                    NodeType::Host {
+                        ip: host_info.ip,
+                        hostname: host_info.hostname,
+                    },
+                    props,
+                )
+                .await;
 
             discovered.push(node_id);
 
@@ -333,16 +379,21 @@ impl EnvironmentDiscovery {
                     ("protocol".to_string(), service.protocol.clone()),
                 ]);
 
-                let service_id = self.graph.add_node(
-                    NodeType::Service {
-                        host_id: node_id,
-                        port: service.port,
-                        protocol: service.protocol,
-                    },
-                    service_props,
-                ).await;
+                let service_id = self
+                    .graph
+                    .add_node(
+                        NodeType::Service {
+                            host_id: node_id,
+                            port: service.port,
+                            protocol: service.protocol,
+                        },
+                        service_props,
+                    )
+                    .await;
 
-                self.graph.add_edge(node_id, service_id, EdgeType::RunsOn, 0.1).await?;
+                self.graph
+                    .add_edge(node_id, service_id, EdgeType::RunsOn, 0.1)
+                    .await?;
             }
         }
 
@@ -373,23 +424,30 @@ mod tests {
     async fn test_graph_basic() {
         let graph = EnvironmentGraph::new();
 
-        let node1 = graph.add_node(
-            NodeType::Host {
-                ip: "192.168.1.1".to_string(),
-                hostname: None,
-            },
-            HashMap::new(),
-        ).await;
+        let node1 = graph
+            .add_node(
+                NodeType::Host {
+                    ip: "192.168.1.1".to_string(),
+                    hostname: None,
+                },
+                HashMap::new(),
+            )
+            .await;
 
-        let node2 = graph.add_node(
-            NodeType::Host {
-                ip: "192.168.1.2".to_string(),
-                hostname: None,
-            },
-            HashMap::new(),
-        ).await;
+        let node2 = graph
+            .add_node(
+                NodeType::Host {
+                    ip: "192.168.1.2".to_string(),
+                    hostname: None,
+                },
+                HashMap::new(),
+            )
+            .await;
 
-        graph.add_edge(node1, node2, EdgeType::NetworkAccess, 1.0).await.unwrap();
+        graph
+            .add_edge(node1, node2, EdgeType::NetworkAccess, 1.0)
+            .await
+            .unwrap();
 
         assert_eq!(graph.node_count().await, 2);
         assert_eq!(graph.edge_count().await, 1);
@@ -399,12 +457,42 @@ mod tests {
     async fn test_pathfinding() {
         let graph = EnvironmentGraph::new();
 
-        let n1 = graph.add_node(NodeType::Host { ip: "192.168.1.1".to_string(), hostname: None }, HashMap::new()).await;
-        let n2 = graph.add_node(NodeType::Host { ip: "192.168.1.2".to_string(), hostname: None }, HashMap::new()).await;
-        let n3 = graph.add_node(NodeType::Host { ip: "192.168.1.3".to_string(), hostname: None }, HashMap::new()).await;
+        let n1 = graph
+            .add_node(
+                NodeType::Host {
+                    ip: "192.168.1.1".to_string(),
+                    hostname: None,
+                },
+                HashMap::new(),
+            )
+            .await;
+        let n2 = graph
+            .add_node(
+                NodeType::Host {
+                    ip: "192.168.1.2".to_string(),
+                    hostname: None,
+                },
+                HashMap::new(),
+            )
+            .await;
+        let n3 = graph
+            .add_node(
+                NodeType::Host {
+                    ip: "192.168.1.3".to_string(),
+                    hostname: None,
+                },
+                HashMap::new(),
+            )
+            .await;
 
-        graph.add_edge(n1, n2, EdgeType::NetworkAccess, 1.0).await.unwrap();
-        graph.add_edge(n2, n3, EdgeType::NetworkAccess, 1.0).await.unwrap();
+        graph
+            .add_edge(n1, n2, EdgeType::NetworkAccess, 1.0)
+            .await
+            .unwrap();
+        graph
+            .add_edge(n2, n3, EdgeType::NetworkAccess, 1.0)
+            .await
+            .unwrap();
 
         let path = graph.shortest_path(n1, n3).await;
         assert!(path.is_some());

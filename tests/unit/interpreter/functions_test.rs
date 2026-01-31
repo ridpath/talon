@@ -1,5 +1,5 @@
-use talon::parser::parse_script;
 use talon::interpreter::interpret;
+use talon::parser::parse_script;
 
 async fn run_script(code: &str) -> Result<(), String> {
     let commands = parse_script(code)?;
@@ -36,7 +36,10 @@ async fn test_function_with_default_params() {
         }
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Function with default parameters should succeed");
+    assert!(
+        result.is_ok(),
+        "Function with default parameters should succeed"
+    );
 }
 
 #[tokio::test]
@@ -72,7 +75,10 @@ async fn test_function_call_multiple_args() {
         calc(1, 2, 3)
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Function call with multiple args should succeed");
+    assert!(
+        result.is_ok(),
+        "Function call with multiple args should succeed"
+    );
 }
 
 #[tokio::test]
@@ -186,7 +192,10 @@ async fn test_function_accessing_global() {
         access_global()
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Function accessing global variable should work");
+    assert!(
+        result.is_ok(),
+        "Function accessing global variable should work"
+    );
 }
 
 #[tokio::test]
@@ -199,7 +208,10 @@ async fn test_function_modifying_global() {
         increment()
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Function modifying global variable should work");
+    assert!(
+        result.is_ok(),
+        "Function modifying global variable should work"
+    );
 }
 
 #[tokio::test]
@@ -224,7 +236,7 @@ async fn test_function_call_order() {
     let code = r#"
         func1()
         func2()
-        
+
         fn func1() {
             let a = 1
         }
@@ -258,7 +270,10 @@ async fn test_function_with_mixed_args() {
         connect("localhost", port: 8080, timeout: 30)
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Mixed positional and named args should work");
+    assert!(
+        result.is_ok(),
+        "Mixed positional and named args should work"
+    );
 }
 
 #[tokio::test]
@@ -271,7 +286,10 @@ async fn test_function_default_param_usage() {
         greet("Alice")
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Default parameters should work with and without args");
+    assert!(
+        result.is_ok(),
+        "Default parameters should work with and without args"
+    );
 }
 
 #[tokio::test]
@@ -298,7 +316,10 @@ async fn test_function_no_return() {
         action()
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Function without explicit return should work");
+    assert!(
+        result.is_ok(),
+        "Function without explicit return should work"
+    );
 }
 
 #[tokio::test]

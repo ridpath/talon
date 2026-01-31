@@ -4,8 +4,8 @@
 // World-class heap grooming primitives for controlling heap layout,
 // cache alignment, and exploit reliability
 
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 /// Heap grooming strategy
 #[derive(Debug, Clone, PartialEq)]
@@ -26,7 +26,7 @@ pub enum GroomingStrategy {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct HeapBlock {
     pub size: usize,
-    pub keep: bool,  // Keep allocated or free
+    pub keep: bool, // Keep allocated or free
     pub data: Vec<u8>,
 }
 
@@ -38,7 +38,7 @@ impl HeapBlock {
             data: vec![0x41; size],
         }
     }
-    
+
     pub fn with_data(size: usize, keep: bool, data: Vec<u8>) -> Self {
         HeapBlock { size, keep, data }
     }
@@ -71,11 +71,15 @@ impl HeapGroom {
             allocations: Vec::new(),
         }
     }
-    
+
     /// Generate spray pattern
     pub fn spray(size: usize, count: usize) -> Vec<Vec<u8>> {
-        log::info!("Generating spray pattern: {} chunks of size 0x{:x}", count, size);
-        
+        log::info!(
+            "Generating spray pattern: {} chunks of size 0x{:x}",
+            count,
+            size
+        );
+
         let mut payloads = Vec::new();
         for i in 0..count {
             let mut data = vec![b'A' + (i % 26) as u8; size];
@@ -84,16 +88,20 @@ impl HeapGroom {
             data[..marker.len()].copy_from_slice(marker.as_bytes());
             payloads.push(data);
         }
-        
+
         payloads
     }
-    
+
     /// Generate hole pattern for consolidation
     pub fn create_holes(size: usize, pattern: Vec<bool>) -> Vec<AllocationStep> {
-        log::info!("Creating hole pattern: size=0x{:x}, holes={}", size, pattern.len());
-        
+        log::info!(
+            "Creating hole pattern: size=0x{:x}, holes={}",
+            size,
+            pattern.len()
+        );
+
         let mut steps = Vec::new();
-        
+
         // Step 1: Allocate all chunks
         for (i, &_keep) in pattern.iter().enumerate() {
             steps.push(AllocationStep {
@@ -104,7 +112,7 @@ impl HeapGroom {
                 free: false,
             });
         }
-        
+
         // Step 2: Free chunks based on pattern
         for (i, &_keep) in pattern.iter().enumerate() {
             if !_keep {
@@ -117,17 +125,21 @@ impl HeapGroom {
                 });
             }
         }
-        
+
         steps
     }
-    
+
     /// Align allocations to cache lines (64 bytes typical)
     pub fn cache_align(size: usize, alignment: usize) -> Vec<AllocationStep> {
-        log::info!("Cache-aligning chunks: size=0x{:x}, align={}", size, alignment);
-        
+        log::info!(
+            "Cache-aligning chunks: size=0x{:x}, align={}",
+            size,
+            alignment
+        );
+
         let mut steps = Vec::new();
         let padding = alignment - (size % alignment);
-        
+
         if padding == alignment {
             // Already aligned
             steps.push(AllocationStep {
@@ -146,7 +158,7 @@ impl HeapGroom {
                 data: Some(vec![b'P'; padding]),
                 free: true, // Will be freed
             });
-            
+
             // Add aligned chunk
             steps.push(AllocationStep {
                 step: 1,
@@ -156,17 +168,17 @@ impl HeapGroom {
                 free: false,
             });
         }
-        
+
         steps
     }
-    
+
     /// Generate feng shui layout plan
     pub fn feng_shui(layout: Vec<HeapBlock>) -> Vec<AllocationStep> {
         log::info!("Generating feng shui layout: {} blocks", layout.len());
-        
+
         let mut steps = Vec::new();
         let mut chunk_index = HashMap::new();
-        
+
         // Allocate all blocks
         for (i, block) in layout.iter().enumerate() {
             let step_num = steps.len();
@@ -179,7 +191,7 @@ impl HeapGroom {
             });
             chunk_index.insert(i, step_num);
         }
-        
+
         // Free blocks that shouldn't be kept
         for (i, block) in layout.iter().enumerate() {
             if !block.keep {
@@ -193,17 +205,21 @@ impl HeapGroom {
                 });
             }
         }
-        
+
         steps
     }
-    
+
     /// Fill tcache bins in order
     pub fn fill_tcache(sizes: Vec<usize>, bins_per_size: usize) -> Vec<AllocationStep> {
-        log::info!("Filling tcache: {} sizes, {} bins each", sizes.len(), bins_per_size);
-        
+        log::info!(
+            "Filling tcache: {} sizes, {} bins each",
+            sizes.len(),
+            bins_per_size
+        );
+
         let mut steps = Vec::new();
         let mut chunk_counter = 0;
-        
+
         for size in sizes {
             // Allocate 7 chunks (tcache max)
             for _ in 0..bins_per_size.min(7) {
@@ -216,7 +232,7 @@ impl HeapGroom {
                 });
                 chunk_counter += 1;
             }
-            
+
             // Free all to populate tcache
             for i in 0..bins_per_size.min(7) {
                 steps.push(AllocationStep {
@@ -229,17 +245,17 @@ impl HeapGroom {
                 chunk_counter += 1;
             }
         }
-        
+
         steps
     }
-    
+
     /// Generate exploit script for grooming
     pub fn generate_script(&self) -> String {
         let mut script = String::new();
-        
+
         script.push_str(&format!("# Heap Grooming Script for {}\n", self.binary));
         script.push_str(&format!("# Strategy: {:?}\n\n", self.strategy));
-        
+
         let steps = match &self.strategy {
             GroomingStrategy::Spray { size, count } => {
                 let payloads = Self::spray(*size, *count);
@@ -255,50 +271,53 @@ impl HeapGroom {
                 }
                 s
             }
-            GroomingStrategy::Holes { size, pattern } => {
-                Self::create_holes(*size, pattern.clone())
-            }
+            GroomingStrategy::Holes { size, pattern } => Self::create_holes(*size, pattern.clone()),
             GroomingStrategy::CacheAlign { size, alignment } => {
                 Self::cache_align(*size, *alignment)
             }
-            GroomingStrategy::FengShui { layout } => {
-                Self::feng_shui(layout.clone())
-            }
-            GroomingStrategy::BinFilling { bins } => {
-                Self::fill_tcache(bins.clone(), 7)
-            }
+            GroomingStrategy::FengShui { layout } => Self::feng_shui(layout.clone()),
+            GroomingStrategy::BinFilling { bins } => Self::fill_tcache(bins.clone(), 7),
         };
-        
+
         for step in steps {
             script.push_str(&format!("# Step {}: {}\n", step.step, step.action));
             if step.free {
                 script.push_str(&format!("free({})\n\n", step.step));
             } else {
-                script.push_str(&format!("chunk_{} = malloc(0x{:x})\n", step.step, step.size));
+                script.push_str(&format!(
+                    "chunk_{} = malloc(0x{:x})\n",
+                    step.step, step.size
+                ));
                 if let Some(data) = &step.data {
-                    script.push_str(&format!("write(chunk_{}, {:?})\n\n", step.step, 
-                        &data[..data.len().min(16)]));
+                    script.push_str(&format!(
+                        "write(chunk_{}, {:?})\n\n",
+                        step.step,
+                        &data[..data.len().min(16)]
+                    ));
                 }
             }
         }
-        
+
         script
     }
-    
+
     /// Visualize heap layout
     pub fn visualize(&self) -> String {
         let mut vis = String::new();
         vis.push_str("═══════════════════════════════════════════\n");
         vis.push_str("         HEAP LAYOUT VISUALIZATION        \n");
         vis.push_str("═══════════════════════════════════════════\n\n");
-        
+
         match &self.strategy {
             GroomingStrategy::FengShui { layout } => {
                 for (i, block) in layout.iter().enumerate() {
                     let status = if block.keep { "[KEEP]" } else { "[FREE]" };
-                    vis.push_str(&format!("Chunk {}: 0x{:04x} bytes {}\n", i, block.size, status));
+                    vis.push_str(&format!(
+                        "Chunk {}: 0x{:04x} bytes {}\n",
+                        i, block.size, status
+                    ));
                     vis.push_str("  ┌────────────────────────────────────────────────────┐\n");
-                    
+
                     let preview = if block.data.len() > 8 {
                         format!("{:02x?}...", &block.data[..8])
                     } else {
@@ -324,7 +343,7 @@ pub fn calculate_spray_count(target_prob: f64, chunk_size: usize) -> usize {
     let base_count = 100;
     let size_factor = 1.0 + (chunk_size as f64 / 1024.0);
     let prob_factor = target_prob * 2.0;
-    
+
     (base_count as f64 * size_factor * prob_factor) as usize
 }
 
@@ -380,7 +399,7 @@ mod tests {
     fn test_hole_pattern() {
         let pattern = vec![true, false, true, false, true];
         let steps = HeapGroom::create_holes(0x80, pattern.clone());
-        
+
         // Should have allocation steps + free steps
         assert!(steps.len() >= pattern.len());
     }
@@ -398,7 +417,7 @@ mod tests {
             HeapBlock::new(0x90, false),
             HeapBlock::new(0x80, true),
         ];
-        
+
         let steps = HeapGroom::feng_shui(layout);
         assert_eq!(steps.len(), 4); // 3 allocations + 1 free
     }
@@ -442,7 +461,13 @@ mod tests {
 
     #[test]
     fn test_heap_groom_creation() {
-        let groom = HeapGroom::new("./vuln", GroomingStrategy::Spray { size: 0x80, count: 100 });
+        let groom = HeapGroom::new(
+            "./vuln",
+            GroomingStrategy::Spray {
+                size: 0x80,
+                count: 100,
+            },
+        );
         assert_eq!(groom.binary, "./vuln");
     }
 }

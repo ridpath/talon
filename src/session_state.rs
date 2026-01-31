@@ -1,7 +1,9 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use std::collections::HashMap;
+use std::net::SocketAddr;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::net::SocketAddr;
 
 #[derive(Debug, Clone)]
 pub struct ExploitSession {
@@ -131,7 +133,7 @@ impl ExploitSession {
 
     pub async fn connect(target: &str, port: u16) -> Result<Self, String> {
         let session = Self::new();
-        
+
         let addr = format!("{}:{}", target, port)
             .parse::<SocketAddr>()
             .map_err(|e| format!("Invalid address: {}", e))?;
@@ -146,7 +148,7 @@ impl ExploitSession {
 
     pub async fn attach(pid: u32) -> Result<Self, String> {
         let session = Self::new();
-        
+
         {
             let mut state = session.state.write().await;
             state.target.pid = Some(pid);
@@ -165,7 +167,7 @@ impl ExploitSession {
         F: FnOnce(&mut SessionState) -> Result<(), String>,
     {
         let mut state = self.state.write().await;
-        updater(&mut *state)
+        updater(&mut state)
     }
 
     pub async fn set_libc_base(&self, address: u64) {
@@ -262,7 +264,7 @@ impl ExploitSession {
 
     pub async fn rewind(&self, snapshot_id: u64) -> Result<(), String> {
         let history = self.history.read().await;
-        
+
         let snapshot = history
             .iter()
             .find(|s| s.id == snapshot_id)
@@ -276,7 +278,7 @@ impl ExploitSession {
 
     pub async fn rewind_to_label(&self, label: &str) -> Result<(), String> {
         let history = self.history.read().await;
-        
+
         let snapshot = history
             .iter()
             .rev()
@@ -360,12 +362,12 @@ mod tests {
     async fn test_checkpoint_rewind() {
         let session = ExploitSession::new();
         session.set_libc_base(0x1000).await;
-        
+
         let checkpoint = session.checkpoint().await.unwrap();
-        
+
         session.set_libc_base(0x2000).await;
         assert_eq!(session.get_libc_base().await, Some(0x2000));
-        
+
         session.rewind(checkpoint).await.unwrap();
         assert_eq!(session.get_libc_base().await, Some(0x1000));
     }

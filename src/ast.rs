@@ -1,3 +1,6 @@
+#![allow(clippy::upper_case_acronyms)]
+#![allow(clippy::enum_variant_names)]
+
 use std::collections::HashMap;
 
 // Core Type System
@@ -95,46 +98,100 @@ pub enum Control {
 #[derive(Debug, Clone)]
 pub enum Command {
     // Core Language Constructs
-    Include { path: String },
-    Import { module: String, items: Option<Vec<String>> },
+    Include {
+        path: String,
+    },
+    Import {
+        module: String,
+        items: Option<Vec<String>>,
+    },
     DefineFunction(FunctionDef),
-    CallFunction { name: String, args: Vec<(Option<String>, Expr)> },
-    VarDecl { name: String, value: Expr },
+    CallFunction {
+        name: String,
+        args: Vec<(Option<String>, Expr)>,
+    },
+    VarDecl {
+        name: String,
+        value: Expr,
+    },
     TypedDecl(TypedVar),
-    ConstDecl { name: String, value: Expr },
-    Assignment { name: String, value: Expr },
-    StructDef { name: String, fields: Vec<(String, String)> },
-    DestructuringDecl { vars: Vec<String>, value: Expr },
+    ConstDecl {
+        name: String,
+        value: Expr,
+    },
+    Assignment {
+        name: String,
+        value: Expr,
+    },
+    StructDef {
+        name: String,
+        fields: Vec<(String, String)>,
+    },
+    DestructuringDecl {
+        vars: Vec<String>,
+        value: Expr,
+    },
     Expr(Expr),
     Control(Control),
     Match(MatchBlock),
     TryCatch(TryCatch),
     DefineMacro(MacroDef),
-    CallMacro { name: String, args: Vec<Expr> },
+    CallMacro {
+        name: String,
+        args: Vec<Expr>,
+    },
 
     // Network & Shellcode
-    Connect { ip: String, port: u16 },
+    Connect {
+        ip: String,
+        port: u16,
+    },
     GenerateShellcode(ShellcodeSpec),
     ExecuteShellcode,
-    LoadShellcode { path: String },
-    RunCommand { command: String },
+    LoadShellcode {
+        path: String,
+    },
+    RunCommand {
+        command: String,
+    },
     Sleep(u64),
     XorDecode(u8),
-    Beacon { url: String, interval: u64 },
+    Beacon {
+        url: String,
+        interval: u64,
+    },
 
     // File & Memory Operations
-    ReadFile { path: String, var: String },
-    WriteFile { data: Expr, path: String },
-    DumpMemory { address: u64, length: u32 },
-    Assemble { code: String },
-    Download { url: String, path: String },
+    ReadFile {
+        path: String,
+        var: String,
+    },
+    WriteFile {
+        data: Expr,
+        path: String,
+    },
+    DumpMemory {
+        address: u64,
+        length: u32,
+    },
+    Assemble {
+        code: String,
+    },
+    Download {
+        url: String,
+        path: String,
+    },
 
     // Red Team Operations
     AntiDebugCheck,
     ExitIfDebugger,
     ScanSubnet(String),
     Hash(HashTarget),
-    BruteFtp { ip: String, user: String, pass_list_path: String },
+    BruteFtp {
+        ip: String,
+        user: String,
+        pass_list_path: String,
+    },
     Reverse(RECommand),
 
     // Cryptographic & Security Modules
@@ -145,27 +202,61 @@ pub enum Command {
     CTF(CTFCommand),
 
     // Exploitation Primitives
-    FormatStringExploit { target: String, offset: u32 },
-    StackOverflowExploit { padding: u32, ret_addr: u64 },
-    NopSled { length: u32 },
-    HeapSpray { data: String },
-    SigropChain { lib: String },
-    FindFormatOffset { binary: String },
-    VisualizeHeap { binary: String },
-    EncodeBase64 { data: Expr },
-    DecodeBase64 { data: Expr },
+    FormatStringExploit {
+        target: String,
+        offset: u32,
+    },
+    StackOverflowExploit {
+        padding: u32,
+        ret_addr: u64,
+    },
+    NopSled {
+        length: u32,
+    },
+    HeapSpray {
+        data: String,
+    },
+    SigropChain {
+        lib: String,
+    },
+    FindFormatOffset {
+        binary: String,
+    },
+    VisualizeHeap {
+        binary: String,
+    },
+    EncodeBase64 {
+        data: Expr,
+    },
+    DecodeBase64 {
+        data: Expr,
+    },
 
     // Fuzzing
-    Fuzz { binary: String, seed: String, cycles: u32 },
+    Fuzz {
+        binary: String,
+        seed: String,
+        cycles: u32,
+    },
     FuzzProtocol(FuzzProtocolSpec),
 
     // Advanced Features
-    BitwiseOp { op: String, left: Expr, right: Expr },
-    ToolExec { tool: String, args: Vec<Expr> },
+    BitwiseOp {
+        op: String,
+        left: Expr,
+        right: Expr,
+    },
+    ToolExec {
+        tool: String,
+        args: Vec<Expr>,
+    },
 
     // Symbolic Execution & AI
     SymbolicExecution(SymbolicSpec),
-    SolveConstraints { target: u64, constraints: Vec<String> },
+    SolveConstraints {
+        target: u64,
+        constraints: Vec<String>,
+    },
     AutoExploit(AutoExploitSpec),
 
     // Live Debugging
@@ -175,8 +266,13 @@ pub enum Command {
     HeapGroom(HeapGroomSpec),
 
     // Gadget Finding
-    FindOneGadget { libc_path: String },
-    FindMagicGadget { pattern: String, constraints: Vec<String> },
+    FindOneGadget {
+        libc_path: String,
+    },
+    FindMagicGadget {
+        pattern: String,
+        constraints: Vec<String>,
+    },
 
     // Kernel Exploitation
     KernelExploit(KernelExploitSpec),
@@ -217,106 +313,236 @@ pub enum Command {
 
     // Differential Fuzzing
     DiffFuzz(DiffFuzzSpec),
-    
+
     // Taint Analysis
     TaintAnalysis(TaintAnalysisSpec),
-    
+
     // Automated ROP Chain Generation
     AutoROP(AutoROPSpec),
-    
+
     // Modern Heap Exploitation
     HeapExploit(HeapExploitSpec),
-    
+
     // CVE Scanner & Impact Assessment
     CVEScan(CVEScanSpec),
-    
+
     // Binary Similarity Analysis
     BinarySimilarity(BinarySimilaritySpec),
-    
+
     // Exploit Chaining & Multi-Stage Attacks
-    ChainConnect { host: String, port: u16, timeout: Option<u64> },
-    ChainSend { data: Expr },
-    ChainReceive { size: usize },
-    ChainReceiveUntil { delimiter: String, max_size: usize },
-    ChainExploitLeak { stage_name: String, payload: Expr, offset: usize, size: usize },
-    ChainCalculateBase { leaked_addr: Expr, offset: u64, name: String },
-    ChainBruteforceASLR { attempts: usize, payload: Expr, offset: usize },
+    ChainConnect {
+        host: String,
+        port: u16,
+        timeout: Option<u64>,
+    },
+    ChainSend {
+        data: Expr,
+    },
+    ChainReceive {
+        size: usize,
+    },
+    ChainReceiveUntil {
+        delimiter: String,
+        max_size: usize,
+    },
+    ChainExploitLeak {
+        stage_name: String,
+        payload: Expr,
+        offset: usize,
+        size: usize,
+    },
+    ChainCalculateBase {
+        leaked_addr: Expr,
+        offset: u64,
+        name: String,
+    },
+    ChainBruteforceASLR {
+        attempts: usize,
+        payload: Expr,
+        offset: usize,
+    },
     ChainInteractive,
-    ChainSaveState { path: String },
-    ChainLoadState { path: String },
+    ChainSaveState {
+        path: String,
+    },
+    ChainLoadState {
+        path: String,
+    },
     ChainPrintSummary,
-    
+
     // Runtime Safety & Resource Management
-    SetTimeout { milliseconds: u64 },
-    SetMemoryLimit { megabytes: usize },
-    SetRecursionLimit { max_depth: usize },
+    SetTimeout {
+        milliseconds: u64,
+    },
+    SetMemoryLimit {
+        megabytes: usize,
+    },
+    SetRecursionLimit {
+        max_depth: usize,
+    },
     EnableStrictMode,
     DisableStrictMode,
     GetSafetyStats,
     ResetSafety,
-    
+
     // Phase 16 - Differentiation Features
-    ParallelExploit { targets: Vec<String>, payload: Expr },
-    GenerateExploitAI { binary: String, vuln_type: String, arch: String },
-    
+    ParallelExploit {
+        targets: Vec<String>,
+        payload: Expr,
+    },
+    GenerateExploitAI {
+        binary: String,
+        vuln_type: String,
+        arch: String,
+    },
+
     // Phase 21 - Meta-Programming Primitives
-    GetAST { script: Option<String> },
-    PatchFunction { target: String, replacement: String },
-    GenerateStrategy { goal: String, constraints: Vec<String> },
+    GetAST {
+        script: Option<String>,
+    },
+    PatchFunction {
+        target: String,
+        replacement: String,
+    },
+    GenerateStrategy {
+        goal: String,
+        constraints: Vec<String>,
+    },
     GetScriptMetadata,
-    ModifyAST { transformations: Vec<String> },
-    
+    ModifyAST {
+        transformations: Vec<String>,
+    },
+
     // Phase 21 - Reactive Memory Bindings
-    BindMemory { name: String, address: Expr, mem_type: String },
-    UnbindMemory { name: String },
-    WatchMemory { address: Expr, size: usize, callback: String },
-    
+    BindMemory {
+        name: String,
+        address: Expr,
+        mem_type: String,
+    },
+    UnbindMemory {
+        name: String,
+    },
+    WatchMemory {
+        address: Expr,
+        size: usize,
+        callback: String,
+    },
+
     // Phase 21 - Event-Driven Constructs
-    OnEvent { event_type: String, condition: Option<Expr>, body: Vec<Command> },
-    WatchRegister { register: String, range: Option<(Expr, Expr)>, body: Vec<Command> },
-    OnMemoryChange { address: Expr, body: Vec<Command> },
-    
+    OnEvent {
+        event_type: String,
+        condition: Option<Expr>,
+        body: Vec<Command>,
+    },
+    WatchRegister {
+        register: String,
+        range: Option<(Expr, Expr)>,
+        body: Vec<Command>,
+    },
+    OnMemoryChange {
+        address: Expr,
+        body: Vec<Command>,
+    },
+
     // Phase 21 - Probabilistic Execution
-    TryAll { strategies: Vec<Vec<Command>>, timeout: Option<u64> },
-    Race { threads: Vec<(String, Vec<Command>)>, sync_gap: Option<u64> },
-    Tunable { name: String, initial: Expr, range: (Expr, Expr) },
-    OptimizeTunable { name: String, direction: String },
-    
+    TryAll {
+        strategies: Vec<Vec<Command>>,
+        timeout: Option<u64>,
+    },
+    Race {
+        threads: Vec<(String, Vec<Command>)>,
+        sync_gap: Option<u64>,
+    },
+    Tunable {
+        name: String,
+        initial: Expr,
+        range: (Expr, Expr),
+    },
+    OptimizeTunable {
+        name: String,
+        direction: String,
+    },
+
     // Phase 21 - Script Continuity
-    CheckpointScript { name: String },
-    ResumeFromCheckpoint { name: String },
-    ForkStrategy { name: String },
-    MergeStrategy { source: String, target: String },
-    
+    CheckpointScript {
+        name: String,
+    },
+    ResumeFromCheckpoint {
+        name: String,
+    },
+    ForkStrategy {
+        name: String,
+    },
+    MergeStrategy {
+        source: String,
+        target: String,
+    },
+
     // Phase 21 - AI-in-the-Loop
-    InlineAISuggest { context: String },
-    QueryAI { question: String },
-    ImplementChoice { choice_number: usize },
-    
+    InlineAISuggest {
+        context: String,
+    },
+    QueryAI {
+        question: String,
+    },
+    ImplementChoice {
+        choice_number: usize,
+    },
+
     // Phase 22 - Symbiotic Execution
-    Symlink { var_name: String, target_expr: String, link_type: String },
-    UnsymlinkVariable { var_name: String },
+    Symlink {
+        var_name: String,
+        target_expr: String,
+        link_type: String,
+    },
+    UnsymlinkVariable {
+        var_name: String,
+    },
     SyncSymlinks,
-    
+
     // Phase 22 - Goal-Oriented Planning
-    Achieve { goal: String, address: Option<Expr>, value: Option<Expr>, constraints: Vec<String>, primitives: Vec<String> },
-    
+    Achieve {
+        goal: String,
+        address: Option<Expr>,
+        value: Option<Expr>,
+        constraints: Vec<String>,
+        primitives: Vec<String>,
+    },
+
     // Phase 22 - Strategy Definition
-    DefineStrategy { name: String, parameters: Vec<(String, Expr, Expr, Expr)>, implementation: Vec<Command> },
-    ExecuteStrategy { name: String },
-    
+    DefineStrategy {
+        name: String,
+        parameters: Vec<(String, Expr, Expr, Expr)>,
+        implementation: Vec<Command>,
+    },
+    ExecuteStrategy {
+        name: String,
+    },
+
     // Phase 22 - Speculative Execution
-    Speculate { commands: Vec<Command> },
-    PrecomputeFutures { branches: Vec<(String, Vec<Command>)> },
-    
+    Speculate {
+        commands: Vec<Command>,
+    },
+    PrecomputeFutures {
+        branches: Vec<(String, Vec<Command>)>,
+    },
+
     // Phase 22 - Fractal Primitives
-    AssemblePrimitives { primitives: Vec<AssemblePrimitive> },
-    
+    AssemblePrimitives {
+        primitives: Vec<AssemblePrimitive>,
+    },
+
     // Phase 22 - Vulnerability Forecasting
-    AnalyzeTarget { binary_path: String },
-    
+    AnalyzeTarget {
+        binary_path: String,
+    },
+
     // Phase 22 - Defense Simulation
-    DefenseSimulator { profile_name: String, exploit_commands: Vec<Command>, iterations: usize },
+    DefenseSimulator {
+        profile_name: String,
+        exploit_commands: Vec<Command>,
+        iterations: usize,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -333,29 +559,75 @@ pub enum Expr {
     Literal(Literal),
     Ident(String),
     Return(Box<Expr>),
-    BinaryOp { op: String, left: Box<Expr>, right: Box<Expr> },
-    ComparisonOp { op: String, left: Box<Expr>, right: Box<Expr> },
-    BitwiseOp { op: String, left: Box<Expr>, right: Box<Expr> },
+    BinaryOp {
+        op: String,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    ComparisonOp {
+        op: String,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
+    BitwiseOp {
+        op: String,
+        left: Box<Expr>,
+        right: Box<Expr>,
+    },
     List(Vec<Expr>),
     Map(HashMap<String, Expr>),
     Set(Vec<Expr>),
     Bytes(Vec<u8>),
-    Lambda { arg: String, body: Box<Expr> },
+    Lambda {
+        arg: String,
+        body: Box<Expr>,
+    },
     InterpolatedString(Vec<Expr>),
-    MethodChain { base: Box<Expr>, calls: Vec<String> },
-    ListComprehension { expr: Box<Expr>, var: String, iterable: Box<Expr> },
+    MethodChain {
+        base: Box<Expr>,
+        calls: Vec<String>,
+    },
+    ListComprehension {
+        expr: Box<Expr>,
+        var: String,
+        iterable: Box<Expr>,
+    },
     Variant(String, Option<Box<Expr>>),
     Env(String),
-    RegexMatch { regex: String, haystack: Box<Expr> },
+    RegexMatch {
+        regex: String,
+        haystack: Box<Expr>,
+    },
     Await(Box<Expr>),
-    Call { name: String, args: Vec<(Option<String>, Expr)> },
-    MacroCall { name: String, args: Vec<Expr> },
-    Index { base: Box<Expr>, index: Box<Expr> },
-    Slice { base: Box<Expr>, start: Box<Expr>, end: Box<Expr> },
-    Pack { size: u8, value: Box<Expr> },
-    Unpack { size: u8, data: Box<Expr> },
+    Call {
+        name: String,
+        args: Vec<(Option<String>, Expr)>,
+    },
+    MacroCall {
+        name: String,
+        args: Vec<Expr>,
+    },
+    Index {
+        base: Box<Expr>,
+        index: Box<Expr>,
+    },
+    Slice {
+        base: Box<Expr>,
+        start: Box<Expr>,
+        end: Box<Expr>,
+    },
+    Pack {
+        size: u8,
+        value: Box<Expr>,
+    },
+    Unpack {
+        size: u8,
+        data: Box<Expr>,
+    },
     Spread(Box<Expr>),
-    Pipe { stages: Vec<Expr> },
+    Pipe {
+        stages: Vec<Expr>,
+    },
 }
 
 // ──────────────── Primitive Literals ────────────────
@@ -425,29 +697,76 @@ pub enum OffensiveCommand {
 
 #[derive(Debug, Clone)]
 pub enum BlockchainCommand {
-    ParseABI { json: String },
-    EthCall { node: String, data: String },
-    EVMDisassemble { bytecode: String },
-    FetchContract { address: String, api_key: String },
-    ScanReentrancy { contract: String },
-    DetectDelegatecall { contract: String },
-    CheckOracleIntegrity { oracle: String },
-    ParseSolidity { code: String },
-    SourcifyContract { address: String },
-    ParseEvents { logs: String },
-    TraceTx { tx_hash: String },
-    SimulateWalletDrain { target: String, token: String, amount: u64 },
-    DetectMEV { logs: String },
-    ScrapeEtherscan { address: String },
-    DecodeTxInput { input: String },
-    FuzzEVM { bytecode: String, cycles: u32 },
+    ParseABI {
+        json: String,
+    },
+    EthCall {
+        node: String,
+        data: String,
+    },
+    EVMDisassemble {
+        bytecode: String,
+    },
+    FetchContract {
+        address: String,
+        api_key: String,
+    },
+    ScanReentrancy {
+        contract: String,
+    },
+    DetectDelegatecall {
+        contract: String,
+    },
+    CheckOracleIntegrity {
+        oracle: String,
+    },
+    ParseSolidity {
+        code: String,
+    },
+    SourcifyContract {
+        address: String,
+    },
+    ParseEvents {
+        logs: String,
+    },
+    TraceTx {
+        tx_hash: String,
+    },
+    SimulateWalletDrain {
+        target: String,
+        token: String,
+        amount: u64,
+    },
+    DetectMEV {
+        logs: String,
+    },
+    ScrapeEtherscan {
+        address: String,
+    },
+    DecodeTxInput {
+        input: String,
+    },
+    FuzzEVM {
+        bytecode: String,
+        cycles: u32,
+    },
 }
 
 #[derive(Debug, Clone)]
 pub enum CryptoCommand {
-    GenerateECCKeypair { curve: String },
-    ECDSASign { message: String, priv_key: String, curve: String },
-    AESGCMEncrypt { data: String, key: String, nonce: String },
+    GenerateECCKeypair {
+        curve: String,
+    },
+    ECDSASign {
+        message: String,
+        priv_key: String,
+        curve: String,
+    },
+    AESGCMEncrypt {
+        data: String,
+        key: String,
+        nonce: String,
+    },
 }
 
 #[derive(Debug, Clone)]
@@ -465,14 +784,39 @@ pub enum ToolchainCommand {
 
 #[derive(Debug, Clone)]
 pub enum CTFCommand {
-    NewSession { name: String },
-    AddChallenge { id: String, name: String, category: String, points: u32 },
-    SetConnection { challenge_id: String, host: String, port: u16, protocol: String },
-    AddNote { challenge_id: String, note: String },
-    SetStatus { challenge_id: String, status: String },
-    SubmitFlag { challenge_id: String, flag: String },
-    SaveSession { path: String },
-    LoadSession { path: String },
+    NewSession {
+        name: String,
+    },
+    AddChallenge {
+        id: String,
+        name: String,
+        category: String,
+        points: u32,
+    },
+    SetConnection {
+        challenge_id: String,
+        host: String,
+        port: u16,
+        protocol: String,
+    },
+    AddNote {
+        challenge_id: String,
+        note: String,
+    },
+    SetStatus {
+        challenge_id: String,
+        status: String,
+    },
+    SubmitFlag {
+        challenge_id: String,
+        flag: String,
+    },
+    SaveSession {
+        path: String,
+    },
+    LoadSession {
+        path: String,
+    },
     ShowStats,
     ListChallenges,
 }
@@ -710,4 +1054,3 @@ pub struct BinarySimilaritySpec {
     pub threshold: f64,
     pub output: String,
 }
-

@@ -12,17 +12,21 @@ pub fn dex_price(source: &str, token_a: &str, token_b: &str) -> f64 {
 }
 
 fn get_uniswap_price(token_a: &str, token_b: &str) -> f64 {
-    let query = format!(r#"
+    let query = format!(
+        r#"
         {{
             pair(id: "{}-{}") {{
                 token0Price
                 token1Price
             }}
         }}
-    "#, token_a, token_b);
+    "#,
+        token_a, token_b
+    );
 
     let client = Client::new();
-    let res = client.post("https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2")
+    let res = client
+        .post("https://api.thegraph.com/subgraphs/name/uniswap/uniswap-v2")
         .json(&serde_json::json!({ "query": query }))
         .send()
         .expect("Uniswap API failed");

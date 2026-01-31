@@ -16,10 +16,14 @@ impl PoCWeaponizer {
     }
 
     pub fn parameterize(&mut self) {
-        self.parameters.insert("TARGET_HOST".to_string(), "{{TARGET_HOST}}".to_string());
-        self.parameters.insert("TARGET_PORT".to_string(), "{{TARGET_PORT}}".to_string());
-        self.parameters.insert("CALLBACK_HOST".to_string(), "{{CALLBACK_HOST}}".to_string());
-        self.parameters.insert("CALLBACK_PORT".to_string(), "{{CALLBACK_PORT}}".to_string());
+        self.parameters
+            .insert("TARGET_HOST".to_string(), "{{TARGET_HOST}}".to_string());
+        self.parameters
+            .insert("TARGET_PORT".to_string(), "{{TARGET_PORT}}".to_string());
+        self.parameters
+            .insert("CALLBACK_HOST".to_string(), "{{CALLBACK_HOST}}".to_string());
+        self.parameters
+            .insert("CALLBACK_PORT".to_string(), "{{CALLBACK_PORT}}".to_string());
     }
 
     pub fn generate_python_wrapper(&self) -> Result<String, String> {
@@ -31,7 +35,9 @@ impl PoCWeaponizer {
         script.push_str("def main():\n");
         script.push_str("    parser = argparse.ArgumentParser(description='Weaponized exploit')\n");
         script.push_str("    parser.add_argument('--target', required=True, help='Target host')\n");
-        script.push_str("    parser.add_argument('--port', type=int, required=True, help='Target port')\n");
+        script.push_str(
+            "    parser.add_argument('--port', type=int, required=True, help='Target port')\n",
+        );
         script.push_str("    args = parser.parse_args()\n\n");
         script.push_str("    exploit = '''");
         script.push_str(&self.exploit_script);

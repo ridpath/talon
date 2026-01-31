@@ -1,5 +1,5 @@
-use talon::parser::parse_script;
 use talon::interpreter::interpret;
+use talon::parser::parse_script;
 
 async fn run_script(code: &str) -> Result<(), String> {
     let commands = parse_script(code)?;
@@ -112,7 +112,10 @@ async fn test_undefined_function_error() {
         undefined_function()
     "#;
     let result = run_script(code).await;
-    assert!(result.is_err(), "Calling undefined function should throw error");
+    assert!(
+        result.is_err(),
+        "Calling undefined function should throw error"
+    );
 }
 
 #[tokio::test]
@@ -180,7 +183,10 @@ async fn test_null_type_error() {
         let x: null = 42
     "#;
     let result = run_script(code).await;
-    assert!(result.is_err(), "Null type with non-null value should error");
+    assert!(
+        result.is_err(),
+        "Null type with non-null value should error"
+    );
     assert!(result.unwrap_err().contains("Type Error"));
 }
 
@@ -213,7 +219,10 @@ async fn test_error_message_quality() {
     let result = run_script(code).await;
     assert!(result.is_err(), "Should produce error");
     let err = result.unwrap_err();
-    assert!(err.contains("UNDEFINED VARIABLE"), "Error should be descriptive");
+    assert!(
+        err.contains("UNDEFINED VARIABLE"),
+        "Error should be descriptive"
+    );
 }
 
 #[tokio::test]
@@ -252,7 +261,10 @@ async fn test_error_in_nested_function() {
         outer()
     "#;
     let result = run_script(code).await;
-    assert!(result.is_err(), "Error should propagate through nested functions");
+    assert!(
+        result.is_err(),
+        "Error should propagate through nested functions"
+    );
 }
 
 #[tokio::test]
@@ -316,7 +328,10 @@ async fn test_error_in_match_expression() {
         }
     "#;
     let result = run_script(code).await;
-    assert!(result.is_err(), "Error in match expression should propagate");
+    assert!(
+        result.is_err(),
+        "Error in match expression should propagate"
+    );
 }
 
 #[tokio::test]
@@ -331,7 +346,10 @@ async fn test_try_catch_multiple_statements() {
         }
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Try-catch with multiple statements should work");
+    assert!(
+        result.is_ok(),
+        "Try-catch with multiple statements should work"
+    );
 }
 
 #[tokio::test]
@@ -388,7 +406,10 @@ async fn test_try_catch_variable_scope() {
         }
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Try-catch variable scope should work correctly");
+    assert!(
+        result.is_ok(),
+        "Try-catch variable scope should work correctly"
+    );
 }
 
 #[tokio::test]
@@ -431,7 +452,10 @@ async fn test_error_propagation_chain() {
         level1()
     "#;
     let result = run_script(code).await;
-    assert!(result.is_err(), "Errors should propagate through call chain");
+    assert!(
+        result.is_err(),
+        "Errors should propagate through call chain"
+    );
 }
 
 #[tokio::test]

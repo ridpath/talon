@@ -5,14 +5,14 @@ let binary_path = "examples/vuln_binary"
 
 print("\n[*] Step 1: Analyzing target binary...")
 let elf = Elf(binary_path)
-print("Binary path:", elf["path"])
-print("Base address:", hex(elf["base_addr"]))
-print("PIE enabled:", elf["pie"])
-print("NX enabled:", elf["nx"])
-print("Stack canary:", elf["canary"])
+print("Binary path:", elf.path)
+print("Base address:", hex(elf.base_addr))
+print("PIE enabled:", elf.pie)
+print("NX enabled:", elf.nx)
+print("Stack canary:", elf.canary)
 
 print("\n[*] Step 2: Locating win() function...")
-let win_addr = elf["symbols"]["win"]
+let win_addr = elf.symbols.win
 print("win() at:", hex(win_addr))
 
 print("\n[*] Step 3: Finding buffer overflow offset...")

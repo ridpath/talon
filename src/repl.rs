@@ -1,14 +1,16 @@
-use std::collections::HashMap;
-use crate::parser::parse_script;
+#![allow(clippy::upper_case_acronyms)]
+
+use crate::helpers::{DocGenerator, ErrorHelper, ScriptHelper};
 use crate::interpreter::interpret;
-use crate::helpers::{ScriptHelper, ErrorHelper, DocGenerator};
-use rustyline::error::ReadlineError;
-use rustyline::{Editor, Helper, Context, hint::HistoryHinter};
+use crate::parser::parse_script;
 use rustyline::completion::{Completer, Pair};
+use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
-use rustyline::validate::{Validator, ValidationResult, ValidationContext};
 use rustyline::hint::Hinter;
+use rustyline::validate::{ValidationContext, ValidationResult, Validator};
+use rustyline::{hint::HistoryHinter, Context, Editor, Helper};
 use std::borrow::Cow;
+use std::collections::HashMap;
 
 struct TalonCompleter {
     hinter: HistoryHinter,
@@ -16,7 +18,7 @@ struct TalonCompleter {
 
 impl Completer for TalonCompleter {
     type Candidate = Pair;
-    
+
     fn complete(
         &self,
         line: &str,
@@ -24,31 +26,67 @@ impl Completer for TalonCompleter {
         _ctx: &Context<'_>,
     ) -> Result<(usize, Vec<Pair>), ReadlineError> {
         let mut candidates = Vec::new();
-        
+
         let functions = vec![
-            "cyclic", "cyclic_find", "shellcode", "rop_find", "fmtstr_payload",
-            "interactive", "disasm", "connect", "analyze", "fuzz", "parse",
-            "scan", "detect", "execute", "load", "print", "hex", "base64",
-            "xor", "aes", "rsa", "socket", "http", "fetch", "send", "recv",
+            "cyclic",
+            "cyclic_find",
+            "shellcode",
+            "rop_find",
+            "fmtstr_payload",
+            "interactive",
+            "disasm",
+            "connect",
+            "analyze",
+            "fuzz",
+            "parse",
+            "scan",
+            "detect",
+            "execute",
+            "load",
+            "print",
+            "hex",
+            "base64",
+            "xor",
+            "aes",
+            "rsa",
+            "socket",
+            "http",
+            "fetch",
+            "send",
+            "recv",
         ];
-        
+
         let keywords = vec![
-            "let", "const", "define", "function", "if", "else", "for", "in",
-            "end", "return", "match", "case", "try", "catch", "async", "await",
-            "struct", "import", "include", "parallel",
+            "let", "const", "define", "function", "if", "else", "for", "in", "end", "return",
+            "match", "case", "try", "catch", "async", "await", "struct", "import", "include",
+            "parallel",
         ];
-        
+
         let commands = vec![
-            "help", "examples", "templates", "cheatsheet", "history", "clear",
-            "exit", "quit", "quickstart", "load", ":debug", ":time", ":profile",
-            ":inspect", ":history", ":save",
+            "help",
+            "examples",
+            "templates",
+            "cheatsheet",
+            "history",
+            "clear",
+            "exit",
+            "quit",
+            "quickstart",
+            "load",
+            ":debug",
+            ":time",
+            ":profile",
+            ":inspect",
+            ":history",
+            ":save",
         ];
-        
-        let word_start = line[..pos].rfind(|c: char| c.is_whitespace() || c == '(')
+
+        let word_start = line[..pos]
+            .rfind(|c: char| c.is_whitespace() || c == '(')
             .map(|i| i + 1)
             .unwrap_or(0);
         let prefix = &line[word_start..pos];
-        
+
         for func in functions {
             if func.starts_with(prefix) {
                 candidates.push(Pair {
@@ -57,7 +95,7 @@ impl Completer for TalonCompleter {
                 });
             }
         }
-        
+
         for keyword in keywords {
             if keyword.starts_with(prefix) {
                 candidates.push(Pair {
@@ -66,7 +104,7 @@ impl Completer for TalonCompleter {
                 });
             }
         }
-        
+
         for cmd in commands {
             if cmd.starts_with(prefix) {
                 candidates.push(Pair {
@@ -75,14 +113,14 @@ impl Completer for TalonCompleter {
                 });
             }
         }
-        
+
         Ok((word_start, candidates))
     }
 }
 
 impl Hinter for TalonCompleter {
     type Hint = String;
-    
+
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<Self::Hint> {
         self.hinter.hint(line, pos, ctx)
     }
@@ -92,7 +130,7 @@ impl Highlighter for TalonCompleter {
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
         Cow::Borrowed(line)
     }
-    
+
     fn highlight_char(&self, _line: &str, _pos: usize, _forced: bool) -> bool {
         false
     }
@@ -132,12 +170,12 @@ impl REPL {
         repl.load_history();
         repl
     }
-    
+
     fn get_history_file() -> Option<std::path::PathBuf> {
         use directories::BaseDirs;
         BaseDirs::new().map(|base_dirs| base_dirs.home_dir().join(".talon_history"))
     }
-    
+
     fn load_history(&mut self) {
         if let Some(history_file) = Self::get_history_file() {
             if let Ok(content) = std::fs::read_to_string(&history_file) {
@@ -148,7 +186,7 @@ impl REPL {
             }
         }
     }
-    
+
     fn save_history(&self) {
         if let Some(history_file) = Self::get_history_file() {
             let content = self.history.join("\n");
@@ -157,13 +195,13 @@ impl REPL {
             }
         }
     }
-    
+
     fn auto_save_history(&self) {
         if self.history.len().is_multiple_of(10) && !self.history.is_empty() {
             self.save_history();
         }
     }
-    
+
     pub fn run(&mut self) {
         println!("\n{}", "═".repeat(60));
         println!("TALON REPL - Interactive Exploit Development Shell");
@@ -178,43 +216,43 @@ impl REPL {
         println!("  exit/quit     - Exit REPL");
         println!("TIP: Press TAB for autocomplete");
         println!("{}\n", "═".repeat(60));
-        
+
         let helper = TalonCompleter {
             hinter: HistoryHinter {},
         };
         let mut rl = Editor::new().unwrap();
         rl.set_helper(Some(helper));
-        
+
         if let Some(history_file) = Self::get_history_file() {
             let _ = rl.load_history(&history_file);
         }
-        
+
         loop {
             let prompt = self.get_prompt();
             let readline = rl.readline(&prompt);
-            
+
             match readline {
                 Ok(input) => {
                     let input = input.trim();
-                    
+
                     if input.is_empty() {
                         continue;
                     }
-                    
+
                     let _ = rl.add_history_entry(input);
-                    
+
                     if self.handle_repl_command(input) {
                         continue;
                     }
-                    
+
                     self.check_multiline(input);
-                    
+
                     if self.in_block {
                         self.multiline_buffer.push_str(input);
                         self.multiline_buffer.push('\n');
                         continue;
                     }
-                    
+
                     let code = if !self.multiline_buffer.is_empty() {
                         let complete = format!("{}{}", self.multiline_buffer, input);
                         self.multiline_buffer.clear();
@@ -222,7 +260,7 @@ impl REPL {
                     } else {
                         input.to_string()
                     };
-                    
+
                     self.history.push(code.clone());
                     self.auto_save_history();
                     self.execute(&code);
@@ -241,14 +279,14 @@ impl REPL {
                 }
             }
         }
-        
+
         if let Some(history_file) = Self::get_history_file() {
             let _ = rl.save_history(&history_file);
         }
         self.save_history();
         println!("History saved. Goodbye!");
     }
-    
+
     fn get_prompt(&self) -> String {
         if self.in_block {
             "... ".to_string()
@@ -256,22 +294,22 @@ impl REPL {
             "talon> ".to_string()
         }
     }
-    
+
     fn check_multiline(&mut self, input: &str) {
         let block_starters = vec!["define", "if", "for", "match", "try", "parallel", "struct"];
-        
+
         for starter in block_starters {
             if input.starts_with(starter) && !input.contains("end") {
                 self.in_block = true;
                 return;
             }
         }
-        
+
         if input == "end" {
             self.in_block = false;
         }
     }
-    
+
     fn handle_repl_command(&mut self, input: &str) -> bool {
         match input {
             "help" | "?" => {
@@ -341,7 +379,7 @@ impl REPL {
             _ => false,
         }
     }
-    
+
     fn show_help(&self) {
         println!("\nTALON REPL Help");
         println!("{}", "─".repeat(60));
@@ -355,7 +393,7 @@ impl REPL {
         println!("  history        - Show command history");
         println!("  clear          - Clear screen");
         println!("  exit           - Exit REPL\n");
-        
+
         println!("TIP: Advanced REPL Commands:");
         println!("  :debug on/off     - Toggle debug output");
         println!("  :time <cmd>       - Measure execution time");
@@ -363,41 +401,41 @@ impl REPL {
         println!("  :inspect <var>    - Inspect variable details");
         println!("  :history [N]      - Show last N commands");
         println!("  :save <file>      - Save session to file\n");
-        
+
         println!("TIP: Quick Examples:");
         println!("  let x = 42");
         println!("  connect to \"192.168.1.1\" on port 22");
         println!("  analyze pe file \"malware.exe\"");
         println!("  fuzz file \"input.dat\"\n");
-        
+
         println!("TIP: Common Mistakes:");
         for (mistake, tip) in ErrorHelper::common_mistakes() {
             println!("  [ERROR] {} → {}", mistake, tip);
         }
         println!();
     }
-    
+
     fn show_examples(&self) {
         println!("\n[CODE EXAMPLES]");
         println!("{}", "─".repeat(60));
-        
+
         println!("\n- Basic Example:");
         println!("{}", DocGenerator::generate_example("basic"));
-        
+
         println!("\n- Exploit Example:");
         println!("{}", DocGenerator::generate_example("exploit"));
     }
-    
+
     fn show_templates(&self) {
         println!("\nAvailable Templates");
         println!("{}", "─".repeat(60));
-        
+
         let exploits = ScriptHelper::common_exploits();
         println!("\nExploit Templates:");
         for (name, _) in exploits.iter() {
             println!("  • {} - Load with: load {}", name, name);
         }
-        
+
         let tasks = ScriptHelper::common_tasks();
         println!("\nTask Templates:");
         for (name, _) in tasks.iter() {
@@ -405,11 +443,11 @@ impl REPL {
         }
         println!();
     }
-    
+
     fn load_template(&mut self, name: &str) {
         let exploits = ScriptHelper::common_exploits();
         let tasks = ScriptHelper::common_tasks();
-        
+
         if let Some(code) = exploits.get(name) {
             println!("\n[OK] Loaded template: {}", name);
             println!("{}", code);
@@ -419,14 +457,17 @@ impl REPL {
             println!("{}", code);
             self.execute(code);
         } else {
-            println!("[ERROR] Template '{}' not found. Type 'templates' to see available templates.", name);
+            println!(
+                "[ERROR] Template '{}' not found. Type 'templates' to see available templates.",
+                name
+            );
         }
     }
-    
+
     fn show_history(&self) {
         println!("\nCommand History");
         println!("{}", "─".repeat(60));
-        
+
         if self.history.is_empty() {
             println!("  (empty)");
         } else {
@@ -436,7 +477,7 @@ impl REPL {
         }
         println!();
     }
-    
+
     fn execute(&mut self, code: &str) {
         match parse_script(code) {
             Ok(commands) => {
@@ -457,7 +498,7 @@ impl REPL {
             }
         }
     }
-    
+
     fn handle_debug_command(&mut self, cmd: &str) {
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
@@ -465,7 +506,7 @@ impl REPL {
             println!("Usage: :debug on | :debug off");
             return;
         }
-        
+
         match parts[1] {
             "on" | "true" | "1" => {
                 self.debug_mode = true;
@@ -480,47 +521,47 @@ impl REPL {
             }
         }
     }
-    
+
     fn handle_time_command(&mut self, cmd: &str) {
         let code = cmd.strip_prefix(":time").unwrap().trim();
         if code.is_empty() {
             println!("Usage: :time <command>");
             return;
         }
-        
+
         let start = std::time::Instant::now();
         self.execute(code);
         let duration = start.elapsed();
-        
+
         println!("\nExecution time: {:?}", duration);
     }
-    
+
     fn handle_profile_command(&mut self, cmd: &str) {
         let code = cmd.strip_prefix(":profile").unwrap().trim();
         if code.is_empty() {
             println!("Usage: :profile <command>");
             return;
         }
-        
+
         println!("Profiling execution...");
         let start = std::time::Instant::now();
-        
+
         self.execute(code);
-        
+
         let duration = start.elapsed();
         println!("\n=== Performance Profile ===");
         println!("Total time:     {:?}", duration);
         println!("Microseconds:   {}", duration.as_micros());
         println!("Memory impact:  Low (interpreter mode)");
     }
-    
+
     fn handle_inspect_command(&mut self, cmd: &str) {
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
             println!("Usage: :inspect <variable>");
             return;
         }
-        
+
         let var_name = parts[1];
         if let Some(value) = self.variables.get(var_name) {
             println!("\n=== Variable Inspection ===");
@@ -532,7 +573,7 @@ impl REPL {
             println!("Variable '{}' not found", var_name);
         }
     }
-    
+
     fn handle_history_command(&mut self, cmd: &str) {
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         let count = if parts.len() >= 2 {
@@ -540,35 +581,35 @@ impl REPL {
         } else {
             10
         };
-        
+
         println!("\n=== Command History (last {}) ===", count);
         let start_idx = if self.history.len() > count {
             self.history.len() - count
         } else {
             0
         };
-        
+
         for (i, cmd) in self.history.iter().enumerate().skip(start_idx) {
             println!("{:3}: {}", i + 1, cmd);
         }
     }
-    
+
     fn handle_save_command(&mut self, cmd: &str) {
         let parts: Vec<&str> = cmd.split_whitespace().collect();
         if parts.len() < 2 {
             println!("Usage: :save <filename.tal>");
             return;
         }
-        
+
         let filename = parts[1];
         let content = self.history.join("\n");
-        
+
         match std::fs::write(filename, content) {
             Ok(_) => println!("Session saved to {}", filename),
             Err(e) => println!("Error saving session: {}", e),
         }
     }
-    
+
     fn infer_type(value: &str) -> &'static str {
         if value.parse::<i64>().is_ok() {
             "Number"

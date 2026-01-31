@@ -19,7 +19,7 @@ mod lsp_server_integration {
             ("shellcode", "Generate shellcode"),
             ("rop_find", "Find ROP gadgets"),
         ];
-        
+
         for (func, desc_part) in test_cases {
             assert!(!func.is_empty());
             assert!(!desc_part.is_empty());
@@ -33,7 +33,7 @@ mod lsp_server_integration {
             ("cyclic", vec!["pattern", "offset", "buffer"]),
             ("process_attach", vec!["PID", "process", "attach"]),
         ];
-        
+
         for (func, keywords) in hover_tests {
             assert!(!func.is_empty());
             assert!(!keywords.is_empty());
@@ -47,7 +47,7 @@ mod lsp_server_integration {
             ("if true", "Expected 'end' keyword"),
             ("func test()", "Expected function body"),
         ];
-        
+
         for (code, _expected_msg) in error_cases {
             assert!(!code.is_empty());
         }
@@ -56,7 +56,7 @@ mod lsp_server_integration {
     #[tokio::test]
     async fn test_completion_trigger_characters() {
         let triggers = vec![".", "(", " ", "="];
-        
+
         for trigger in triggers {
             assert!(!trigger.is_empty());
         }
@@ -69,7 +69,7 @@ mod lsp_server_integration {
             ("connect", "connect(host: string, port: number) -> number"),
             ("send", "send(socket: number, data: bytes|string) -> number"),
         ];
-        
+
         for (func, sig) in function_signatures {
             assert!(sig.contains(func));
             assert!(sig.contains("->"));
@@ -87,7 +87,7 @@ func exploit(target)
     send(conn, payload)
 end
         "#;
-        
+
         assert!(sample_code.contains("let"));
         assert!(sample_code.contains("func"));
     }
@@ -114,7 +114,7 @@ end
             ("undefined_function", "Import function"),
             ("type_mismatch", "Fix type error"),
         ];
-        
+
         for (issue, _action) in action_tests {
             assert!(!issue.is_empty());
         }
@@ -124,7 +124,7 @@ end
     async fn test_formatting() {
         let unformatted = "let x=1\nlet y= 2\nlet z =3";
         let formatted = "let x = 1\nlet y = 2\nlet z = 3";
-        
+
         assert_ne!(unformatted, formatted);
     }
 
@@ -132,7 +132,7 @@ end
     async fn test_incremental_sync() {
         let initial = "let x = 1";
         let change = "let x = 2";
-        
+
         assert_ne!(initial, change);
     }
 
@@ -143,7 +143,7 @@ end
             "helper.talon",
             "config.talon",
         ];
-        
+
         assert_eq!(files.len(), 3);
     }
 
@@ -171,7 +171,7 @@ end
             "talon.loadTemplate",
             "talon.payloadFactory",
         ];
-        
+
         for cmd in commands {
             assert!(cmd.starts_with("talon."));
         }
@@ -201,7 +201,7 @@ func exploit()
     end
 end
         "#;
-        
+
         assert!(code.contains("func"));
         assert!(code.contains("if"));
     }
@@ -239,7 +239,7 @@ end
             "func ()",
             "if\nend",
         ];
-        
+
         for code in invalid_codes {
             assert!(!code.is_empty());
         }
@@ -324,9 +324,9 @@ mod lsp_performance_tests {
     #[tokio::test]
     async fn test_completion_response_time() {
         let start = Instant::now();
-        
+
         tokio::time::sleep(Duration::from_millis(1)).await;
-        
+
         let elapsed = start.elapsed();
         assert!(elapsed < Duration::from_millis(100));
     }
@@ -334,9 +334,9 @@ mod lsp_performance_tests {
     #[tokio::test]
     async fn test_hover_response_time() {
         let start = Instant::now();
-        
+
         tokio::time::sleep(Duration::from_millis(1)).await;
-        
+
         let elapsed = start.elapsed();
         assert!(elapsed < Duration::from_millis(50));
     }
@@ -344,9 +344,9 @@ mod lsp_performance_tests {
     #[tokio::test]
     async fn test_diagnostics_update_time() {
         let start = Instant::now();
-        
+
         tokio::time::sleep(Duration::from_millis(1)).await;
-        
+
         let elapsed = start.elapsed();
         assert!(elapsed < Duration::from_millis(200));
     }
@@ -355,9 +355,9 @@ mod lsp_performance_tests {
     async fn test_large_file_parsing() {
         let large_content = "let x = 1\n".repeat(10000);
         let start = Instant::now();
-        
+
         let _lines = large_content.lines().count();
-        
+
         let elapsed = start.elapsed();
         assert!(elapsed < Duration::from_secs(1));
     }
@@ -365,14 +365,14 @@ mod lsp_performance_tests {
     #[tokio::test]
     async fn test_concurrent_requests_handling() {
         let mut tasks = vec![];
-        
+
         for _ in 0..10 {
             let task = tokio::spawn(async {
                 tokio::time::sleep(Duration::from_millis(10)).await;
             });
             tasks.push(task);
         }
-        
+
         for task in tasks {
             assert!(task.await.is_ok());
         }
@@ -395,9 +395,9 @@ mod lsp_performance_tests {
     #[tokio::test]
     async fn test_symbol_table_build_time() {
         let start = Instant::now();
-        
+
         let _symbols = vec!["p64", "p32", "cyclic", "connect", "send"];
-        
+
         let elapsed = start.elapsed();
         assert!(elapsed < Duration::from_millis(10));
     }
@@ -439,7 +439,7 @@ mod lsp_vscode_integration {
             "ROP Chain Builder",
             "Smart Assistant",
         ];
-        
+
         assert_eq!(elements.len(), 3);
     }
 
@@ -455,7 +455,7 @@ mod lsp_vscode_integration {
             ("rop", "ROP chain template"),
             ("heap", "Heap exploitation template"),
         ];
-        
+
         assert!(!snippets.is_empty());
     }
 

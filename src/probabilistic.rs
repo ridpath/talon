@@ -1,9 +1,9 @@
+use crate::ast::Command;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::time::{timeout, Duration};
-use serde::{Deserialize, Serialize};
-use crate::ast::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TunableParameter {
@@ -27,25 +27,31 @@ impl ProbabilisticExecutor {
         }
     }
 
-    pub async fn try_all(&self, strategies: Vec<Vec<Command>>, timeout_ms: Option<u64>) -> Result<(usize, String), String> {
-        let duration = timeout_ms.map(Duration::from_millis).unwrap_or(Duration::from_secs(300));
+    pub async fn try_all(
+        &self,
+        strategies: Vec<Vec<Command>>,
+        timeout_ms: Option<u64>,
+    ) -> Result<(usize, String), String> {
+        let duration = timeout_ms
+            .map(Duration::from_millis)
+            .unwrap_or(Duration::from_secs(300));
         let mut handles = Vec::new();
 
         for (idx, strategy) in strategies.into_iter().enumerate() {
-            let handle = tokio::spawn(async move {
-                (idx, strategy)
-            });
+            let handle = tokio::spawn(async move { (idx, strategy) });
             handles.push(handle);
         }
 
         let result = match timeout(duration, async {
-            for (_idx, handle) in handles.into_iter().enumerate() {
+            for handle in handles.into_iter() {
                 if let Ok((strategy_idx, _strategy)) = handle.await {
                     return Ok((strategy_idx, "Strategy succeeded".to_string()));
                 }
             }
             Err("All strategies failed".to_string())
-        }).await {
+        })
+        .await
+        {
             Ok(Ok(r)) => Ok(r),
             Ok(Err(e)) => Err(e),
             Err(_) => Err("Timeout exceeded".to_string()),
@@ -54,7 +60,11 @@ impl ProbabilisticExecutor {
         result
     }
 
-    pub async fn race(&self, threads: Vec<(String, Vec<Command>)>, sync_gap_ms: Option<u64>) -> Result<String, String> {
+    pub async fn race(
+        &self,
+        threads: Vec<(String, Vec<Command>)>,
+        sync_gap_ms: Option<u64>,
+    ) -> Result<String, String> {
         let mut handles = Vec::new();
 
         for (name, commands) in threads.into_iter() {
@@ -76,7 +86,13 @@ impl ProbabilisticExecutor {
         Err("All threads failed".to_string())
     }
 
-    pub async fn create_tunable(&self, name: &str, initial: i64, min: i64, max: i64) -> Result<(), String> {
+    pub async fn create_tunable(
+        &self,
+        name: &str,
+        initial: i64,
+        min: i64,
+        max: i64,
+    ) -> Result<(), String> {
         let tunable = TunableParameter {
             name: name.to_string(),
             current_value: initial,
@@ -87,20 +103,30 @@ impl ProbabilisticExecutor {
             learning_rate: 0.1,
         };
 
-        self.tunables.write().await.insert(name.to_string(), tunable);
+        self.tunables
+            .write()
+            .await
+            .insert(name.to_string(), tunable);
         Ok(())
     }
 
     pub async fn get_tunable_value(&self, name: &str) -> Result<i64, String> {
         let tunables = self.tunables.read().await;
-        tunables.get(name)
+        tunables
+            .get(name)
             .map(|t| t.current_value)
             .ok_or_else(|| format!("Tunable not found: {}", name))
     }
 
-    pub async fn optimize_tunable(&self, name: &str, direction: &str, success: bool) -> Result<(), String> {
+    pub async fn optimize_tunable(
+        &self,
+        name: &str,
+        direction: &str,
+        success: bool,
+    ) -> Result<(), String> {
         let mut tunables = self.tunables.write().await;
-        let tunable = tunables.get_mut(name)
+        let tunable = tunables
+            .get_mut(name)
             .ok_or_else(|| format!("Tunable not found: {}", name))?;
 
         if success {
@@ -115,21 +141,26 @@ impl ProbabilisticExecutor {
         }
 
         let success_rate = tunable.success_count as f64 / total_attempts as f64;
-        let adjustment = ((tunable.max_value - tunable.min_value) as f64 * tunable.learning_rate) as i64;
+        let adjustment =
+            ((tunable.max_value - tunable.min_value) as f64 * tunable.learning_rate) as i64;
 
         match direction {
             "higher" => {
                 if success_rate > 0.5 {
-                    tunable.current_value = (tunable.current_value + adjustment).min(tunable.max_value);
+                    tunable.current_value =
+                        (tunable.current_value + adjustment).min(tunable.max_value);
                 } else {
-                    tunable.current_value = (tunable.current_value - adjustment).max(tunable.min_value);
+                    tunable.current_value =
+                        (tunable.current_value - adjustment).max(tunable.min_value);
                 }
             }
             "lower" => {
                 if success_rate > 0.5 {
-                    tunable.current_value = (tunable.current_value - adjustment).max(tunable.min_value);
+                    tunable.current_value =
+                        (tunable.current_value - adjustment).max(tunable.min_value);
                 } else {
-                    tunable.current_value = (tunable.current_value + adjustment).min(tunable.max_value);
+                    tunable.current_value =
+                        (tunable.current_value + adjustment).min(tunable.max_value);
                 }
             }
             "auto" => {
@@ -140,7 +171,7 @@ impl ProbabilisticExecutor {
                     tunable.learning_rate = 0.1;
                 }
             }
-            _ => return Err(format!("Unknown optimization direction: {}", direction))
+            _ => return Err(format!("Unknown optimization direction: {}", direction)),
         }
 
         Ok(())

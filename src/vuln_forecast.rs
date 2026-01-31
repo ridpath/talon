@@ -1,9 +1,9 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
-use goblin::Object;
+use crate::binary_analyzer::{BinaryAnalysis, BinaryAnalyzer};
 use capstone::prelude::*;
+use goblin::Object;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs;
-use crate::binary_analyzer::{BinaryAnalyzer, BinaryAnalysis};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VulnerabilityForecast {
@@ -73,21 +73,30 @@ impl VulnForecastEngine {
     }
 
     fn initialize_databases(&mut self) {
-        self.cve_database.insert("CVE-2015-0057".to_string(), CVERecord {
-            id: "CVE-2015-0057".to_string(),
-            description: "Windows kernel privilege escalation".to_string(),
-            affected_versions: vec!["Windows 7".to_string(), "Windows 8".to_string()],
-            patch_version: "MS15-010".to_string(),
-            severity: 8.5,
-        });
+        self.cve_database.insert(
+            "CVE-2015-0057".to_string(),
+            CVERecord {
+                id: "CVE-2015-0057".to_string(),
+                description: "Windows kernel privilege escalation".to_string(),
+                affected_versions: vec!["Windows 7".to_string(), "Windows 8".to_string()],
+                patch_version: "MS15-010".to_string(),
+                severity: 8.5,
+            },
+        );
 
-        self.cve_database.insert("CVE-2020-0796".to_string(), CVERecord {
-            id: "CVE-2020-0796".to_string(),
-            description: "SMBv3 remote code execution (SMBGhost)".to_string(),
-            affected_versions: vec!["Windows 10 1903".to_string(), "Windows 10 1909".to_string()],
-            patch_version: "KB4551762".to_string(),
-            severity: 10.0,
-        });
+        self.cve_database.insert(
+            "CVE-2020-0796".to_string(),
+            CVERecord {
+                id: "CVE-2020-0796".to_string(),
+                description: "SMBv3 remote code execution (SMBGhost)".to_string(),
+                affected_versions: vec![
+                    "Windows 10 1903".to_string(),
+                    "Windows 10 1909".to_string(),
+                ],
+                patch_version: "KB4551762".to_string(),
+                severity: 10.0,
+            },
+        );
 
         self.pattern_database.push(VulnPattern {
             name: "unsafe_memcpy".to_string(),
@@ -113,17 +122,21 @@ impl VulnForecastEngine {
 
     pub fn analyze_target(&self, binary_path: &str) -> Result<VulnerabilityForecast, String> {
         log::info!("Analyzing target binary: {}", binary_path);
-        
+
         let binary_analysis = BinaryAnalyzer::analyze(binary_path)
             .map_err(|e| format!("Binary analysis failed: {}", e))?;
-        
+
         let patch_gaps = self.identify_patch_gaps(binary_path, &binary_analysis)?;
         let risk_map = self.generate_risk_map(binary_path, &binary_analysis)?;
         let hotspots = self.identify_hotspots(binary_path, &risk_map)?;
         let recommendations = self.generate_recommendations(&patch_gaps, &hotspots);
 
-        log::info!("Forecast complete: {} patch gaps, {} risk points, {} hotspots", 
-                  patch_gaps.len(), risk_map.len(), hotspots.len());
+        log::info!(
+            "Forecast complete: {} patch gaps, {} risk points, {} hotspots",
+            patch_gaps.len(),
+            risk_map.len(),
+            hotspots.len()
+        );
 
         Ok(VulnerabilityForecast {
             binary_path: binary_path.to_string(),
@@ -134,21 +147,35 @@ impl VulnForecastEngine {
         })
     }
 
-    fn identify_patch_gaps(&self, binary_path: &str, analysis: &BinaryAnalysis) -> Result<Vec<PatchGap>, String> {
+    fn identify_patch_gaps(
+        &self,
+        binary_path: &str,
+        analysis: &BinaryAnalysis,
+    ) -> Result<Vec<PatchGap>, String> {
         let mut gaps = Vec::new();
 
-        let binary_data = fs::read(binary_path)
-            .map_err(|e| format!("Failed to read binary: {}", e))?;
-        
-        let _obj = Object::parse(&binary_data)
-            .map_err(|e| format!("Failed to parse binary: {}", e))?;
+        let binary_data =
+            fs::read(binary_path).map_err(|e| format!("Failed to read binary: {}", e))?;
 
-        for (_cve_id, cve) in &self.cve_database {
+        let _obj =
+            Object::parse(&binary_data).map_err(|e| format!("Failed to parse binary: {}", e))?;
+
+        for cve in self.cve_database.values() {
             let mut confidence = 0.0;
-            
-            if cve.description.contains("SMB") && analysis.symbols.iter().any(|s| s.name.contains("smb") || s.name.contains("SMB")) {
+
+            if cve.description.contains("SMB")
+                && analysis
+                    .symbols
+                    .iter()
+                    .any(|s| s.name.contains("smb") || s.name.contains("SMB"))
+            {
                 confidence = 0.85;
-            } else if cve.description.contains("kernel") && analysis.symbols.iter().any(|s| s.name.contains("kernel") || s.name.contains("nt")) {
+            } else if cve.description.contains("kernel")
+                && analysis
+                    .symbols
+                    .iter()
+                    .any(|s| s.name.contains("kernel") || s.name.contains("nt"))
+            {
                 confidence = 0.75;
             } else if cve.description.contains("Windows") && analysis.os.contains("Windows") {
                 confidence = 0.50;
@@ -173,7 +200,7 @@ impl VulnForecastEngine {
 
     fn calculate_exploitability(&self, _cve_id: &str, analysis: &BinaryAnalysis) -> f64 {
         let mut score: f64 = 0.5;
-        
+
         if !analysis.protections.nx {
             score += 0.2;
         }
@@ -183,15 +210,19 @@ impl VulnForecastEngine {
         if !analysis.protections.canary {
             score += 0.15;
         }
-        
+
         score.min(1.0)
     }
 
-    fn generate_risk_map(&self, binary_path: &str, analysis: &BinaryAnalysis) -> Result<HashMap<String, RiskScore>, String> {
+    fn generate_risk_map(
+        &self,
+        binary_path: &str,
+        analysis: &BinaryAnalysis,
+    ) -> Result<HashMap<String, RiskScore>, String> {
         let mut risk_map = HashMap::new();
 
-        let binary_data = fs::read(binary_path)
-            .map_err(|e| format!("Failed to read binary: {}", e))?;
+        let binary_data =
+            fs::read(binary_path).map_err(|e| format!("Failed to read binary: {}", e))?;
 
         for symbol in &analysis.symbols {
             if symbol.is_imported {
@@ -202,8 +233,11 @@ impl VulnForecastEngine {
             let mut reasons = Vec::new();
 
             for pattern in &self.pattern_database {
-                if symbol.name.contains("strcpy") || symbol.name.contains("memcpy") || 
-                   symbol.name.contains("sprintf") || symbol.name.contains("strcat") {
+                if symbol.name.contains("strcpy")
+                    || symbol.name.contains("memcpy")
+                    || symbol.name.contains("sprintf")
+                    || symbol.name.contains("strcat")
+                {
                     score += pattern.risk_weight;
                     reasons.push(format!("Matches pattern: {}", pattern.name));
                 } else if symbol.name.contains("malloc") || symbol.name.contains("alloc") {
@@ -219,12 +253,15 @@ impl VulnForecastEngine {
             }
 
             if score > 0.0 {
-                risk_map.insert(symbol.name.clone(), RiskScore {
-                    function_name: symbol.name.clone(),
-                    address: symbol.address,
-                    score: score.min(1.0),
-                    reasons,
-                });
+                risk_map.insert(
+                    symbol.name.clone(),
+                    RiskScore {
+                        function_name: symbol.name.clone(),
+                        address: symbol.address,
+                        score: score.min(1.0),
+                        reasons,
+                    },
+                );
             }
         }
 
@@ -235,26 +272,32 @@ impl VulnForecastEngine {
                 .build()
                 .map_err(|e| format!("Capstone init failed: {}", e))?;
 
-            let text_section = analysis.sections.iter()
+            let text_section = analysis
+                .sections
+                .iter()
                 .find(|s| s.name == ".text" || s.is_executable)
                 .ok_or("No executable section found")?;
 
             let start = text_section.address as usize;
             let size = text_section.size.min(10000) as usize;
-            
+
             if start < binary_data.len() && start + size <= binary_data.len() {
-                let insns = cs.disasm_all(&binary_data[start..start + size], text_section.address)
+                let insns = cs
+                    .disasm_all(&binary_data[start..start + size], text_section.address)
                     .map_err(|e| format!("Disassembly failed: {}", e))?;
 
                 for insn in insns.as_ref() {
                     let mnemonic = insn.mnemonic().unwrap_or("");
                     if mnemonic == "call" || mnemonic == "jmp" {
-                        risk_map.insert(format!("func_0x{:x}", insn.address()), RiskScore {
-                            function_name: format!("sub_0x{:x}", insn.address()),
-                            address: insn.address(),
-                            score: 0.3,
-                            reasons: vec!["Disassembled function".to_string()],
-                        });
+                        risk_map.insert(
+                            format!("func_0x{:x}", insn.address()),
+                            RiskScore {
+                                function_name: format!("sub_0x{:x}", insn.address()),
+                                address: insn.address(),
+                                score: 0.3,
+                                reasons: vec!["Disassembled function".to_string()],
+                            },
+                        );
                     }
                 }
             }
@@ -283,7 +326,11 @@ impl VulnForecastEngine {
             }
         }
 
-        hotspots.sort_by(|a, b| b.historical_similarity.partial_cmp(&a.historical_similarity).unwrap());
+        hotspots.sort_by(|a, b| {
+            b.historical_similarity
+                .partial_cmp(&a.historical_similarity)
+                .unwrap()
+        });
         Ok(hotspots)
     }
 
@@ -299,7 +346,11 @@ impl VulnForecastEngine {
         }
     }
 
-    fn generate_recommendations(&self, patch_gaps: &[PatchGap], hotspots: &[Hotspot]) -> Vec<String> {
+    fn generate_recommendations(
+        &self,
+        patch_gaps: &[PatchGap],
+        hotspots: &[Hotspot],
+    ) -> Vec<String> {
         let mut recommendations = Vec::new();
 
         if let Some(top_gap) = patch_gaps.first() {

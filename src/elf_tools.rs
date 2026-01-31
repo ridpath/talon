@@ -1,7 +1,7 @@
 use goblin::elf::Elf;
 use goblin::Object;
-use std::fs;
 use std::collections::HashMap;
+use std::fs;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // ELF/PE SYMBOL RESOLUTION - PWNTOOLS-STYLE BINARY CONTEXT
@@ -16,7 +16,7 @@ pub struct ElfContext {
     pub plt: HashMap<String, u64>,
     pub got: HashMap<String, u64>,
     pub sections: HashMap<String, (u64, u64)>, // name -> (addr, size)
-    
+
     // Security features
     pub nx: bool,
     pub pie: bool,
@@ -27,7 +27,7 @@ pub struct ElfContext {
 
 impl ElfContext {
     /// Load an ELF binary and parse all symbols
-    /// 
+    ///
     /// # Example
     /// ```no_run
     /// # use talon::elf_tools::ElfContext;
@@ -40,16 +40,15 @@ impl ElfContext {
     /// ```
     pub fn load(path: &str) -> Result<Self, String> {
         log::info!("Loading ELF binary: {}", path);
-        
+
         // Read file
-        let buffer = fs::read(path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
-        
+        let buffer = fs::read(path).map_err(|e| format!("Failed to read file: {}", e))?;
+
         // Parse with goblin
         let buffer_static: &'static [u8] = Box::leak(buffer.into_boxed_slice());
-        let obj = Object::parse(buffer_static)
-            .map_err(|e| format!("Failed to parse ELF: {}", e))?;
-        
+        let obj =
+            Object::parse(buffer_static).map_err(|e| format!("Failed to parse ELF: {}", e))?;
+
         match obj {
             Object::Elf(elf) => {
                 // Extract symbols
@@ -57,7 +56,7 @@ impl ElfContext {
                 let mut plt = HashMap::new();
                 let mut got = HashMap::new();
                 let mut sections = HashMap::new();
-                
+
                 // Parse symbols
                 for sym in &elf.syms {
                     if let Some(name) = elf.strtab.get_at(sym.st_name) {
@@ -66,7 +65,7 @@ impl ElfContext {
                         }
                     }
                 }
-                
+
                 // Parse dynamic symbols
                 for sym in &elf.dynsyms {
                     if let Some(name) = elf.dynstrtab.get_at(sym.st_name) {
@@ -75,12 +74,12 @@ impl ElfContext {
                         }
                     }
                 }
-                
+
                 // Find PLT and GOT
                 for sh in &elf.section_headers {
                     if let Some(name) = elf.shdr_strtab.get_at(sh.sh_name) {
                         sections.insert(name.to_string(), (sh.sh_addr, sh.sh_size));
-                        
+
                         // PLT section
                         if name == ".plt" || name.starts_with(".plt.") {
                             // PLT entries are typically 16 bytes each on x86-64
@@ -95,7 +94,7 @@ impl ElfContext {
                                 }
                             }
                         }
-                        
+
                         // GOT section
                         if name == ".got" || name == ".got.plt" {
                             let mut offset = 24u64; // Skip first 3 GOT entries
@@ -110,26 +109,39 @@ impl ElfContext {
                         }
                     }
                 }
-                
+
                 // Detect security features
-                let nx = elf.program_headers.iter()
-                    .any(|ph| ph.p_type == goblin::elf::program_header::PT_GNU_STACK && (ph.p_flags & 0x1) == 0);
-                
+                let nx = elf.program_headers.iter().any(|ph| {
+                    ph.p_type == goblin::elf::program_header::PT_GNU_STACK
+                        && (ph.p_flags & 0x1) == 0
+                });
+
                 let pie = elf.header.e_type == goblin::elf::header::ET_DYN;
-                
+
                 let canary = symbols.contains_key("__stack_chk_fail");
-                
-                let relro = elf.program_headers.iter()
+
+                let relro = elf
+                    .program_headers
+                    .iter()
                     .any(|ph| ph.p_type == goblin::elf::program_header::PT_GNU_RELRO);
-                
-                let fortify = symbols.iter()
-                    .any(|(name, _)| name.contains("_chk"));
-                
-                log::info!("Loaded ELF: {} symbols, {} PLT entries, {} GOT entries", 
-                          symbols.len(), plt.len(), got.len());
-                log::info!("Security: NX={}, PIE={}, Canary={}, RELRO={}, FORTIFY={}", 
-                          nx, pie, canary, relro, fortify);
-                
+
+                let fortify = symbols.iter().any(|(name, _)| name.contains("_chk"));
+
+                log::info!(
+                    "Loaded ELF: {} symbols, {} PLT entries, {} GOT entries",
+                    symbols.len(),
+                    plt.len(),
+                    got.len()
+                );
+                log::info!(
+                    "Security: NX={}, PIE={}, Canary={}, RELRO={}, FORTIFY={}",
+                    nx,
+                    pie,
+                    canary,
+                    relro,
+                    fortify
+                );
+
                 Ok(ElfContext {
                     path: path.to_string(),
                     elf,
@@ -148,67 +160,72 @@ impl ElfContext {
             _ => Err("Not an ELF file".to_string()),
         }
     }
-    
+
     /// Get a symbol address by name
     pub fn symbol(&self, name: &str) -> Option<u64> {
         self.symbols.get(name).copied()
     }
-    
+
     /// Get a PLT entry address
     pub fn plt_addr(&self, name: &str) -> Option<u64> {
         self.plt.get(name).copied()
     }
-    
+
     /// Get a GOT entry address
     pub fn got_addr(&self, name: &str) -> Option<u64> {
         self.got.get(name).copied()
     }
-    
+
     /// Get section info
     pub fn section(&self, name: &str) -> Option<(u64, u64)> {
         self.sections.get(name).copied()
     }
-    
+
     /// Find a string in the binary
     pub fn find_string(&self, search: &str) -> Vec<u64> {
         let results = Vec::new();
-        
+
         // Read binary and search for string
         if let Ok(data) = std::fs::read(&self.path) {
             let search_bytes = search.as_bytes();
-            
+
             for (i, window) in data.windows(search_bytes.len()).enumerate() {
                 if window == search_bytes {
                     // Check if this address is in a valid section
                     for (section_name, (section_addr, section_size)) in &self.sections {
                         let section_start = *section_addr as usize;
                         let section_end = section_start + *section_size as usize;
-                        
+
                         if i >= section_start && i < section_end {
                             let offset = i - section_start;
                             let string_addr = section_addr + offset as u64;
-                            log::info!("Found '{}' at 0x{:x} in section {}", search, string_addr, section_name);
+                            log::info!(
+                                "Found '{}' at 0x{:x} in section {}",
+                                search,
+                                string_addr,
+                                section_name
+                            );
                             return vec![string_addr];
                         }
                     }
                 }
             }
         }
-        
+
         log::warn!("String '{}' not found in binary", search);
         results
     }
-    
+
     /// Get entry point
     pub fn entry(&self) -> u64 {
         self.elf.entry
     }
-    
+
     /// Check if binary is 64-bit
     pub fn is_64bit(&self) -> bool {
         self.elf.is_64
     }
-    
+
     /// Get architecture
     pub fn arch(&self) -> String {
         match self.elf.header.e_machine {
@@ -219,7 +236,7 @@ impl ElfContext {
             _ => format!("Unknown ({})", self.elf.header.e_machine),
         }
     }
-    
+
     /// Display checksec-style security info
     pub fn checksec(&self) -> String {
         format!(
@@ -231,7 +248,11 @@ impl ElfContext {
              FORTIFY:  {}",
             self.arch(),
             if self.relro { "Full RELRO" } else { "No RELRO" },
-            if self.canary { "Canary found" } else { "No canary" },
+            if self.canary {
+                "Canary found"
+            } else {
+                "No canary"
+            },
             if self.nx { "NX enabled" } else { "NX disabled" },
             if self.pie { "PIE enabled" } else { "No PIE" },
             if self.fortify { "Enabled" } else { "No" }

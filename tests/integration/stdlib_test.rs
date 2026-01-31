@@ -9,11 +9,11 @@ const STDLIB_TIMEOUT_SECS: u64 = 10;
 fn run_talon_code(code: &str) -> Result<String, String> {
     let temp_dir = tempfile::tempdir().map_err(|e| format!("Failed to create temp dir: {}", e))?;
     let script_path = temp_dir.path().join("test.talon");
-    
+
     fs::write(&script_path, code).map_err(|e| format!("Failed to write script: {}", e))?;
-    
+
     let cargo_bin = env!("CARGO_BIN_EXE_talon");
-    
+
     let child = Command::new(cargo_bin)
         .arg("run")
         .arg(&script_path)
@@ -24,10 +24,10 @@ fn run_talon_code(code: &str) -> Result<String, String> {
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
     let timeout = Duration::from_secs(STDLIB_TIMEOUT_SECS);
-    
+
     let output = wait_timeout::ChildExt::wait_timeout(child, timeout)
         .map_err(|e| format!("Failed to wait for process: {}", e))?;
-    
+
     match output {
         None => Err(format!("Script timed out after {} seconds", STDLIB_TIMEOUT_SECS)),
         Some(status) => {
@@ -43,7 +43,7 @@ fn run_talon_code(code: &str) -> Result<String, String> {
 #[cfg(test)]
 mod packing_functions {
     use super::*;
-    
+
     #[test]
     fn test_p64_basic() {
         let code = r#"
@@ -52,7 +52,7 @@ print(packed)
 "#;
         assert!(run_talon_code(code).is_ok(), "p64() should pack 64-bit values");
     }
-    
+
     #[test]
     fn test_p32_basic() {
         let code = r#"
@@ -61,7 +61,7 @@ print(packed)
 "#;
         assert!(run_talon_code(code).is_ok(), "p32() should pack 32-bit values");
     }
-    
+
     #[test]
     fn test_u64_basic() {
         let code = r#"
@@ -71,7 +71,7 @@ print(unpacked)
 "#;
         assert!(run_talon_code(code).is_ok(), "u64() should unpack 64-bit values");
     }
-    
+
     #[test]
     fn test_u32_basic() {
         let code = r#"
@@ -81,7 +81,7 @@ print(unpacked)
 "#;
         assert!(run_talon_code(code).is_ok(), "u32() should unpack 32-bit values");
     }
-    
+
     #[test]
     fn test_pack_unpack_roundtrip() {
         let code = r#"
@@ -99,7 +99,7 @@ end
 #[cfg(test)]
 mod encoding_functions {
     use super::*;
-    
+
     #[test]
     fn test_hex_encode() {
         let code = r#"
@@ -109,7 +109,7 @@ print(encoded)
 "#;
         assert!(run_talon_code(code).is_ok(), "hex() should encode data");
     }
-    
+
     #[test]
     fn test_base64_encode() {
         let code = r#"
@@ -119,7 +119,7 @@ print(encoded)
 "#;
         assert!(run_talon_code(code).is_ok(), "base64() should encode data");
     }
-    
+
     #[test]
     fn test_url_encode() {
         let code = r#"
@@ -134,7 +134,7 @@ print(encoded)
 #[cfg(test)]
 mod string_functions {
     use super::*;
-    
+
     #[test]
     fn test_bytes_creation() {
         let code = r#"
@@ -143,7 +143,7 @@ print(data)
 "#;
         assert!(run_talon_code(code).is_ok(), "bytes() should create byte arrays");
     }
-    
+
     #[test]
     fn test_string_repeat() {
         let code = r#"
@@ -152,7 +152,7 @@ print(data)
 "#;
         assert!(run_talon_code(code).is_ok(), "String repeat should work");
     }
-    
+
     #[test]
     fn test_string_concatenation() {
         let code = r#"
@@ -168,7 +168,7 @@ print(c)
 #[cfg(test)]
 mod math_functions {
     use super::*;
-    
+
     #[test]
     fn test_basic_arithmetic() {
         let code = r#"
@@ -180,7 +180,7 @@ print(a + b + c + d)
 "#;
         assert!(run_talon_code(code).is_ok(), "Basic arithmetic should work");
     }
-    
+
     #[test]
     fn test_modulo() {
         let code = r#"
@@ -194,7 +194,7 @@ print(remainder)
 #[cfg(test)]
 mod control_flow {
     use super::*;
-    
+
     #[test]
     fn test_if_statement() {
         let code = r#"
@@ -205,7 +205,7 @@ end
 "#;
         assert!(run_talon_code(code).is_ok(), "If statements should work");
     }
-    
+
     #[test]
     fn test_for_loop() {
         let code = r#"
@@ -215,7 +215,7 @@ end
 "#;
         assert!(run_talon_code(code).is_ok(), "For loops should work");
     }
-    
+
     #[test]
     fn test_while_loop() {
         let code = r#"
@@ -232,7 +232,7 @@ end
 #[cfg(test)]
 mod function_definitions {
     use super::*;
-    
+
     #[test]
     fn test_function_definition() {
         let code = r#"
@@ -245,7 +245,7 @@ print(result)
 "#;
         assert!(run_talon_code(code).is_ok(), "Function definitions should work");
     }
-    
+
     #[test]
     fn test_function_with_default_args() {
         let code = r#"
@@ -263,7 +263,7 @@ print(msg)
 #[cfg(test)]
 mod list_operations {
     use super::*;
-    
+
     #[test]
     fn test_list_creation() {
         let code = r#"
@@ -272,7 +272,7 @@ print(items)
 "#;
         assert!(run_talon_code(code).is_ok(), "List creation should work");
     }
-    
+
     #[test]
     fn test_list_access() {
         let code = r#"
@@ -287,7 +287,7 @@ print(first)
 #[cfg(test)]
 mod cyclic_pattern {
     use super::*;
-    
+
     #[test]
     fn test_cyclic_generation() {
         let code = r#"
@@ -296,7 +296,7 @@ print(pattern)
 "#;
         assert!(run_talon_code(code).is_ok(), "cyclic() should generate patterns");
     }
-    
+
     #[test]
     fn test_cyclic_find() {
         let code = r#"
@@ -311,7 +311,7 @@ print(offset)
 #[cfg(test)]
 mod exploit_primitives {
     use super::*;
-    
+
     #[test]
     fn test_rop_gadget_search() {
         let code = r#"
@@ -319,7 +319,7 @@ print("ROP test placeholder")
 "#;
         assert!(run_talon_code(code).is_ok(), "ROP primitives test placeholder");
     }
-    
+
     #[test]
     fn test_shellcode_generation() {
         let code = r#"
@@ -332,7 +332,7 @@ print("Shellcode test placeholder")
 #[cfg(test)]
 mod file_operations {
     use super::*;
-    
+
     #[test]
     fn test_file_read_simulation() {
         let code = r#"

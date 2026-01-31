@@ -28,32 +28,32 @@ print("Used for finding buffer overflow offsets")
 print("\n[4] Libc Database Lookup")
 print("-" * 50)
 let libc = Libc("ubuntu20.04")
-print("Loaded:", libc["name"])
-print("Build ID:", libc["build_id"])
+print("Loaded:", libc.name)
+print("Build ID:", libc.build_id)
 print("")
 print("Symbol offsets:")
-print("  system():", hex(libc["symbols"]["system"]))
-print("  execve():", hex(libc["symbols"]["execve"]))
-print("  /bin/sh string:", hex(libc["symbols"]["bin_sh"]))
-print("  __malloc_hook:", hex(libc["symbols"]["__malloc_hook"]))
-print("  __free_hook:", hex(libc["symbols"]["__free_hook"]))
+print("  system():", hex(libc.symbols.system))
+print("  execve():", hex(libc.symbols.execve))
+print("  /bin/sh string:", hex(libc.symbols.bin_sh))
+print("  __malloc_hook:", hex(libc.symbols.__malloc_hook))
+print("  __free_hook:", hex(libc.symbols.__free_hook))
 print("")
-print("One-gadgets available:", len(libc["one_gadgets"]))
+print("One-gadgets available:", len(libc.one_gadgets))
 
 print("\n[5] Libc with Base Address")
 print("-" * 50)
 let leaked_base = 0x7ffff7a00000
 print("Simulated leaked libc base:", hex(leaked_base))
 let libc_resolved = Libc({version: "ubuntu20.04", base: leaked_base})
-print("Resolved system():", hex(libc_resolved["symbols"]["system"]))
-print("Resolved /bin/sh:", hex(libc_resolved["symbols"]["bin_sh"]))
+print("Resolved system():", hex(libc_resolved.symbols.system))
+print("Resolved /bin/sh:", hex(libc_resolved.symbols.bin_sh))
 
 print("\n[6] Building ROP Payload")
 print("-" * 50)
 let offset = 264
 let pop_rdi_gadget = 0x401234
-let system_addr = libc_resolved["symbols"]["system"]
-let binsh_addr = libc_resolved["symbols"]["bin_sh"]
+let system_addr = libc_resolved.symbols.system
+let binsh_addr = libc_resolved.symbols.bin_sh
 
 print("Buffer offset:", offset, "bytes")
 print("Gadget (pop rdi; ret):", hex(pop_rdi_gadget))

@@ -1,5 +1,5 @@
-use talon::parser::parse_script;
 use talon::interpreter::interpret;
+use talon::parser::parse_script;
 
 async fn run_script(code: &str) -> Result<(), String> {
     let commands = parse_script(code)?;
@@ -180,7 +180,10 @@ async fn test_cyclic_find_missing_args() {
         let offset = cyclic_find(pattern)
     "#;
     let result = run_script(code).await;
-    assert!(result.is_err(), "cyclic_find() with missing args should fail");
+    assert!(
+        result.is_err(),
+        "cyclic_find() with missing args should fail"
+    );
 }
 
 #[tokio::test]
@@ -391,7 +394,10 @@ async fn test_fmtstr_payload_missing_offset() {
         let payload = fmtstr_payload(writes: {"0x400000": 0xdeadbeef})
     "#;
     let result = run_script(code).await;
-    assert!(result.is_err(), "fmtstr_payload() without offset should fail");
+    assert!(
+        result.is_err(),
+        "fmtstr_payload() without offset should fail"
+    );
 }
 
 #[tokio::test]

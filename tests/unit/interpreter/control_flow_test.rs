@@ -1,5 +1,5 @@
-use talon::parser::parse_script;
 use talon::interpreter::interpret;
+use talon::parser::parse_script;
 
 async fn run_script(code: &str) -> Result<(), String> {
     let commands = parse_script(code)?;

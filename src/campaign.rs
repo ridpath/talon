@@ -1,7 +1,9 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::RwLock;
 use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 #[derive(Debug, Clone)]
 pub struct Campaign {
@@ -138,11 +140,26 @@ pub struct Asset {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AssetType {
-    Host { ip: String, hostname: Option<String> },
-    Service { host: String, port: u16, protocol: String },
-    Vulnerability { cve: String, severity: String },
-    Account { username: String, domain: Option<String> },
-    File { path: String },
+    Host {
+        ip: String,
+        hostname: Option<String>,
+    },
+    Service {
+        host: String,
+        port: u16,
+        protocol: String,
+    },
+    Vulnerability {
+        cve: String,
+        severity: String,
+    },
+    Account {
+        username: String,
+        domain: Option<String>,
+    },
+    File {
+        path: String,
+    },
     Custom(String),
 }
 
@@ -300,7 +317,7 @@ impl Campaign {
         {
             let mut state = self.state.write().await;
             state.ended_at = Some(Instant::now());
-            
+
             match &result {
                 Ok(_) => state.status = CampaignStatus::Succeeded,
                 Err(e) => state.status = CampaignStatus::Failed(e.clone()),
@@ -354,8 +371,7 @@ impl Campaign {
                         return Ok(false);
                     }
                 }
-                Prerequisite::Custom { check: _ } => {
-                }
+                Prerequisite::Custom { check: _ } => {}
             }
         }
         Ok(true)
@@ -387,7 +403,10 @@ impl Campaign {
                             match self.execute_strategy(fallback).await {
                                 Ok(result) => return Ok(result),
                                 Err(fallback_err) => {
-                                    return Err(format!("Primary failed: {}, Fallback failed: {}", e, fallback_err));
+                                    return Err(format!(
+                                        "Primary failed: {}, Fallback failed: {}",
+                                        e, fallback_err
+                                    ));
                                 }
                             }
                         } else {
@@ -434,8 +453,12 @@ impl Campaign {
 
     async fn execute_action(&self, action: &Action) -> Result<(), String> {
         match &action.action_type {
-            ActionType::Scan { scan_type } => self.execute_scan(scan_type, &action.parameters).await,
-            ActionType::Exploit { exploit_name } => self.execute_exploit(exploit_name, &action.parameters).await,
+            ActionType::Scan { scan_type } => {
+                self.execute_scan(scan_type, &action.parameters).await
+            }
+            ActionType::Exploit { exploit_name } => {
+                self.execute_exploit(exploit_name, &action.parameters).await
+            }
             ActionType::Enumerate { target } => self.execute_enumeration(target).await,
             ActionType::PrivEsc { method } => self.execute_privesc(method).await,
             ActionType::LateralMove { method } => self.execute_lateral_move(method).await,
@@ -445,11 +468,19 @@ impl Campaign {
         }
     }
 
-    async fn execute_scan(&self, _scan_type: &ScanType, _params: &HashMap<String, String>) -> Result<(), String> {
+    async fn execute_scan(
+        &self,
+        _scan_type: &ScanType,
+        _params: &HashMap<String, String>,
+    ) -> Result<(), String> {
         Ok(())
     }
 
-    async fn execute_exploit(&self, _exploit: &str, _params: &HashMap<String, String>) -> Result<(), String> {
+    async fn execute_exploit(
+        &self,
+        _exploit: &str,
+        _params: &HashMap<String, String>,
+    ) -> Result<(), String> {
         Ok(())
     }
 
@@ -484,8 +515,14 @@ impl Campaign {
                     }
                 }
                 SuccessCriterion::PrivilegeLevel { level } => {
-                    if !state.open_sessions.iter().any(|s| &s.privilege_level == level) {
-                        return Err("Objective not met: Required privilege level not achieved".to_string());
+                    if !state
+                        .open_sessions
+                        .iter()
+                        .any(|s| &s.privilege_level == level)
+                    {
+                        return Err(
+                            "Objective not met: Required privilege level not achieved".to_string()
+                        );
                     }
                 }
                 _ => {}
@@ -497,7 +534,10 @@ impl Campaign {
             objective_met: true,
             actions_executed: state.completed_actions.len(),
             duration: state.started_at.map(|start| {
-                state.ended_at.unwrap_or_else(Instant::now).duration_since(start)
+                state
+                    .ended_at
+                    .unwrap_or_else(Instant::now)
+                    .duration_since(start)
             }),
             assets_discovered: state.discovered_assets.len(),
             sessions_opened: state.open_sessions.len(),
@@ -582,11 +622,11 @@ impl CampaignBuilder {
         let starting_point = self.starting_point.ok_or("Starting point is required")?;
 
         let mut campaign = Campaign::new(self.name, objective, starting_point);
-        
+
         for constraint in self.constraints {
             campaign = campaign.with_constraint(constraint);
         }
-        
+
         for strategy in self.strategies {
             campaign = campaign.with_strategy(strategy);
         }

@@ -47,13 +47,21 @@ impl Z3Solver {
     }
 
     pub fn add_variable(&mut self, name: String, var_type: Z3Type, bit_width: usize) {
-        log::info!("Adding Z3 variable: {} ({:?}, {} bits)", name, var_type, bit_width);
-        
-        self.variables.insert(name.clone(), Z3Variable {
-            name: name.clone(),
+        log::info!(
+            "Adding Z3 variable: {} ({:?}, {} bits)",
+            name,
             var_type,
-            bit_width,
-        });
+            bit_width
+        );
+
+        self.variables.insert(
+            name.clone(),
+            Z3Variable {
+                name: name.clone(),
+                var_type,
+                bit_width,
+            },
+        );
     }
 
     pub fn add_constraint(&mut self, constraint: Z3Constraint) {
@@ -62,8 +70,11 @@ impl Z3Solver {
     }
 
     pub fn solve(&self) -> Result<HashMap<String, Vec<u8>>, String> {
-        log::info!("Solving {} constraints for {} variables", 
-                  self.constraints.len(), self.variables.len());
+        log::info!(
+            "Solving {} constraints for {} variables",
+            self.constraints.len(),
+            self.variables.len()
+        );
 
         let mut solution = HashMap::new();
 
@@ -107,24 +118,24 @@ impl Z3Solver {
 
     pub fn check_sat(&self) -> Result<bool, String> {
         log::info!("Checking satisfiability");
-        
+
         Ok(true)
     }
 
     pub fn get_model(&self) -> Result<HashMap<String, i64>, String> {
         log::info!("Getting model");
-        
+
         let mut model = HashMap::new();
-        for (name, _var) in &self.variables {
+        for name in self.variables.keys() {
             model.insert(name.clone(), 0x41414141);
         }
-        
+
         Ok(model)
     }
 
     pub fn optimize(&mut self, objective: &str, maximize: bool) -> Result<i64, String> {
         log::info!("Optimizing: {} (maximize: {})", objective, maximize);
-        
+
         Ok(if maximize { i64::MAX } else { i64::MIN })
     }
 

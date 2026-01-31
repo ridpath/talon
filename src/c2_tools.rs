@@ -92,7 +92,7 @@ pub fn http_get_beacon(url: &str, query: &str, ua_profile: &str) -> Result<Strin
         .user_agent(user_agent_profiles(ua_profile))
         .build()
         .map_err(|e| e.to_string())?;
-    
+
     let full_url = format!("{}{}", url, query);
     let res = client.get(&full_url).send().map_err(|e| e.to_string())?;
     Ok(res.text().unwrap_or_default())
@@ -121,7 +121,7 @@ pub fn replay_from_file(path: &str, ip: &str, port: u16) -> std::io::Result<()> 
     udp_beacon(ip, port, &data)
 }
 
-/// === 🧅 ONION-LIKE ROUTING (Multi-Hop) ===
+/// ===  ONION-LIKE ROUTING (Multi-Hop) ===
 
 pub fn multi_hop_route(
     hops: &[(&str, u16)],

@@ -1,8 +1,8 @@
+use crate::ast::Command;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use crate::ast::Command;
 
 #[derive(Debug, Clone)]
 pub struct Strategy {
@@ -68,16 +68,17 @@ impl StrategyOptimizer {
             avg_execution_time: 0.0,
         };
 
-        self.strategies.write().await.insert(name.to_string(), strategy);
+        self.strategies
+            .write()
+            .await
+            .insert(name.to_string(), strategy);
         Ok(())
     }
 
-    pub async fn execute_strategy(
-        &self,
-        name: &str,
-    ) -> Result<Vec<Command>, String> {
+    pub async fn execute_strategy(&self, name: &str) -> Result<Vec<Command>, String> {
         let strategies = self.strategies.read().await;
-        let strategy = strategies.get(name)
+        let strategy = strategies
+            .get(name)
             .ok_or_else(|| format!("Strategy not found: {}", name))?;
 
         Ok(strategy.implementation.clone())
@@ -90,7 +91,8 @@ impl StrategyOptimizer {
         execution_time_ms: u64,
     ) -> Result<(), String> {
         let mut strategies = self.strategies.write().await;
-        let strategy = strategies.get_mut(strategy_name)
+        let strategy = strategies
+            .get_mut(strategy_name)
             .ok_or_else(|| format!("Strategy not found: {}", strategy_name))?;
 
         if success {
@@ -100,10 +102,12 @@ impl StrategyOptimizer {
         }
 
         let total_executions = (strategy.success_count + strategy.failure_count) as f64;
-        strategy.avg_execution_time = 
-            (strategy.avg_execution_time * (total_executions - 1.0) + execution_time_ms as f64) / total_executions;
+        strategy.avg_execution_time = (strategy.avg_execution_time * (total_executions - 1.0)
+            + execution_time_ms as f64)
+            / total_executions;
 
-        let params: HashMap<String, i64> = strategy.parameters
+        let params: HashMap<String, i64> = strategy
+            .parameters
             .iter()
             .map(|(k, v)| (k.clone(), v.current_value))
             .collect();
@@ -129,7 +133,8 @@ impl StrategyOptimizer {
 
     async fn auto_tune_parameters(&self, strategy_name: &str, success: bool) -> Result<(), String> {
         let mut strategies = self.strategies.write().await;
-        let strategy = strategies.get_mut(strategy_name)
+        let strategy = strategies
+            .get_mut(strategy_name)
             .ok_or_else(|| format!("Strategy not found: {}", strategy_name))?;
 
         let total_attempts = strategy.success_count + strategy.failure_count;
@@ -138,7 +143,10 @@ impl StrategyOptimizer {
         }
 
         let success_rate = strategy.success_count as f64 / total_attempts as f64;
-        let recent_history: Vec<bool> = self.execution_history.read().await
+        let recent_history: Vec<bool> = self
+            .execution_history
+            .read()
+            .await
             .iter()
             .filter(|r| r.strategy_name == strategy_name)
             .rev()
@@ -155,7 +163,7 @@ impl StrategyOptimizer {
         for (param_name, param) in strategy.parameters.iter_mut() {
             let range = (param.max_value - param.min_value) as f64;
             let normalized_position = (param.current_value - param.min_value) as f64 / range;
-            
+
             let gradient = if success {
                 1.0 - recent_success_rate
             } else {
@@ -167,35 +175,45 @@ impl StrategyOptimizer {
             match param.optimization_direction {
                 OptimizationDirection::Maximize => {
                     if success {
-                        param.current_value = (param.current_value + adjustment.abs()).min(param.max_value);
+                        param.current_value =
+                            (param.current_value + adjustment.abs()).min(param.max_value);
                     } else {
-                        param.current_value = (param.current_value - adjustment.abs()).max(param.min_value);
+                        param.current_value =
+                            (param.current_value - adjustment.abs()).max(param.min_value);
                     }
                 }
                 OptimizationDirection::Minimize => {
                     if success {
-                        param.current_value = (param.current_value - adjustment.abs()).max(param.min_value);
+                        param.current_value =
+                            (param.current_value - adjustment.abs()).max(param.min_value);
                     } else {
-                        param.current_value = (param.current_value + adjustment.abs()).min(param.max_value);
+                        param.current_value =
+                            (param.current_value + adjustment.abs()).min(param.max_value);
                     }
                 }
                 OptimizationDirection::Auto => {
                     if recent_success_rate > 0.7 {
                         param.learning_rate *= 0.9;
                     } else if recent_success_rate < 0.3 {
-                        if normalized_position > 0.7 || normalized_position < 0.3 {
+                        if !(0.3..=0.7).contains(&normalized_position) {
                             param.current_value = (param.min_value + param.max_value) / 2;
                         }
                         param.learning_rate = param.learning_rate.max(0.05);
                     } else {
-                        param.current_value = (param.current_value as f64 * 0.9 + 
-                                             ((param.min_value + param.max_value) / 2) as f64 * 0.1) as i64;
+                        param.current_value = (param.current_value as f64 * 0.9
+                            + ((param.min_value + param.max_value) / 2) as f64 * 0.1)
+                            as i64;
                     }
                 }
             }
 
-            log::debug!("Parameter '{}' adjusted: {} (success_rate: {:.2}, recent: {:.2})", 
-                       param_name, param.current_value, success_rate, recent_success_rate);
+            log::debug!(
+                "Parameter '{}' adjusted: {} (success_rate: {:.2}, recent: {:.2})",
+                param_name,
+                param.current_value,
+                success_rate,
+                recent_success_rate
+            );
         }
 
         Ok(())
@@ -203,7 +221,8 @@ impl StrategyOptimizer {
 
     pub async fn get_strategy_stats(&self, name: &str) -> Result<(f64, f64, usize), String> {
         let strategies = self.strategies.read().await;
-        let strategy = strategies.get(name)
+        let strategy = strategies
+            .get(name)
             .ok_or_else(|| format!("Strategy not found: {}", name))?;
 
         let total = (strategy.success_count + strategy.failure_count) as f64;
@@ -216,27 +235,35 @@ impl StrategyOptimizer {
         Ok((success_rate, strategy.avg_execution_time, total as usize))
     }
 
-    pub async fn get_parameter_history(&self, strategy_name: &str) -> Result<Vec<HashMap<String, i64>>, String> {
+    pub async fn get_parameter_history(
+        &self,
+        strategy_name: &str,
+    ) -> Result<Vec<HashMap<String, i64>>, String> {
         let history = self.execution_history.read().await;
         let param_history: Vec<HashMap<String, i64>> = history
             .iter()
             .filter(|r| r.strategy_name == strategy_name)
             .map(|r| r.parameters.clone())
             .collect();
-        
-        log::info!("Retrieved parameter history for '{}': {} records", strategy_name, param_history.len());
+
+        log::info!(
+            "Retrieved parameter history for '{}': {} records",
+            strategy_name,
+            param_history.len()
+        );
         Ok(param_history)
     }
 
     pub async fn reset_strategy(&self, strategy_name: &str) -> Result<(), String> {
         let mut strategies = self.strategies.write().await;
-        let strategy = strategies.get_mut(strategy_name)
+        let strategy = strategies
+            .get_mut(strategy_name)
             .ok_or_else(|| format!("Strategy not found: {}", strategy_name))?;
 
         strategy.success_count = 0;
         strategy.failure_count = 0;
         strategy.avg_execution_time = 0.0;
-        
+
         for param in strategy.parameters.values_mut() {
             param.current_value = (param.min_value + param.max_value) / 2;
             param.learning_rate = 0.1;
@@ -246,7 +273,10 @@ impl StrategyOptimizer {
         Ok(())
     }
 
-    pub async fn compare_strategies(&self, names: Vec<String>) -> Result<Vec<(String, f64, f64)>, String> {
+    pub async fn compare_strategies(
+        &self,
+        names: Vec<String>,
+    ) -> Result<Vec<(String, f64, f64)>, String> {
         let mut results = Vec::new();
 
         for name in names {
@@ -255,19 +285,27 @@ impl StrategyOptimizer {
         }
 
         results.sort_by(|a, b| {
-            b.1.partial_cmp(&a.1).unwrap()
+            b.1.partial_cmp(&a.1)
+                .unwrap()
                 .then(a.2.partial_cmp(&b.2).unwrap())
         });
 
         Ok(results)
     }
 
-    pub async fn get_parameter_value(&self, strategy_name: &str, param_name: &str) -> Result<i64, String> {
+    pub async fn get_parameter_value(
+        &self,
+        strategy_name: &str,
+        param_name: &str,
+    ) -> Result<i64, String> {
         let strategies = self.strategies.read().await;
-        let strategy = strategies.get(strategy_name)
+        let strategy = strategies
+            .get(strategy_name)
             .ok_or_else(|| format!("Strategy not found: {}", strategy_name))?;
 
-        let param = strategy.parameters.get(param_name)
+        let param = strategy
+            .parameters
+            .get(param_name)
             .ok_or_else(|| format!("Parameter not found: {}", param_name))?;
 
         Ok(param.current_value)

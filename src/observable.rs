@@ -1,6 +1,6 @@
+use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use std::collections::HashMap;
 
 pub type ObservableId = u64;
 pub type SubscriberId = u64;
@@ -16,7 +16,7 @@ pub struct Observable<T: Clone + Send + Sync> {
 
 pub struct Subscriber<T> {
     id: SubscriberId,
-    callback: Arc<dyn Fn(&T) -> () + Send + Sync>,
+    callback: Arc<dyn Fn(&T) + Send + Sync>,
 }
 
 pub struct ObservableManager {
@@ -96,7 +96,7 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
     async fn notify_subscribers(&self) {
         let value = self.value.read().await;
         let subscribers = self.subscribers.read().await;
-        
+
         for subscriber in subscribers.iter() {
             (subscriber.callback)(&*value);
         }
@@ -104,7 +104,7 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
 
     pub async fn subscribe<F>(&self, callback: F) -> SubscriberId
     where
-        F: Fn(&T) -> () + Send + Sync + 'static,
+        F: Fn(&T) + Send + Sync + 'static,
     {
         let id = self.manager.allocate_subscriber_id().await;
         let subscriber = Subscriber {
@@ -141,14 +141,15 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
 
         let mapped_clone = mapped.clone();
         let mapper = Arc::new(mapper);
-        
+
         self.subscribe(move |value| {
             let mapped_value = mapper(value);
             let mapped_clone2 = mapped_clone.clone();
             tokio::spawn(async move {
                 mapped_clone2.set(mapped_value).await;
             });
-        }).await;
+        })
+        .await;
 
         mapped
     }
@@ -186,16 +187,13 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
             tokio::spawn(async move {
                 filtered_clone2.set(result).await;
             });
-        }).await;
+        })
+        .await;
 
         filtered
     }
 
-    pub async fn combine<U, R, F>(
-        &self,
-        other: &Observable<U>,
-        combiner: F,
-    ) -> Observable<R>
+    pub async fn combine<U, R, F>(&self, other: &Observable<U>, combiner: F) -> Observable<R>
     where
         U: Clone + Send + Sync + 'static,
         R: Clone + Send + Sync + 'static,
@@ -226,14 +224,15 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
             let combined_clone2 = combined_clone.clone();
             let combiner_clone2 = Arc::clone(&combiner_clone);
             let self_clone = self_clone_for_sub1.clone();
-            
+
             tokio::spawn(async move {
                 let val1 = self_clone.get().await;
                 let val2 = other_clone2.get().await;
                 let result = combiner_clone2(&val1, &val2);
                 combined_clone2.set(result).await;
             });
-        }).await;
+        })
+        .await;
 
         let combined_clone2 = combined.clone();
         let combiner_clone2 = Arc::clone(&combiner);
@@ -241,19 +240,21 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
         let other_clone_for_sub2 = other.clone();
         let other_clone_for_closure = other_clone_for_sub2.clone();
 
-        other_clone_for_sub2.subscribe(move |_| {
-            let self_clone2 = self_clone.clone();
-            let combined_clone3 = combined_clone2.clone();
-            let combiner_clone3 = Arc::clone(&combiner_clone2);
-            let other_clone2 = other_clone_for_closure.clone();
-            
-            tokio::spawn(async move {
-                let val1 = self_clone2.get().await;
-                let val2 = other_clone2.get().await;
-                let result = combiner_clone3(&val1, &val2);
-                combined_clone3.set(result).await;
-            });
-        }).await;
+        other_clone_for_sub2
+            .subscribe(move |_| {
+                let self_clone2 = self_clone.clone();
+                let combined_clone3 = combined_clone2.clone();
+                let combiner_clone3 = Arc::clone(&combiner_clone2);
+                let other_clone2 = other_clone_for_closure.clone();
+
+                tokio::spawn(async move {
+                    let val1 = self_clone2.get().await;
+                    let val2 = other_clone2.get().await;
+                    let result = combiner_clone3(&val1, &val2);
+                    combined_clone3.set(result).await;
+                });
+            })
+            .await;
 
         combined
     }
@@ -277,14 +278,15 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
             tokio::spawn(async move {
                 let mut last = last_update_clone.write().await;
                 let now = std::time::Instant::now();
-                
+
                 if now.duration_since(*last) >= duration {
                     *last = now;
                     drop(last);
                     throttled_clone2.set(value_clone).await;
                 }
             });
-        }).await;
+        })
+        .await;
 
         throttled
     }
@@ -319,7 +321,8 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
                     }));
                 }
             });
-        }).await;
+        })
+        .await;
 
         debounced
     }
@@ -365,10 +368,10 @@ impl ReactiveContext {
     ) -> Option<Observable<T>> {
         let vars = self.variables.read().await;
         let id = vars.get(name)?;
-        
+
         let observables = self.manager.observables.read().await;
         let any_obs = observables.get(id)?;
-        
+
         any_obs.downcast_ref::<Observable<T>>().cloned()
     }
 
@@ -385,9 +388,9 @@ mod tests {
     async fn test_observable_basic() {
         let ctx = ReactiveContext::new();
         let obs = ctx.create_observable("test".to_string(), 42).await;
-        
+
         assert_eq!(obs.get().await, 42);
-        
+
         obs.set(100).await;
         assert_eq!(obs.get().await, 100);
     }
@@ -396,10 +399,10 @@ mod tests {
     async fn test_observable_subscribe() {
         let ctx = ReactiveContext::new();
         let obs = ctx.create_observable("test".to_string(), 0).await;
-        
+
         let received = Arc::new(RwLock::new(Vec::new()));
         let received_clone = Arc::clone(&received);
-        
+
         obs.subscribe(move |value| {
             let value_copy = *value;
             let received = Arc::clone(&received_clone);
@@ -407,15 +410,16 @@ mod tests {
                 let mut r = received.write().await;
                 r.push(value_copy);
             });
-        }).await;
-        
+        })
+        .await;
+
         obs.set(1).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         obs.set(2).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
         obs.set(3).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        
+
         let r = received.read().await;
         assert_eq!(*r, vec![1, 2, 3]);
     }
@@ -425,12 +429,12 @@ mod tests {
         let ctx = ReactiveContext::new();
         let obs = ctx.create_observable("test".to_string(), 5).await;
         let mapped = obs.map(|x| x * 2).await;
-        
+
         assert_eq!(mapped.get().await, 10);
-        
+
         obs.set(10).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        
+
         assert_eq!(mapped.get().await, 20);
     }
 
@@ -439,12 +443,12 @@ mod tests {
         let ctx = ReactiveContext::new();
         let obs = ctx.create_observable("test".to_string(), 5).await;
         let filtered = obs.filter(|x| *x > 10).await;
-        
+
         assert_eq!(filtered.get().await, None);
-        
+
         obs.set(15).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        
+
         assert_eq!(filtered.get().await, Some(15));
     }
 
@@ -454,17 +458,17 @@ mod tests {
         let obs1 = ctx.create_observable("a".to_string(), 5).await;
         let obs2 = ctx.create_observable("b".to_string(), 10).await;
         let combined = obs1.combine(&obs2, |a, b| a + b).await;
-        
+
         assert_eq!(combined.get().await, 15);
-        
+
         obs1.set(20).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        
+
         assert_eq!(combined.get().await, 30);
-        
+
         obs2.set(5).await;
         tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
-        
+
         assert_eq!(combined.get().await, 25);
     }
 }

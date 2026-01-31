@@ -143,36 +143,36 @@ This ensures:
 
 ### Types of Contributions
 
-**🐛 Bug Fixes**
+** Bug Fixes**
 - Fix parsing errors
 - Resolve runtime issues
 - Correct documentation errors
 
-**✨ New Features**
+** New Features**
 - Add exploitation primitives
 - Implement new standard library functions
 - Create exploit templates
 - Improve binary analysis capabilities
 
-**📚 Documentation**
+** Documentation**
 - Improve README
 - Add examples
 - Write tutorials
 - Document stdlib functions
 
-**🧪 Testing**
+** Testing**
 - Add unit tests
 - Create integration tests
 - Write fuzz targets
 - Improve coverage
 
-**⚡ Performance**
+** Performance**
 - Optimize hot paths
 - Reduce allocations
 - Improve parsing speed
 - Benchmark critical functions
 
-**🔒 Security**
+** Security**
 - Report vulnerabilities (see `SECURITY.md`)
 - Add security checks
 - Improve input validation
@@ -425,12 +425,12 @@ See **`TESTING.md`** for comprehensive testing guidance.
 
 ### Before Submitting
 
-- ✅ All tests pass: `cargo test --all-features`
-- ✅ No linting errors: `cargo clippy -- -D warnings`
-- ✅ Code is formatted: `cargo fmt`
-- ✅ Documentation is updated
-- ✅ CHANGELOG.md is updated (for notable changes)
-- ✅ Commit messages follow Conventional Commits
+-  All tests pass: `cargo test --all-features`
+-  No linting errors: `cargo clippy -- -D warnings`
+-  Code is formatted: `cargo fmt`
+-  Documentation is updated
+-  CHANGELOG.md is updated (for notable changes)
+-  Commit messages follow Conventional Commits
 
 ### PR Description Template
 
@@ -475,11 +475,11 @@ Related to #456
 
 ### Merge Requirements
 
-- ✅ CI passes (Linux + Windows)
-- ✅ Code coverage maintained (>80%)
-- ✅ At least 1 approving review
-- ✅ No unresolved review comments
-- ✅ Branch up-to-date with main
+-  CI passes (Linux + Windows)
+-  Code coverage maintained (>80%)
+-  At least 1 approving review
+-  No unresolved review comments
+-  Branch up-to-date with main
 
 ---
 
@@ -729,4 +729,4 @@ If you have questions not covered in this guide:
 
 Your contributions make TALON better for the security research community. Whether it's code, documentation, bug reports, or ideas—every contribution matters.
 
-Happy hacking! 🦅
+Happy hacking! 

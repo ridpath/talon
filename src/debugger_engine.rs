@@ -1,3 +1,5 @@
+#![allow(clippy::upper_case_acronyms)]
+
 use std::collections::HashMap;
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
@@ -59,7 +61,7 @@ impl DebuggerEngine {
                     .stderr(Stdio::piped())
                     .spawn()
                     .map_err(|e| format!("Failed to start GDB: {}", e))?;
-                
+
                 DebuggerBackend::GDB { process }
             }
             "lldb" => {
@@ -70,7 +72,7 @@ impl DebuggerEngine {
                     .stderr(Stdio::piped())
                     .spawn()
                     .map_err(|e| format!("Failed to start LLDB: {}", e))?;
-                
+
                 DebuggerBackend::LLDB { process }
             }
             "native" => DebuggerBackend::Native,
@@ -122,7 +124,7 @@ impl DebuggerEngine {
 
     pub fn remove_breakpoint(&mut self, id: usize) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
-        
+
         if state.breakpoints.remove(&id).is_some() {
             self.send_command(&format!("delete {}", id))?;
             Ok(())
@@ -157,7 +159,9 @@ impl DebuggerEngine {
 
     pub fn get_variable(&self, name: &str) -> Result<String, String> {
         let state = self.state.lock().unwrap();
-        state.variables.get(name)
+        state
+            .variables
+            .get(name)
             .cloned()
             .ok_or_else(|| format!("Variable {} not found", name))
     }
@@ -188,20 +192,18 @@ impl DebuggerEngine {
             DebuggerBackend::GDB { .. } | DebuggerBackend::LLDB { .. } => {
                 Ok(format!("Executed: {}", cmd))
             }
-            DebuggerBackend::Native => {
-                Ok("Native debugger command executed".to_string())
-            }
+            DebuggerBackend::Native => Ok("Native debugger command executed".to_string()),
             _ => Err("Unsupported debugger backend".to_string()),
         }
     }
 
     fn update_state(&mut self) -> Result<(), String> {
         let mut state = self.state.lock().unwrap();
-        
+
         state.registers.insert("rip".to_string(), 0x400000);
         state.registers.insert("rsp".to_string(), 0x7fffffffe000);
         state.registers.insert("rbp".to_string(), 0x7fffffffe010);
-        
+
         Ok(())
     }
 
@@ -213,9 +215,9 @@ impl DebuggerEngine {
 impl Drop for DebuggerEngine {
     fn drop(&mut self) {
         match &mut self.backend {
-            DebuggerBackend::GDB { process } | 
-            DebuggerBackend::LLDB { process } |
-            DebuggerBackend::WinDbg { process } => {
+            DebuggerBackend::GDB { process }
+            | DebuggerBackend::LLDB { process }
+            | DebuggerBackend::WinDbg { process } => {
                 let _ = process.kill();
             }
             _ => {}
@@ -229,12 +231,16 @@ pub fn attach_to_process(pid: u32, backend: &str) -> Result<DebuggerEngine, Stri
     Ok(engine)
 }
 
-pub fn launch_and_debug(program: &str, args: &[&str], backend: &str) -> Result<DebuggerEngine, String> {
+pub fn launch_and_debug(
+    program: &str,
+    args: &[&str],
+    backend: &str,
+) -> Result<DebuggerEngine, String> {
     let engine = DebuggerEngine::new(backend)?;
-    
+
     let _full_command = format!("{} {}", program, args.join(" "));
     engine.send_command(&format!("file {}", program))?;
     engine.send_command(&format!("run {}", args.join(" ")))?;
-    
+
     Ok(engine)
 }

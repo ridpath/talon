@@ -1,5 +1,5 @@
-use std::fs;
 use goblin::Object;
+use std::fs;
 
 #[derive(Debug, Clone)]
 pub struct BinaryInfo {
@@ -33,12 +33,10 @@ pub struct TargetDetector;
 
 impl TargetDetector {
     pub fn analyze(path: &str) -> Result<BinaryInfo, String> {
-        let data = fs::read(path)
-            .map_err(|e| format!("Failed to read binary: {}", e))?;
-        
-        let obj = Object::parse(&data)
-            .map_err(|e| format!("Failed to parse binary: {}", e))?;
-        
+        let data = fs::read(path).map_err(|e| format!("Failed to read binary: {}", e))?;
+
+        let obj = Object::parse(&data).map_err(|e| format!("Failed to parse binary: {}", e))?;
+
         match obj {
             Object::Elf(elf) => Self::analyze_elf(path, &elf),
             Object::PE(pe) => Self::analyze_pe(path, &pe),
@@ -46,7 +44,7 @@ impl TargetDetector {
             _ => Err("Unsupported binary format".to_string()),
         }
     }
-    
+
     fn analyze_elf(path: &str, elf: &goblin::elf::Elf) -> Result<BinaryInfo, String> {
         let arch = match elf.header.e_machine {
             0x3E => "x86_64",
@@ -55,25 +53,26 @@ impl TargetDetector {
             0x28 => "arm",
             0xF3 => "riscv",
             _ => "unknown",
-        }.to_string();
-        
+        }
+        .to_string();
+
         let bits = if elf.is_64 { 64 } else { 32 };
-        
+
         let endian = if elf.little_endian { "little" } else { "big" }.to_string();
-        
+
         let nx = elf.program_headers.iter().any(|ph| {
-            ph.p_type == goblin::elf::program_header::PT_GNU_STACK &&
-            (ph.p_flags & goblin::elf::program_header::PF_X) == 0
+            ph.p_type == goblin::elf::program_header::PT_GNU_STACK
+                && (ph.p_flags & goblin::elf::program_header::PF_X) == 0
         });
-        
+
         let canary = Self::check_canary_elf(elf);
-        
+
         let relro = Self::check_relro_elf(elf);
-        
+
         let pie = elf.header.e_type == goblin::elf::header::ET_DYN;
-        
+
         let stripped = elf.syms.is_empty();
-        
+
         let has_debug = elf.section_headers.iter().any(|sh| {
             if let Some(name) = elf.shdr_strtab.get_at(sh.sh_name) {
                 name.starts_with(".debug")
@@ -81,7 +80,7 @@ impl TargetDetector {
                 false
             }
         });
-        
+
         Ok(BinaryInfo {
             path: path.to_string(),
             arch,
@@ -99,23 +98,23 @@ impl TargetDetector {
             has_debug,
         })
     }
-    
+
     fn analyze_pe(path: &str, pe: &goblin::pe::PE) -> Result<BinaryInfo, String> {
         let arch = if pe.is_64 { "x86_64" } else { "x86" }.to_string();
         let bits = if pe.is_64 { 64 } else { 32 };
-        
-        let nx = pe.header.optional_header
-            .map(|oh| {
-                (oh.windows_fields.dll_characteristics & 0x0100) != 0
-            })
+
+        let nx = pe
+            .header
+            .optional_header
+            .map(|oh| (oh.windows_fields.dll_characteristics & 0x0100) != 0)
             .unwrap_or(false);
-        
-        let aslr = pe.header.optional_header
-            .map(|oh| {
-                (oh.windows_fields.dll_characteristics & 0x0040) != 0
-            })
+
+        let aslr = pe
+            .header
+            .optional_header
+            .map(|oh| (oh.windows_fields.dll_characteristics & 0x0040) != 0)
             .unwrap_or(false);
-        
+
         Ok(BinaryInfo {
             path: path.to_string(),
             arch,
@@ -133,7 +132,7 @@ impl TargetDetector {
             has_debug: false,
         })
     }
-    
+
     fn analyze_mach(path: &str, _mach: &goblin::mach::Mach) -> Result<BinaryInfo, String> {
         Ok(BinaryInfo {
             path: path.to_string(),
@@ -152,7 +151,7 @@ impl TargetDetector {
             has_debug: false,
         })
     }
-    
+
     fn check_canary_elf(elf: &goblin::elf::Elf) -> bool {
         elf.dynsyms.iter().any(|sym| {
             if let Some(name) = elf.dynstrtab.get_at(sym.st_name) {
@@ -162,29 +161,30 @@ impl TargetDetector {
             }
         })
     }
-    
+
     fn check_relro_elf(elf: &goblin::elf::Elf) -> RelroType {
-        let has_relro = elf.program_headers.iter().any(|ph| {
-            ph.p_type == goblin::elf::program_header::PT_GNU_RELRO
-        });
-        
+        let has_relro = elf
+            .program_headers
+            .iter()
+            .any(|ph| ph.p_type == goblin::elf::program_header::PT_GNU_RELRO);
+
         if !has_relro {
             return RelroType::None;
         }
-        
-        let has_bind_now = elf.dynamic.as_ref()
-            .map(|dyn_info| {
-                dyn_info.info.flags_1 & goblin::elf::dynamic::DF_1_NOW != 0
-            })
+
+        let has_bind_now = elf
+            .dynamic
+            .as_ref()
+            .map(|dyn_info| dyn_info.info.flags_1 & goblin::elf::dynamic::DF_1_NOW != 0)
             .unwrap_or(false);
-        
+
         if has_bind_now {
             RelroType::Full
         } else {
             RelroType::Partial
         }
     }
-    
+
     pub fn print_analysis(info: &BinaryInfo) {
         println!("Binary Analysis: {}", info.path);
         println!("  Architecture: {} ({}-bit)", info.arch, info.bits);
@@ -192,14 +192,38 @@ impl TargetDetector {
         println!("  Endianness: {}", info.endian);
         println!("  PIE: {}", if info.pie { "Enabled" } else { "Disabled" });
         println!("  Stripped: {}", if info.stripped { "Yes" } else { "No" });
-        println!("  Debug Info: {}", if info.has_debug { "Present" } else { "Absent" });
+        println!(
+            "  Debug Info: {}",
+            if info.has_debug { "Present" } else { "Absent" }
+        );
         println!("\nSecurity Protections:");
-        println!("  NX: {}", if info.protections.nx { "Enabled" } else { "Disabled" });
-        println!("  Canary: {}", if info.protections.canary { "Enabled" } else { "Disabled" });
+        println!(
+            "  NX: {}",
+            if info.protections.nx {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+        );
+        println!(
+            "  Canary: {}",
+            if info.protections.canary {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+        );
         println!("  RELRO: {:?}", info.protections.relro);
-        println!("  ASLR: {}", if info.protections.aslr { "Enabled" } else { "Disabled" });
+        println!(
+            "  ASLR: {}",
+            if info.protections.aslr {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+        );
     }
-    
+
     pub fn check_system_aslr() -> bool {
         #[cfg(target_os = "linux")]
         {
@@ -209,7 +233,7 @@ impl TargetDetector {
                 true
             }
         }
-        
+
         #[cfg(not(target_os = "linux"))]
         {
             true

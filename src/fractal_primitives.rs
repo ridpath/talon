@@ -1,5 +1,5 @@
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Primitive {
@@ -43,12 +43,18 @@ impl FractalAssembler {
     }
 
     fn initialize_gadgets(&mut self) {
-        self.gadget_database.insert("pop_rdi_ret".to_string(), vec![0x401234, 0x402567]);
-        self.gadget_database.insert("pop_rsi_ret".to_string(), vec![0x401890, 0x403120]);
-        self.gadget_database.insert("pop_rdx_ret".to_string(), vec![0x404560]);
-        self.gadget_database.insert("ret".to_string(), vec![0x400100]);
-        self.gadget_database.insert("xchg_rax_rsp_ret".to_string(), vec![0x405678]);
-        self.gadget_database.insert("mov_deref_rdi_rsi_ret".to_string(), vec![0x406789]);
+        self.gadget_database
+            .insert("pop_rdi_ret".to_string(), vec![0x401234, 0x402567]);
+        self.gadget_database
+            .insert("pop_rsi_ret".to_string(), vec![0x401890, 0x403120]);
+        self.gadget_database
+            .insert("pop_rdx_ret".to_string(), vec![0x404560]);
+        self.gadget_database
+            .insert("ret".to_string(), vec![0x400100]);
+        self.gadget_database
+            .insert("xchg_rax_rsp_ret".to_string(), vec![0x405678]);
+        self.gadget_database
+            .insert("mov_deref_rdi_rsi_ret".to_string(), vec![0x406789]);
     }
 
     pub fn assemble(&self, primitives: Vec<Primitive>) -> Result<AssembledConstruct, String> {
@@ -67,8 +73,7 @@ impl FractalAssembler {
                     payload.extend(write_payload);
                     description_parts.push(format!(
                         "Write {:?} to address {:?}",
-                        primitive.value,
-                        primitive.address
+                        primitive.value, primitive.address
                     ));
                 }
                 PrimitiveType::StackPivot => {
@@ -91,7 +96,10 @@ impl FractalAssembler {
         payload.extend(vec![0x90; alignment_padding]);
 
         if alignment_padding > 0 {
-            description_parts.push(format!("Added {} bytes of alignment padding", alignment_padding));
+            description_parts.push(format!(
+                "Added {} bytes of alignment padding",
+                alignment_padding
+            ));
         }
 
         Ok(AssembledConstruct {
@@ -104,9 +112,15 @@ impl FractalAssembler {
     }
 
     fn identify_construct_type(&self, primitives: &[Primitive]) -> String {
-        let has_write = primitives.iter().any(|p| matches!(p.primitive_type, PrimitiveType::Write));
-        let has_pivot = primitives.iter().any(|p| matches!(p.primitive_type, PrimitiveType::StackPivot));
-        let has_jump = primitives.iter().any(|p| matches!(p.primitive_type, PrimitiveType::Jump));
+        let has_write = primitives
+            .iter()
+            .any(|p| matches!(p.primitive_type, PrimitiveType::Write));
+        let has_pivot = primitives
+            .iter()
+            .any(|p| matches!(p.primitive_type, PrimitiveType::StackPivot));
+        let has_jump = primitives
+            .iter()
+            .any(|p| matches!(p.primitive_type, PrimitiveType::Jump));
 
         if has_write && has_pivot && has_jump {
             "ROP Chain".to_string()
@@ -139,7 +153,9 @@ impl FractalAssembler {
 
     fn assemble_stack_pivot(&self, primitive: &Primitive) -> Result<(Vec<u64>, Vec<u8>), String> {
         let pivot_gadget = self.get_gadget("xchg_rax_rsp_ret")?;
-        let target = primitive.address.ok_or("Stack pivot missing target address")?;
+        let target = primitive
+            .address
+            .ok_or("Stack pivot missing target address")?;
 
         let mut payload = Vec::new();
         payload.extend(&pivot_gadget.to_le_bytes());
@@ -150,7 +166,9 @@ impl FractalAssembler {
 
     fn assemble_jump(&self, primitive: &Primitive) -> Result<(Vec<u64>, Vec<u8>), String> {
         let ret_gadget = self.get_gadget("ret")?;
-        let target = primitive.address.ok_or("Jump primitive missing target address")?;
+        let target = primitive
+            .address
+            .ok_or("Jump primitive missing target address")?;
 
         let mut payload = Vec::new();
         payload.extend(&ret_gadget.to_le_bytes());

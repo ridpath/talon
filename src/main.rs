@@ -1,181 +1,181 @@
 #![allow(dead_code)]
 
 mod ast;
-mod parser;
-mod parser_utils;
+mod cli;
 mod codegen;
+mod dex_tools;
+mod interpreter;
 #[cfg(feature = "llvm")]
 mod llvm_codegen;
-mod wasm_codegen;
+mod package_manager;
+mod parser;
+mod parser_utils;
 mod re_tools;
 mod visualizer;
-mod cli;
-mod interpreter;
-mod package_manager;
-mod dex_tools;
+mod wasm_codegen;
 
 // Advanced Utilities
-mod pty;
-mod socket_tools;
 mod env_tools;
 mod fs_meta;
 mod memory_tools;
+mod pty;
+mod socket_tools;
 
 // User-Friendly Enhancements
 mod helpers;
 mod repl;
 
 // CTF/PENTESTING MODULES (Phase 1-5)
-mod web_tools;
 mod crypto_tools;
-mod stego_tools;
-mod encoding_tools;
 mod ctf_helpers;
+mod encoding_tools;
+mod stego_tools;
+mod web_tools;
 // DISABLED: forensics_tools has persistent Unicode encoding issues on Windows
 // mod forensics_tools;
-mod osint_tools;
-mod binary_patch;
 mod archive_tools;
-mod packet_tools;
+mod binary_patch;
+mod blockchain_tools;
 mod fuzzing_tools;
 mod offensive_tools;
-mod blockchain_tools;
+mod osint_tools;
+mod packet_tools;
 
 // EXPLOIT DEVELOPMENT MODULES (Phase 7+)
-mod packing_tools;          // pack64/u64/pack32/u32 - pwntools-style packing
-mod cyclic_tools;           // De Bruijn sequences for offset finding
-mod interactive_io;         // Socket context with send/recv/interactive (FULL TTY)
-mod elf_tools;              // ELF symbol resolution (symbols, plt, got) + string search
-mod rop_tools;              // ROP gadget search & chain builder + quality scoring
-mod fmtstr_tools;           // Format string auto-exploit (optimized payload generation)
-mod shellcode_encoders;     // Alphanumeric, unicode, XOR encoders
-mod exploit_templates;      // Auto-generate exploit scripts
-mod srop_tools;             // Sigreturn-Oriented Programming (SROP) frame builder
-mod heap_tools;             // Modern heap exploitation (tcache, fastbin, unsorted bin)
-mod shellcode_db;           // Pre-built shellcode database (x86/x64 Linux)
-mod libc_db;                // Common libc versions and offsets database
+mod cyclic_tools; // De Bruijn sequences for offset finding
+mod elf_tools; // ELF symbol resolution (symbols, plt, got) + string search
+mod exploit_templates; // Auto-generate exploit scripts
+mod fmtstr_tools; // Format string auto-exploit (optimized payload generation)
+mod heap_tools; // Modern heap exploitation (tcache, fastbin, unsorted bin)
+mod interactive_io; // Socket context with send/recv/interactive (FULL TTY)
+mod libc_db;
+mod packing_tools; // pack64/u64/pack32/u32 - pwntools-style packing
+mod rop_tools; // ROP gadget search & chain builder + quality scoring
+mod shellcode_db; // Pre-built shellcode database (x86/x64 Linux)
+mod shellcode_encoders; // Alphanumeric, unicode, XOR encoders
+mod srop_tools; // Sigreturn-Oriented Programming (SROP) frame builder // Common libc versions and offsets database
 
 // NEXT-GEN FEATURES - 1000x Beyond Pwntools (Phase 10+)
-mod symbolic_engine;        // Symbolic execution & constraint solving (Z3)
-mod ai_exploit;             // AI-powered exploit generation (LM Studio)
-mod debugger_bridge;        // Live debugging DSL (GDB/LLDB/WinDbg)
-mod advanced_fuzzer;        // Protocol-aware coverage-guided fuzzing
-mod advanced_features;      // Heap feng shui, kernel exploits, smart contracts, etc.
-mod gdb_mi;                 // GDB Machine Interface protocol
-mod z3_solver;              // Z3 constraint solver bindings
-mod natural_language;       // Natural language to Talon DSL
+mod advanced_features; // Heap feng shui, kernel exploits, smart contracts, etc.
+mod advanced_fuzzer; // Protocol-aware coverage-guided fuzzing
+mod ai_exploit; // AI-powered exploit generation (LM Studio)
+mod debugger_bridge; // Live debugging DSL (GDB/LLDB/WinDbg)
+mod gdb_mi; // GDB Machine Interface protocol
+mod natural_language;
+mod symbolic_engine; // Symbolic execution & constraint solving (Z3)
+mod z3_solver; // Z3 constraint solver bindings // Natural language to Talon DSL
 
 // PHASE 11 - USABILITY & USER EXPERIENCE
-mod config;                 // Configuration file management (~/.talonrc)
-mod output_utils;           // Colored output and progress bars
-mod templates;              // Exploit template generator
-mod exploit_db;             // Built-in CVE and exploit database
-mod target_detection;       // Binary analysis and protection detection
-mod manpages;               // Comprehensive man page generator
-mod completions;            // Shell completion scripts (bash/zsh/fish)
-mod enhanced_binary_diff;   // Advanced binary diffing with exploit discovery
-mod cheatsheet;             // Topic-specific exploitation cheat sheets
-mod examples;               // Example library management (list, show, run, copy)
-mod workspace;              // CTF workspace management (init, add, list, sync)
-mod notebook;               // Notebook-style exploit development with annotations
-mod formatter;              // Code formatter for TALON scripts
-mod linter;                 // Linter for detecting common mistakes and issues
+mod cheatsheet; // Topic-specific exploitation cheat sheets
+mod completions; // Shell completion scripts (bash/zsh/fish)
+mod config; // Configuration file management (~/.talonrc)
+mod enhanced_binary_diff; // Advanced binary diffing with exploit discovery
+mod examples; // Example library management (list, show, run, copy)
+mod exploit_db; // Built-in CVE and exploit database
+mod formatter; // Code formatter for TALON scripts
+mod linter;
+mod manpages; // Comprehensive man page generator
+mod notebook; // Notebook-style exploit development with annotations
+mod output_utils; // Colored output and progress bars
+mod target_detection; // Binary analysis and protection detection
+mod templates; // Exploit template generator
+mod workspace; // CTF workspace management (init, add, list, sync) // Linter for detecting common mistakes and issues
 
 // PHASE 13 - ADVANCED SECURITY FRAMEWORKS
-mod smart_contract_auditor;  // Comprehensive smart contract security analysis and auditing
-mod kernel_exploiter;        // Advanced kernel exploitation and privilege escalation toolkit
-mod ctf_automation;          // CTF session management, flag submission, and challenge tracking
-mod diff_fuzzer;             // Differential fuzzing for 1-day/0-day vulnerability discovery
-mod cve_scanner;             // CVE scanner with exploit-db.com integration and impact assessment
-mod binary_similarity;       // Binary similarity analysis with function embedding-based matching
-mod exploit_chaining;        // Exploit chaining & multi-stage attack orchestration framework
-mod runtime_safety;          // Runtime safety & resource management (timeouts, memory limits, recursion depth)
+mod binary_similarity; // Binary similarity analysis with function embedding-based matching
+mod ctf_automation; // CTF session management, flag submission, and challenge tracking
+mod cve_scanner; // CVE scanner with exploit-db.com integration and impact assessment
+mod diff_fuzzer; // Differential fuzzing for 1-day/0-day vulnerability discovery
+mod exploit_chaining; // Exploit chaining & multi-stage attack orchestration framework
+mod kernel_exploiter; // Advanced kernel exploitation and privilege escalation toolkit
+mod runtime_safety;
+mod smart_contract_auditor; // Comprehensive smart contract security analysis and auditing // Runtime safety & resource management (timeouts, memory limits, recursion depth)
 
 // PHASE 14 - ADVANCED SCRIPTING FEATURES
-mod plugin_system;           // Plugin system for extending Talon with custom modules
-mod profiler;                // Performance profiler for identifying bottlenecks
-mod doc_generator;           // Documentation system for stdlib functions
+mod doc_generator;
+mod plugin_system; // Plugin system for extending Talon with custom modules
+mod profiler; // Performance profiler for identifying bottlenecks // Documentation system for stdlib functions
 
 // PHASE 15 - CORE EXPLOITATION PRIMITIVES
-mod cyclic_pattern;          // De Bruijn sequence generation for buffer overflow offset finding
-mod shellcode_library;       // Multi-architecture shellcode library with common payloads
-mod rop_gadget_finder;       // Native ROP gadget finder with semantic analysis
-mod format_string;           // Format string exploit payload generator
-mod disasm_visualizer;       // Advanced disassembler with visualization support
-mod interactive_shell;       // Interactive shell for live exploitation
+mod cyclic_pattern; // De Bruijn sequence generation for buffer overflow offset finding
+mod disasm_visualizer; // Advanced disassembler with visualization support
+mod format_string; // Format string exploit payload generator
+mod interactive_shell;
+mod rop_gadget_finder; // Native ROP gadget finder with semantic analysis
+mod shellcode_library; // Multi-architecture shellcode library with common payloads // Interactive shell for live exploitation
 
 // PHASE 16 - DIFFERENTIATION FEATURES
-mod parallel_exploit;        // Parallel exploitation with Tokio for concurrent attacks
-mod sized_buffer;            // Memory-safe sized buffers with compile-time checking
-mod ai_exploit_gen;          // AI-powered exploit generation (local & cloud)
+mod ai_exploit_gen;
+mod parallel_exploit; // Parallel exploitation with Tokio for concurrent attacks
+mod sized_buffer; // Memory-safe sized buffers with compile-time checking // AI-powered exploit generation (local & cloud)
 
 // PHASE 17 - PROFESSIONAL PRODUCTION FEATURES
-mod module_system;           // Import/export module system for code organization
-mod debugger_engine;         // Integrated debugger with step-through capabilities
-mod binary_analyzer;         // Automatic binary analysis and exploit strategy generation
-// mod test_framework;          // Unit testing framework with annotations
-mod macro_system;            // Macro system for code generation
-mod hot_reload;              // Hot reload for live code updates
+mod binary_analyzer;
+mod debugger_engine; // Integrated debugger with step-through capabilities
+mod module_system; // Import/export module system for code organization // Automatic binary analysis and exploit strategy generation
+                   // mod test_framework;          // Unit testing framework with annotations
+mod hot_reload;
+mod macro_system; // Macro system for code generation // Hot reload for live code updates
 
 // PHASE 18 - ORCHESTRATOR RUNTIME
-mod orchestrator;            // Async orchestrator runtime with task management
-mod session_state;           // First-class exploit session state management
-mod resilient_execution;     // Resilient execution with auto-rollback
-mod parallel_execution;      // Parallel for, race, and concurrent strategies
-mod exploit_graph;           // Declarative exploit graphs with dependency resolution
-mod time_travel;             // Time-travel debugging with checkpoint/rewind
-mod observable;              // Reactive Observable<T> type system for state management
-mod event_loop;              // Event-driven runtime with async handler dispatch
-mod campaign;                // Objective-driven campaign orchestrator for autonomous operations
-mod environment_graph;       // Attack surface modeling and pathfinding for lateral movement
-mod ai_planner;              // AI-driven campaign planning and strategy generation
-mod ai_suggestion;           // Intelligent exploit suggestion and auto-weaponization
+mod ai_planner; // AI-driven campaign planning and strategy generation
+mod ai_suggestion;
+mod campaign; // Objective-driven campaign orchestrator for autonomous operations
+mod environment_graph; // Attack surface modeling and pathfinding for lateral movement
+mod event_loop; // Event-driven runtime with async handler dispatch
+mod exploit_graph; // Declarative exploit graphs with dependency resolution
+mod observable; // Reactive Observable<T> type system for state management
+mod orchestrator; // Async orchestrator runtime with task management
+mod parallel_execution; // Parallel for, race, and concurrent strategies
+mod resilient_execution; // Resilient execution with auto-rollback
+mod session_state; // First-class exploit session state management
+mod time_travel; // Time-travel debugging with checkpoint/rewind // Intelligent exploit suggestion and auto-weaponization
 
 // PHASE 20 - REVOLUTIONARY UX & COMMUNITY FEATURES
-mod replay_format;           // .talonrec replay file format for session sharing
-mod report_generator;        // Professional exploit report generation
-mod poc_weaponizer;          // PoC to production exploit weaponization wizard
-mod tool_integration;        // Ghidra/radare2 integration for reverse engineering
-mod one_liners;              // One-liner primitives for common tasks
-mod tutorial_system;         // Interactive guided tutorial system
-mod challenge_marketplace;   // Community challenge marketplace
-// mod collaborative_session;   // Real-time collaborative exploitation sessions
-mod adversary_playbook;      // Adversary emulation playbook simulator
-mod script_translator;       // Pwntools/Metasploit script translation
+mod challenge_marketplace;
+mod one_liners; // One-liner primitives for common tasks
+mod poc_weaponizer; // PoC to production exploit weaponization wizard
+mod replay_format; // .talonrec replay file format for session sharing
+mod report_generator; // Professional exploit report generation
+mod tool_integration; // Ghidra/radare2 integration for reverse engineering
+mod tutorial_system; // Interactive guided tutorial system // Community challenge marketplace
+                     // mod collaborative_session;   // Real-time collaborative exploitation sessions
+mod adversary_playbook; // Adversary emulation playbook simulator
+mod script_translator; // Pwntools/Metasploit script translation
 
 // PHASE 21 - META-PROGRAMMING & REACTIVE RUNTIME
-mod meta_programming;        // AST introspection and code generation
-mod reactive_memory;         // Live memory bindings and reactive variables
-mod event_system;            // Event-driven language constructs
-mod probabilistic;           // Probabilistic and parallel execution
-mod script_continuity;       // Checkpoint/resume and strategy forking
+mod event_system; // Event-driven language constructs
+mod meta_programming; // AST introspection and code generation
+mod probabilistic; // Probabilistic and parallel execution
+mod reactive_memory; // Live memory bindings and reactive variables
+mod script_continuity; // Checkpoint/resume and strategy forking
 
 // PHASE 22 - SYMBIOTIC EXECUTION & AUTONOMOUS RESEARCH
-mod symbiotic_execution;     // Bidirectional state binding with target
-mod goal_planner;            // Declarative goal-oriented exploit synthesis
-mod strategy_optimizer;      // Self-optimizing strategy execution
-mod speculative_execution;   // Predictive future execution and sandbox
-mod defense_simulator;       // Adversarial defense simulation
-mod vuln_forecast;           // Vulnerability prediction and patch analysis
-mod fractal_primitives;      // Auto-assembling exploit primitives
+mod defense_simulator; // Adversarial defense simulation
+mod fractal_primitives;
+mod goal_planner; // Declarative goal-oriented exploit synthesis
+mod speculative_execution; // Predictive future execution and sandbox
+mod strategy_optimizer; // Self-optimizing strategy execution
+mod symbiotic_execution; // Bidirectional state binding with target
+mod vuln_forecast; // Vulnerability prediction and patch analysis // Auto-assembling exploit primitives
 
 // PHASE 23 - PWNTOOLS KILLER FEATURES (Jan 2026)
-mod libc_database;           // libc.rip integration for libc identification and download
-mod auto_offset;             // Automatic offset finding with crash analysis
-mod flag_tools;              // Flag pattern search and CTF platform submission
-mod gdb_parser;              // Real GDB output parsing with MI support
-mod quick_mode;              // Interactive quick-mode helpers (quick_shell, quick_rop, etc.)
+mod auto_offset; // Automatic offset finding with crash analysis
+mod flag_tools; // Flag pattern search and CTF platform submission
+mod gdb_parser; // Real GDB output parsing with MI support
+mod libc_database; // libc.rip integration for libc identification and download
+mod quick_mode; // Interactive quick-mode helpers (quick_shell, quick_rop, etc.)
 
 // Standard Library
+use colored::*;
 use std::env;
 use std::fs;
-use colored::*;
 
 fn main() {
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
         .init();
-    
+
     let args: Vec<String> = env::args().collect();
 
     if args.len() < 2 {
@@ -193,11 +193,12 @@ fn main() {
         }
 
         "run" if args.len() >= 3 => {
-            let verbose = args.contains(&"--verbose".to_string()) || args.contains(&"-V".to_string());
+            let verbose =
+                args.contains(&"--verbose".to_string()) || args.contains(&"-V".to_string());
             if verbose {
                 log::set_max_level(log::LevelFilter::Debug);
             }
-            
+
             if let Err(e) = run_script(&args[2]) {
                 eprintln!("{} {}", "[ERROR]".red(), e);
                 std::process::exit(1);
@@ -239,8 +240,8 @@ fn main() {
 
 /// Handles running a .talon script file
 fn run_script(path: &str) -> Result<(), String> {
-    let script = fs::read_to_string(path)
-        .map_err(|e| format!("Failed to read script '{}': {}", path, e))?;
+    let script =
+        fs::read_to_string(path).map_err(|e| format!("Failed to read script '{}': {}", path, e))?;
 
     if script.trim().is_empty() {
         return Err("Script is empty".into());
@@ -255,19 +256,19 @@ fn run_script(path: &str) -> Result<(), String> {
 /// Natural language to Talon DSL translation
 fn run_natural_language(query: &str) {
     use tokio::runtime::Runtime;
-    
+
     println!("{}", "TALON Natural Language Interface".bold().cyan());
     println!("{}", "═══════════════════════════════════════".cyan());
     println!();
     println!("{} {}", "Query:".bold(), query.italic());
     println!();
-    
+
     let rt = Runtime::new().unwrap();
     let result = rt.block_on(async {
         let processor = natural_language::NaturalLanguageProcessor::new();
         processor.parse_natural_language(query).await
     });
-    
+
     match result {
         Ok(talon_code) => {
             println!("{}", "Generated Talon Code:".bold().green());
@@ -275,9 +276,11 @@ fn run_natural_language(query: &str) {
             println!("{}", talon_code);
             println!("{}", "─────────────────────────────────────────".green());
             println!();
-            println!("{} Save this to a file and run with: {}", 
-                "[TIP]".yellow(), 
-                "talon run exploit.talon".bold().cyan());
+            println!(
+                "{} Save this to a file and run with: {}",
+                "[TIP]".yellow(),
+                "talon run exploit.talon".bold().cyan()
+            );
         }
         Err(e) => {
             eprintln!("{} {}", "[ERROR]".red(), e);
@@ -288,17 +291,15 @@ fn run_natural_language(query: &str) {
 
 /// Interactive exploit wizard
 fn run_wizard() {
-    
-    
     println!();
     println!("{}", "TALON Exploit Wizard".bold().purple());
     println!("{}", "═══════════════════════════════════════".purple());
     println!();
     println!("This wizard will guide you through creating an exploit.");
     println!();
-    
+
     let exploit_type = prompt("What type of challenge are you working on?\n  [1] Buffer Overflow (Stack)\n  [2] Format String\n  [3] ROP Chain\n  [4] Heap Exploitation\n  [5] Return-to-libc\n  [6] Reactive Exploit (Self-Healing)\n  [7] Campaign (Lateral Movement)\n  [8] Event-Driven Exploitation\n  [9] Multi-Target Parallel\n> ");
-    
+
     let template = match exploit_type.trim() {
         "1" => generate_buffer_overflow_wizard(),
         "2" => generate_format_string_wizard(),
@@ -314,20 +315,28 @@ fn run_wizard() {
             return;
         }
     };
-    
+
     println!();
     println!("{}", "Generated Exploit Template:".bold().green());
     println!("{}", "─────────────────────────────────────────".green());
     println!("{}", template);
     println!("{}", "─────────────────────────────────────────".green());
     println!();
-    
+
     let filename = prompt("Save to file (e.g., exploit.talon): ");
     if !filename.trim().is_empty() {
         match fs::write(filename.trim(), template) {
             Ok(_) => {
-                println!("{} Exploit saved to: {}", "[OK]".green(), filename.trim().bold());
-                println!("{} Run with: {}", "[TIP]".yellow(), format!("talon run {}", filename.trim()).bold().cyan());
+                println!(
+                    "{} Exploit saved to: {}",
+                    "[OK]".green(),
+                    filename.trim().bold()
+                );
+                println!(
+                    "{} Run with: {}",
+                    "[TIP]".yellow(),
+                    format!("talon run {}", filename.trim()).bold().cyan()
+                );
             }
             Err(e) => {
                 eprintln!("{} Failed to save file: {}", "[ERROR]".red(), e);
@@ -349,11 +358,20 @@ fn generate_buffer_overflow_wizard() -> String {
     let binary = prompt("Target binary path: ");
     let host = prompt("Target host (default: 127.0.0.1): ");
     let port = prompt("Target port (default: 9999): ");
-    
-    let host = if host.trim().is_empty() { "127.0.0.1" } else { host.trim() };
-    let port = if port.trim().is_empty() { "9999" } else { port.trim() };
-    
-    format!(r#"# Buffer Overflow Exploit - Generated by TALON Wizard
+
+    let host = if host.trim().is_empty() {
+        "127.0.0.1"
+    } else {
+        host.trim()
+    };
+    let port = if port.trim().is_empty() {
+        "9999"
+    } else {
+        port.trim()
+    };
+
+    format!(
+        r#"# Buffer Overflow Exploit - Generated by TALON Wizard
 
 print("[EXPLOIT] Buffer Overflow")
 print("═══════════════════════════════════════")
@@ -387,13 +405,18 @@ print("Payload size:", len(payload), "bytes")
 # connect to target_host on port target_port
 # send payload
 # interactive
-"#, binary.trim(), host, port)
+"#,
+        binary.trim(),
+        host,
+        port
+    )
 }
 
 fn generate_format_string_wizard() -> String {
     let binary = prompt("Target binary path: ");
-    
-    format!(r#"# Format String Exploit - Generated by TALON Wizard
+
+    format!(
+        r#"# Format String Exploit - Generated by TALON Wizard
 
 print("[EXPLOIT] Format String")
 print("═══════════════════════════════════════")
@@ -414,13 +437,16 @@ print("[OK] Format string offset:", offset)
 
 # TODO: Customize your writes
 # let payload = build_format_string(offset, target_addr, value)
-"#, binary.trim())
+"#,
+        binary.trim()
+    )
 }
 
 fn generate_rop_wizard() -> String {
     let binary = prompt("Target binary path: ");
-    
-    format!(r#"# ROP Chain Exploit - Generated by TALON Wizard
+
+    format!(
+        r#"# ROP Chain Exploit - Generated by TALON Wizard
 
 print("[EXPLOIT] ROP Chain")
 print("═══════════════════════════════════════")
@@ -435,7 +461,7 @@ let padding = cyclic(crash_offset)
 # Use: ROPgadget --binary {{binary}}
 
 let pop_rdi = 0x0000000000400686
-let pop_rsi = 0x0000000000400687  
+let pop_rsi = 0x0000000000400687
 let ret = 0x0000000000400285
 
 # Step 3: Build ROP chain
@@ -447,11 +473,13 @@ let rop_chain = [
 
 # Step 4: Construct final payload
 print("[OK] ROP chain ready with", len(rop_chain), "gadgets")
-"#, binary.trim())
+"#,
+        binary.trim()
+    )
 }
 
 fn generate_heap_wizard() -> String {
-    format!(r#"# Heap Exploitation - Generated by TALON Wizard
+    r#"# Heap Exploitation - Generated by TALON Wizard
 
 print("[EXPLOIT] Heap Exploitation")
 print("═══════════════════════════════════════")
@@ -468,11 +496,11 @@ print("════════════════════════�
 # Overwrite function pointers, vtables, etc.
 
 print("[OK] Heap exploit template ready")
-"#)
+"#.to_string()
 }
 
 fn generate_ret2libc_wizard() -> String {
-    format!(r#"# Return-to-libc Exploit - Generated by TALON Wizard
+    r#"# Return-to-libc Exploit - Generated by TALON Wizard
 
 print("[EXPLOIT] Return-to-libc")
 print("═══════════════════════════════════════")
@@ -496,17 +524,26 @@ let pop_rdi = 0x400686
 # let rop_chain = [pop_rdi, binsh, system]
 
 print("[OK] Ret2libc chain ready")
-"#)
+"#.to_string()
 }
 
 fn generate_reactive_exploit_wizard() -> String {
     let target = prompt("Target host (default: 127.0.0.1): ");
     let port = prompt("Target port (default: 9999): ");
-    
-    let target = if target.trim().is_empty() { "127.0.0.1" } else { target.trim() };
-    let port = if port.trim().is_empty() { "9999" } else { port.trim() };
-    
-    format!(r#"# Reactive Self-Healing Exploit - Generated by TALON Wizard
+
+    let target = if target.trim().is_empty() {
+        "127.0.0.1"
+    } else {
+        target.trim()
+    };
+    let port = if port.trim().is_empty() {
+        "9999"
+    } else {
+        port.trim()
+    };
+
+    format!(
+        r#"# Reactive Self-Healing Exploit - Generated by TALON Wizard
 
 print("[EXPLOIT] Reactive Self-Healing Exploit")
 print("═══════════════════════════════════════")
@@ -530,7 +567,7 @@ let $rop_chain = combine($system_addr, $binsh_addr, (sys, sh) => [
 on session.crash -> {{
     print("[WARNING] Target crashed, analyzing...")
     let analysis = analyze_crash(session)
-    
+
     if analysis.type == "stack_smashing" {{
         print("[INFO] Adjusting payload size")
         session.payload_size = session.payload_size - 8
@@ -554,14 +591,17 @@ resilient session {{
 }}
 
 print("[OK] Reactive exploit ready - will adapt to ASLR and failures")
-"#, target, port)
+"#,
+        target, port
+    )
 }
 
 fn generate_campaign_wizard() -> String {
     let objective = prompt("Campaign objective (e.g., 'Domain Admin access'): ");
     let start_point = prompt("Starting point (e.g., 'Compromised workstation'): ");
-    
-    format!(r#"# Autonomous Campaign - Generated by TALON Wizard
+
+    format!(
+        r#"# Autonomous Campaign - Generated by TALON Wizard
 
 print("[CAMPAIGN] Autonomous Security Campaign")
 print("═══════════════════════════════════════")
@@ -617,11 +657,14 @@ print("[INFO] Found", len(attack_paths), "potential paths to objective")
 execute_campaign("Lateral_Movement")
 
 print("[OK] Campaign orchestration ready")
-"#, objective.trim(), start_point.trim())
+"#,
+        objective.trim(),
+        start_point.trim()
+    )
 }
 
 fn generate_event_driven_wizard() -> String {
-    format!(r#"# Event-Driven Exploitation - Generated by TALON Wizard
+    r#"# Event-Driven Exploitation - Generated by TALON Wizard
 
 print("[EXPLOIT] Event-Driven Exploitation")
 print("═══════════════════════════════════════")
@@ -630,103 +673,103 @@ print("════════════════════════�
 let session = Session.attach_debugger("./target", breakpoint_mode: true)
 
 # MEMORY EVENT HANDLERS
-on memory_write(session, 0x401000) -> {{
+on memory_write(session, 0x401000) -> {
     print("[ALERT] Modified .text section at", hex(event.address))
     analyze_self_modification(event.data)
-}}
+}
 
-on memory_read(session, stack_canary_addr) -> {{
+on memory_read(session, stack_canary_addr) -> {
     print("[ALERT] Stack canary read detected")
     # Potential canary leak
-}}
+}
 
 # FUNCTION CALL HANDLERS
-on function_call(session, "malloc") -> {{
+on function_call(session, "malloc") -> {
     let size = read_arg(session, 0)
-    if size > 0x10000 {{
+    if size > 0x10000 {
         print("[ALERT] Large allocation:", size)
-    }}
-}}
+    }
+}
 
-on function_call(session, "free") -> {{
+on function_call(session, "free") -> {
     let ptr = read_arg(session, 0)
     track_free(ptr)
     detect_double_free()
-}}
+}
 
 # EXCEPTION HANDLERS
-on exception(session, STATUS_ACCESS_VIOLATION) -> {{
+on exception(session, STATUS_ACCESS_VIOLATION) -> {
     print("[CRASH] Access violation at", hex(event.address))
     let crash_info = analyze_crash(session, event)
-    
-    if crash_info.exploitable {{
+
+    if crash_info.exploitable {
         print("[SUCCESS] Exploitable crash found!")
         generate_exploit(crash_info)
-    }}
-}}
+    }
+}
 
 # REGISTER CHANGE HANDLERS
-on register_modify(session, "rip", old, new) -> {{
+on register_modify(session, "rip", old, new) -> {
     print("[INFO] Control flow change:", hex(old), "->", hex(new))
-    if new >= 0x7f0000000000 {{
+    if new >= 0x7f0000000000 {
         print("[SUCCESS] Hijacked RIP to libc!")
-    }}
-}}
+    }
+}
 
 # Start event loop and continue execution
 session.start_event_loop()
 session.continue_execution()
 
 print("[OK] Event-driven exploit ready")
-"#)
+"#.to_string()
 }
 
 fn generate_parallel_wizard() -> String {
-    format!(r#"# Multi-Target Parallel Exploitation - Generated by TALON Wizard
+    r#"# Multi-Target Parallel Exploitation - Generated by TALON Wizard
 
 print("[EXPLOIT] Multi-Target Parallel Exploitation")
 print("═══════════════════════════════════════")
 
 # Define target list
 let targets = [
-    {{"host": "192.168.1.10", "port": 9999}},
-    {{"host": "192.168.1.11", "port": 9999}},
-    {{"host": "192.168.1.12", "port": 9999}},
-    {{"host": "192.168.1.13", "port": 9999}},
-    {{"host": "192.168.1.14", "port": 9999}}
+    {"host": "192.168.1.10", "port": 9999},
+    {"host": "192.168.1.11", "port": 9999},
+    {"host": "192.168.1.12", "port": 9999},
+    {"host": "192.168.1.13", "port": 9999},
+    {"host": "192.168.1.14", "port": 9999}
 ]
 
 # PARALLEL EXECUTION - Attack all targets simultaneously
-let results = parallel for target in targets {{
+let results = parallel for target in targets {
     print("[INFO] Attacking", target.host)
-    
+
     let session = Session.connect(target.host, target.port)
-    
+
     # Leak libc base
     let libc_base = leak_libc(session)
-    
+
     # Build exploit
     let system = libc_base + 0x4f440
     let binsh = libc_base + 0x1b3e9a
-    
+
     let rop = build_rop_chain([
         pop_rdi(),
         binsh,
         system
     ])
-    
+
     # Execute exploit
     let result = exploit(session, rop)
-    
-    if result.success {{
+
+    if result.success {
         print("[SUCCESS] Compromised", target.host)
         spawn_shell(session)
-    }} else {{
+    } else {
         print("[FAILED] Could not exploit", target.host)
-    }}
-    
+    }
+
     result
-}}
+}
 
 # Analyze results
 let successful = results.filter(r => r.success)
@@ -738,30 +781,30 @@ print("[RESULTS] Failed:", len(failed))
 print("═══════════════════════════════════════")
 
 # RACE STRATEGIES - First successful exploit wins
-race {{
-    strategy1: {{
+race {
+    strategy1: {
         exploit_buffer_overflow(targets[0])
-    }}
-    strategy2: {{
+    }
+    strategy2: {
         exploit_format_string(targets[1])
-    }}
-    strategy3: {{
+    }
+    strategy3: {
         exploit_heap_overflow(targets[2])
-    }}
-}} winner {{
+    }
+} winner {
     print("[SUCCESS] Won with strategy:", winner.name)
     use_shell(winner.session)
-}}
+}
 
 print("[OK] Parallel exploitation ready - 10x faster than serial!")
-"#)
+"#.to_string()
 }
 
 /// Usage output for fallback
 fn print_usage() {
     println!(
         r#"
-{} 
+{}
 
 USAGE:
   talon run <file>       - Run a Talon DSL script

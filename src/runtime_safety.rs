@@ -2,10 +2,10 @@
 // ║   Runtime Safety & Resource Management System                             ║
 // ╚═══════════════════════════════════════════════════════════════════════════╝
 
+use serde::{Deserialize, Serialize};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, AtomicU64, AtomicBool, Ordering};
 use std::time::Instant;
-use serde::{Serialize, Deserialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SafetyConfig {
@@ -80,7 +80,7 @@ impl RuntimeSafety {
 
     pub fn enter_function(&self) -> Result<RecursionGuard, String> {
         let depth = self.recursion_depth.fetch_add(1, Ordering::SeqCst) + 1;
-        
+
         if depth > self.config.max_recursion_depth {
             self.recursion_depth.fetch_sub(1, Ordering::SeqCst);
             return Err(format!(
@@ -182,7 +182,9 @@ impl RuntimeSafety {
                  Operation: {} + {}\n\
                  Result would exceed i64::MAX ({})\n\n\
                  TIP: Use wrapping arithmetic or larger types",
-                a, b, i64::MAX
+                a,
+                b,
+                i64::MAX
             )
         })
     }
@@ -214,17 +216,18 @@ impl RuntimeSafety {
                  Operation: {} - {}\n\
                  Result would be less than i64::MIN ({})\n\n\
                  TIP: Use wrapping arithmetic or unsigned types",
-                a, b, i64::MIN
+                a,
+                b,
+                i64::MIN
             )
         })
     }
 
     pub fn check_divide_by_zero(&self, divisor: i64) -> Result<(), String> {
         if divisor == 0 {
-            return Err(
-                "[ERROR] DIVISION BY ZERO\n\n\
-                 TIP: Check your divisor before performing division".to_string()
-            );
+            return Err("[ERROR] DIVISION BY ZERO\n\n\
+                 TIP: Check your divisor before performing division"
+                .to_string());
         }
         Ok(())
     }
@@ -280,28 +283,85 @@ pub struct SafetyStats {
 
 impl std::fmt::Display for SafetyStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "╔═══════════════════════════════════════════════════════════════╗")?;
-        writeln!(f, "║   RUNTIME SAFETY STATISTICS                                   ║")?;
-        writeln!(f, "╚═══════════════════════════════════════════════════════════════╝")?;
+        writeln!(
+            f,
+            "╔═══════════════════════════════════════════════════════════════╗"
+        )?;
+        writeln!(
+            f,
+            "║   RUNTIME SAFETY STATISTICS                                   ║"
+        )?;
+        writeln!(
+            f,
+            "╚═══════════════════════════════════════════════════════════════╝"
+        )?;
         writeln!(f)?;
         writeln!(f, "Resource Usage:")?;
-        writeln!(f, "   Recursion depth:  {} / {}", 
-                 self.recursion_depth, self.config.max_recursion_depth)?;
-        writeln!(f, "   Memory used:      {} MB / {} MB", 
-                 self.memory_used / (1024 * 1024), 
-                 self.config.max_memory_bytes / (1024 * 1024))?;
-        writeln!(f, "   Elapsed time:     {}ms / {}ms", 
-                 self.elapsed_ms, self.config.max_execution_time_ms)?;
+        writeln!(
+            f,
+            "   Recursion depth:  {} / {}",
+            self.recursion_depth, self.config.max_recursion_depth
+        )?;
+        writeln!(
+            f,
+            "   Memory used:      {} MB / {} MB",
+            self.memory_used / (1024 * 1024),
+            self.config.max_memory_bytes / (1024 * 1024)
+        )?;
+        writeln!(
+            f,
+            "   Elapsed time:     {}ms / {}ms",
+            self.elapsed_ms, self.config.max_execution_time_ms
+        )?;
         writeln!(f)?;
         writeln!(f, "Safety Features:")?;
-        writeln!(f, "   Strict mode:      {}", if self.config.strict_mode { "[OK] Enabled" } else { "[ERROR] Disabled" })?;
-        writeln!(f, "   Bounds checking:  {}", if self.config.bounds_checking { "[OK] Enabled" } else { "[ERROR] Disabled" })?;
-        writeln!(f, "   Type checking:    {}", if self.config.type_checking { "[OK] Enabled" } else { "[ERROR] Disabled" })?;
-        writeln!(f, "   Overflow checks:  {}", if self.config.overflow_checking { "[OK] Enabled" } else { "[ERROR] Disabled" })?;
+        writeln!(
+            f,
+            "   Strict mode:      {}",
+            if self.config.strict_mode {
+                "[OK] Enabled"
+            } else {
+                "[ERROR] Disabled"
+            }
+        )?;
+        writeln!(
+            f,
+            "   Bounds checking:  {}",
+            if self.config.bounds_checking {
+                "[OK] Enabled"
+            } else {
+                "[ERROR] Disabled"
+            }
+        )?;
+        writeln!(
+            f,
+            "   Type checking:    {}",
+            if self.config.type_checking {
+                "[OK] Enabled"
+            } else {
+                "[ERROR] Disabled"
+            }
+        )?;
+        writeln!(
+            f,
+            "   Overflow checks:  {}",
+            if self.config.overflow_checking {
+                "[OK] Enabled"
+            } else {
+                "[ERROR] Disabled"
+            }
+        )?;
         writeln!(f)?;
-        writeln!(f, "Timeout status:    {}", 
-                 if self.timeout_occurred { "[ERROR] TIMED OUT" } else { "[OK] Running" })?;
-        
+        writeln!(
+            f,
+            "Timeout status:    {}",
+            if self.timeout_occurred {
+                "[ERROR] TIMED OUT"
+            } else {
+                "[OK] Running"
+            }
+        )?;
+
         Ok(())
     }
 }

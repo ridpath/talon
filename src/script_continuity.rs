@@ -1,11 +1,11 @@
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
-use serde::{Deserialize, Serialize};
-use flate2::Compression;
-use flate2::write::GzEncoder;
-use flate2::read::GzDecoder;
 
 use crate::interpreter::Value;
 
@@ -65,11 +65,13 @@ impl ScriptContinuity {
         script_state: &str,
         execution_point: usize,
     ) -> Result<(), String> {
-        let variables_serialized = variables.iter()
+        let variables_serialized = variables
+            .iter()
             .map(|(k, v)| (k.clone(), v.to_string()))
             .collect();
 
-        let constants_serialized = constants.iter()
+        let constants_serialized = constants
+            .iter()
             .map(|(k, v)| (k.clone(), v.to_string()))
             .collect();
 
@@ -93,7 +95,9 @@ impl ScriptContinuity {
     }
 
     fn save_checkpoint_to_disk(&self, name: &str) -> Result<(), String> {
-        let checkpoint = self.checkpoints.get(name)
+        let checkpoint = self
+            .checkpoints
+            .get(name)
             .ok_or_else(|| format!("Checkpoint not found: {}", name))?;
 
         let json_data = serde_json::to_string_pretty(checkpoint)
@@ -103,14 +107,16 @@ impl ScriptContinuity {
         fs::create_dir_all("checkpoints")
             .map_err(|e| format!("Failed to create checkpoints directory: {}", e))?;
 
-        let file = File::create(&path)
-            .map_err(|e| format!("Failed to create checkpoint file: {}", e))?;
-        
+        let file =
+            File::create(&path).map_err(|e| format!("Failed to create checkpoint file: {}", e))?;
+
         let mut encoder = GzEncoder::new(file, Compression::best());
-        encoder.write_all(json_data.as_bytes())
+        encoder
+            .write_all(json_data.as_bytes())
             .map_err(|e| format!("Failed to write checkpoint: {}", e))?;
-        
-        encoder.finish()
+
+        encoder
+            .finish()
             .map_err(|e| format!("Failed to finalize checkpoint: {}", e))?;
 
         Ok(())
@@ -118,23 +124,25 @@ impl ScriptContinuity {
 
     pub fn load_checkpoint(&mut self, name: &str) -> Result<ScriptCheckpoint, String> {
         let path = format!("checkpoints/{}.checkpoint", name);
-        
+
         if !Path::new(&path).exists() {
             return Err(format!("Checkpoint file not found: {}", path));
         }
 
-        let file = File::open(&path)
-            .map_err(|e| format!("Failed to open checkpoint file: {}", e))?;
-        
+        let file =
+            File::open(&path).map_err(|e| format!("Failed to open checkpoint file: {}", e))?;
+
         let mut decoder = GzDecoder::new(file);
         let mut json_data = String::new();
-        decoder.read_to_string(&mut json_data)
+        decoder
+            .read_to_string(&mut json_data)
             .map_err(|e| format!("Failed to decompress checkpoint: {}", e))?;
 
         let checkpoint: ScriptCheckpoint = serde_json::from_str(&json_data)
             .map_err(|e| format!("Failed to deserialize checkpoint: {}", e))?;
 
-        self.checkpoints.insert(name.to_string(), checkpoint.clone());
+        self.checkpoints
+            .insert(name.to_string(), checkpoint.clone());
         Ok(checkpoint)
     }
 
@@ -151,11 +159,13 @@ impl ScriptContinuity {
     }
 
     pub fn merge_strategy(&mut self, source: &str, target: &str) -> Result<Vec<String>, String> {
-        let source_fork = self.forks.get(source)
+        let source_fork = self
+            .forks
+            .get(source)
             .ok_or_else(|| format!("Source fork not found: {}", source))?;
 
         let merged_commands = source_fork.commands.clone();
-        
+
         if let Some(target_fork) = self.forks.get_mut(target) {
             target_fork.commands.extend(merged_commands.clone());
         }

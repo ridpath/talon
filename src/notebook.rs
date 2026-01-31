@@ -1,6 +1,6 @@
-use std::fs;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use serde::{Serialize, Deserialize};
+use std::fs;
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
 pub struct NotebookEntry {
@@ -26,7 +26,7 @@ impl Notebook {
             variables: HashMap::new(),
         }
     }
-    
+
     pub fn add_note(&mut self, note: &str) {
         self.entries.push(NotebookEntry {
             entry_type: "note".to_string(),
@@ -34,7 +34,7 @@ impl Notebook {
             content: note.to_string(),
         });
     }
-    
+
     pub fn add_code(&mut self, code: &str) {
         self.entries.push(NotebookEntry {
             entry_type: "code".to_string(),
@@ -42,7 +42,7 @@ impl Notebook {
             content: code.to_string(),
         });
     }
-    
+
     pub fn add_finding(&mut self, finding: &str) {
         self.entries.push(NotebookEntry {
             entry_type: "finding".to_string(),
@@ -50,7 +50,7 @@ impl Notebook {
             content: finding.to_string(),
         });
     }
-    
+
     pub fn add_result(&mut self, result: &str) {
         self.entries.push(NotebookEntry {
             entry_type: "result".to_string(),
@@ -58,18 +58,18 @@ impl Notebook {
             content: result.to_string(),
         });
     }
-    
+
     pub fn set_variable(&mut self, name: &str, value: &str) {
         self.variables.insert(name.to_string(), value.to_string());
     }
-    
+
     pub fn export_markdown(&self, filename: &str) -> Result<(), String> {
         let mut markdown = String::new();
-        
+
         markdown.push_str(&format!("# {}\n\n", self.title));
         markdown.push_str(&format!("**Created:** {}\n\n", self.created_at));
         markdown.push_str("---\n\n");
-        
+
         for entry in &self.entries {
             match entry.entry_type.as_str() {
                 "note" => {
@@ -95,7 +95,7 @@ impl Notebook {
                 _ => {}
             }
         }
-        
+
         if !self.variables.is_empty() {
             markdown.push_str("## Variables\n\n");
             markdown.push_str("| Name | Value |\n");
@@ -103,33 +103,31 @@ impl Notebook {
             for (name, value) in &self.variables {
                 markdown.push_str(&format!("| {} | {} |\n", name, value));
             }
-            markdown.push_str("\n");
+            markdown.push('\n');
         }
-        
+
         fs::write(filename, markdown)
             .map_err(|e| format!("Failed to write markdown file: {}", e))?;
-        
+
         println!("Notebook exported to: {}", filename);
         Ok(())
     }
-    
+
     pub fn save(&self, filename: &str) -> Result<(), String> {
         let json = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize notebook: {}", e))?;
-        
-        fs::write(filename, json)
-            .map_err(|e| format!("Failed to write notebook file: {}", e))?;
-        
+
+        fs::write(filename, json).map_err(|e| format!("Failed to write notebook file: {}", e))?;
+
         println!("Notebook saved to: {}", filename);
         Ok(())
     }
-    
+
     pub fn load(filename: &str) -> Result<Self, String> {
         let content = fs::read_to_string(filename)
             .map_err(|e| format!("Failed to read notebook file: {}", e))?;
-        
-        serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse notebook file: {}", e))
+
+        serde_json::from_str(&content).map_err(|e| format!("Failed to parse notebook file: {}", e))
     }
 }
 
@@ -140,20 +138,19 @@ impl NotebookManager {
         println!("Starting notebook: {}", title);
         Notebook::new(title)
     }
-    
+
     pub fn execute_with_notebook(notebook: &mut Notebook, code: &str) -> Result<String, String> {
         notebook.add_code(code);
-        
-        let cmds = crate::parser::parse_script(code)
-            .map_err(|e| format!("Parse error: {}", e))?;
-        
+
+        let cmds = crate::parser::parse_script(code).map_err(|e| format!("Parse error: {}", e))?;
+
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(crate::interpreter::interpret(&cmds))
             .map_err(|e| format!("Execution error: {}", e))?;
-        
+
         let result = "Executed successfully";
         notebook.add_result(result);
-        
+
         Ok(result.to_string())
     }
 }

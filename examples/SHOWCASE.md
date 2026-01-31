@@ -69,12 +69,12 @@ fn main() -> Result<(), String> {
 ```
 
 **What it does automatically**:
-- ✅ Calculates mangled pointer: `target ^ (chunk_addr >> 12)`
-- ✅ Calculates tcache key: `chunk_addr ^ (tcache_perthread >> 12)`
-- ✅ Resolves `__free_hook` address from libc base
-- ✅ Builds complete exploitation chain
-- ✅ Provides success probability estimate
-- ✅ Lists all constraints
+-  Calculates mangled pointer: `target ^ (chunk_addr >> 12)`
+-  Calculates tcache key: `chunk_addr ^ (tcache_perthread >> 12)`
+-  Resolves `__free_hook` address from libc base
+-  Builds complete exploitation chain
+-  Provides success probability estimate
+-  Lists all constraints
 
 **pwntools doesn't have this.**
 
@@ -280,17 +280,17 @@ fn solve_ctf() -> Result<(), String> {
 
 | Feature | pwntools | how2heap | HeapLAB | TALON |
 |---------|----------|----------|---------|-------|
-| One-liner exploit | ❌ | ❌ | ❌ | ✅ |
-| Auto leak detection | ❌ | ❌ | ❌ | ✅ |
-| GDB integration | ⚠️ Manual | ❌ | ✅ Required | ✅ Optional |
-| Heap grooming | ❌ | ❌ | ❌ | ✅ |
-| Safe-linking bypass | ❌ | ⚠️ Manual | ⚠️ Manual | ✅ Auto |
-| Tcache key bypass | ❌ | ⚠️ Manual | ⚠️ Manual | ✅ Auto |
-| House of Apple | ❌ | ⚠️ Manual | ❌ | ✅ Auto |
-| Heap visualization | ❌ | ❌ | ✅ | ✅ |
-| Type safety | ❌ Python | ❌ C | ❌ Python | ✅ Rust |
+| One-liner exploit |  |  |  |  |
+| Auto leak detection |  |  |  |  |
+| GDB integration | ️ Manual |  |  Required |  Optional |
+| Heap grooming |  |  |  |  |
+| Safe-linking bypass |  | ️ Manual | ️ Manual |  Auto |
+| Tcache key bypass |  | ️ Manual | ️ Manual |  Auto |
+| House of Apple |  | ️ Manual |  |  Auto |
+| Heap visualization |  |  |  |  |
+| Type safety |  Python |  C |  Python |  Rust |
 | Performance | Slow | N/A | Medium | Fast |
-| Testing coverage | Low | None | Unknown | ✅ 119 tests |
+| Testing coverage | Low | None | Unknown |  119 tests |
 
 ---
 
@@ -308,10 +308,10 @@ libc_base = leak - offset  # User must know offset
 ```
 
 ### 2. **Modern Mitigations Automated**
-- Safe-linking: `target ^ (chunk_addr >> 12)` ✅ Automatic
-- Tcache key: `chunk_addr ^ (tcache >> 12)` ✅ Automatic
-- House of Apple ✅ Automatic
-- FILE structure crafting ✅ Automatic
+- Safe-linking: `target ^ (chunk_addr >> 12)`  Automatic
+- Tcache key: `chunk_addr ^ (tcache >> 12)`  Automatic
+- House of Apple  Automatic
+- FILE structure crafting  Automatic
 
 ### 3. **Type Safety**
 - No segfaults in exploit script
@@ -365,19 +365,19 @@ fn main() -> Result<(), String> {
 ## Rating: A+ (98/100)
 
 ### Strengths:
-- ✅ **Modern bypasses** (safe-linking, tcache key, House of Apple)
-- ✅ **GDB integration** (live heap inspection)
-- ✅ **Heap grooming** (5 strategies)
-- ✅ **Auto-leak** (libc, heap, binary)
-- ✅ **One-liner API** (quick_shell, quick_heap)
-- ✅ **Type safety** (Rust)
-- ✅ **Performance** (5-10x faster)
-- ✅ **Testing** (119 tests, >95% coverage)
-- ✅ **Visualization** (heap layout)
+-  **Modern bypasses** (safe-linking, tcache key, House of Apple)
+-  **GDB integration** (live heap inspection)
+-  **Heap grooming** (5 strategies)
+-  **Auto-leak** (libc, heap, binary)
+-  **One-liner API** (quick_shell, quick_heap)
+-  **Type safety** (Rust)
+-  **Performance** (5-10x faster)
+-  **Testing** (119 tests, >95% coverage)
+-  **Visualization** (heap layout)
 
 ### Room for Improvement (2%):
-- ⚠️ ARM64/MIPS heap (architecture-specific)
-- ⚠️ Visual debugger GUI (stretch goal)
+- ️ ARM64/MIPS heap (architecture-specific)
+- ️ Visual debugger GUI (stretch goal)
 
 ---
 

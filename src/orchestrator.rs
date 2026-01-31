@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
-use tokio::sync::{RwLock, Semaphore};
 use std::time::Duration;
+use tokio::sync::{RwLock, Semaphore};
 
 pub struct OrchestratorRuntime {
     max_concurrent_tasks: usize,
@@ -69,7 +69,7 @@ impl OrchestratorRuntime {
 
         tokio::spawn(async move {
             let _permit = semaphore.acquire().await.unwrap();
-            
+
             {
                 let mut tasks = active_tasks.write().await;
                 if let Some(info) = tasks.get_mut(&task_id) {
@@ -97,10 +97,7 @@ impl OrchestratorRuntime {
         task_id
     }
 
-    pub async fn parallel_execute<F, T>(
-        &self,
-        tasks: Vec<(String, F)>,
-    ) -> Vec<TaskResult<T>>
+    pub async fn parallel_execute<F, T>(&self, tasks: Vec<(String, F)>) -> Vec<TaskResult<T>>
     where
         F: std::future::Future<Output = Result<T, String>> + Send + 'static,
         T: Send + 'static,
@@ -114,7 +111,7 @@ impl OrchestratorRuntime {
 
             let handle = tokio::spawn(async move {
                 let _permit = semaphore.acquire().await.unwrap();
-                
+
                 {
                     let mut tasks_guard = active_tasks.write().await;
                     tasks_guard.insert(
@@ -165,10 +162,7 @@ impl OrchestratorRuntime {
         results
     }
 
-    pub async fn race_execute<F, T>(
-        &self,
-        tasks: Vec<(String, F)>,
-    ) -> TaskResult<T>
+    pub async fn race_execute<F, T>(&self, tasks: Vec<(String, F)>) -> TaskResult<T>
     where
         F: std::future::Future<Output = Result<T, String>> + Send + 'static,
         T: Send + 'static,
@@ -182,7 +176,7 @@ impl OrchestratorRuntime {
 
             let handle = tokio::spawn(async move {
                 let _permit = semaphore.acquire().await.unwrap();
-                
+
                 {
                     let mut tasks_guard = active_tasks.write().await;
                     tasks_guard.insert(
@@ -227,7 +221,7 @@ impl OrchestratorRuntime {
 
     pub async fn wait_for_task(&self, task_id: u64, timeout: Duration) -> Result<(), String> {
         let start = std::time::Instant::now();
-        
+
         loop {
             if start.elapsed() > timeout {
                 return Err("Task timeout exceeded".to_string());
@@ -268,7 +262,10 @@ impl<T: Clone + Send + 'static + Sync> ResourcePool<T> {
     }
 
     pub async fn acquire(&self) -> Result<PooledResource<T>, String> {
-        let _permit = self.semaphore.acquire().await
+        let _permit = self
+            .semaphore
+            .acquire()
+            .await
             .map_err(|e| format!("Failed to acquire resource: {}", e))?;
 
         let mut resources = self.resources.write().await;
@@ -305,8 +302,7 @@ impl<T: Send + 'static + Sync> PooledResource<T> {
 
 impl<T: Send + 'static + Sync> Drop for PooledResource<T> {
     fn drop(&mut self) {
-        if let Some(_resource) = self.resource.take() {
-        }
+        if let Some(_resource) = self.resource.take() {}
     }
 }
 
@@ -317,10 +313,9 @@ mod tests {
     #[tokio::test]
     async fn test_spawn_task() {
         let runtime = OrchestratorRuntime::new(4);
-        let task_id = runtime.spawn_task(
-            "test_task".to_string(),
-            async { Ok::<_, String>(42) }
-        ).await;
+        let task_id = runtime
+            .spawn_task("test_task".to_string(), async { Ok::<_, String>(42) })
+            .await;
 
         tokio::time::sleep(Duration::from_millis(100)).await;
         let status = runtime.get_task_status(task_id).await;
@@ -329,11 +324,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_parallel_execute() {
-        use std::pin::Pin;
         use std::future::Future;
-        
+        use std::pin::Pin;
+
         let runtime = OrchestratorRuntime::new(4);
-        let tasks: Vec<(String, Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>)> = vec![
+        let tasks: Vec<(
+            String,
+            Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>,
+        )> = vec![
             ("task1".to_string(), Box::pin(async { Ok::<_, String>(1) })),
             ("task2".to_string(), Box::pin(async { Ok::<_, String>(2) })),
             ("task3".to_string(), Box::pin(async { Ok::<_, String>(3) })),
@@ -345,15 +343,21 @@ mod tests {
 
     #[tokio::test]
     async fn test_race_execute() {
-        use std::pin::Pin;
         use std::future::Future;
-        
+        use std::pin::Pin;
+
         let runtime = OrchestratorRuntime::new(4);
-        let tasks: Vec<(String, Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>)> = vec![
-            ("slow".to_string(), Box::pin(async {
-                tokio::time::sleep(Duration::from_millis(100)).await;
-                Ok::<_, String>(1)
-            })),
+        let tasks: Vec<(
+            String,
+            Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>,
+        )> = vec![
+            (
+                "slow".to_string(),
+                Box::pin(async {
+                    tokio::time::sleep(Duration::from_millis(100)).await;
+                    Ok::<_, String>(1)
+                }),
+            ),
             ("fast".to_string(), Box::pin(async { Ok::<_, String>(2) })),
         ];
 

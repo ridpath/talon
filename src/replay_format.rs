@@ -1,11 +1,11 @@
+use flate2::read::GzDecoder;
+use flate2::write::GzEncoder;
+use flate2::Compression;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{Read, Write};
 use std::path::Path;
-use flate2::Compression;
-use flate2::write::GzEncoder;
-use flate2::read::GzDecoder;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TalonReplay {
@@ -211,14 +211,15 @@ impl TalonReplay {
         let json_data = serde_json::to_string_pretty(self)
             .map_err(|e| format!("Failed to serialize replay: {}", e))?;
 
-        let file = File::create(path)
-            .map_err(|e| format!("Failed to create file: {}", e))?;
-        
+        let file = File::create(path).map_err(|e| format!("Failed to create file: {}", e))?;
+
         let mut encoder = GzEncoder::new(file, Compression::best());
-        encoder.write_all(json_data.as_bytes())
+        encoder
+            .write_all(json_data.as_bytes())
             .map_err(|e| format!("Failed to write compressed data: {}", e))?;
-        
-        encoder.finish()
+
+        encoder
+            .finish()
             .map_err(|e| format!("Failed to finalize compression: {}", e))?;
 
         Ok(())
@@ -229,12 +230,12 @@ impl TalonReplay {
             return Err(format!("Replay file not found: {}", path));
         }
 
-        let file = File::open(path)
-            .map_err(|e| format!("Failed to open file: {}", e))?;
-        
+        let file = File::open(path).map_err(|e| format!("Failed to open file: {}", e))?;
+
         let mut decoder = GzDecoder::new(file);
         let mut json_data = String::new();
-        decoder.read_to_string(&mut json_data)
+        decoder
+            .read_to_string(&mut json_data)
             .map_err(|e| format!("Failed to decompress: {}", e))?;
 
         let replay: TalonReplay = serde_json::from_str(&json_data)
@@ -252,7 +253,10 @@ impl TalonReplay {
         println!("{}", "=".repeat(70));
 
         println!("\nSession Information:");
-        println!("  Target: {}:{}", self.session.target_host, self.session.target_port);
+        println!(
+            "  Target: {}:{}",
+            self.session.target_host, self.session.target_port
+        );
         println!("  Binary: {}", self.metadata.target_binary);
         println!("  Platform: {}", self.metadata.target_platform);
 
@@ -263,7 +267,12 @@ impl TalonReplay {
 
         println!("\nTimeline ({} events):", self.timeline.len());
         for (idx, event) in self.timeline.iter().enumerate() {
-            println!("  [{}] {:?}: {}", idx + 1, event.event_type, event.description);
+            println!(
+                "  [{}] {:?}: {}",
+                idx + 1,
+                event.event_type,
+                event.description
+            );
         }
 
         if !self.breakpoints.is_empty() {
@@ -283,7 +292,12 @@ impl TalonReplay {
         if !self.memory_snapshots.is_empty() {
             println!("\nMemory Snapshots: {}", self.memory_snapshots.len());
             for (idx, snapshot) in self.memory_snapshots.iter().enumerate() {
-                println!("  [{}] {}: {} regions", idx + 1, snapshot.description, snapshot.regions.len());
+                println!(
+                    "  [{}] {}: {} regions",
+                    idx + 1,
+                    snapshot.description,
+                    snapshot.regions.len()
+                );
             }
         }
 
@@ -292,35 +306,38 @@ impl TalonReplay {
 
     pub fn export_to_talon_script(&self, output_path: &str) -> Result<(), String> {
         let mut script = String::new();
-        
+
         script.push_str(&format!("# {}\n", self.metadata.title));
         script.push_str(&format!("# Author: {}\n", self.metadata.author));
         script.push_str(&format!("# {}\n\n", self.metadata.description));
 
         script.push_str(&self.session.script_content);
 
-        fs::write(output_path, script)
-            .map_err(|e| format!("Failed to write script: {}", e))?;
+        fs::write(output_path, script).map_err(|e| format!("Failed to write script: {}", e))?;
 
         Ok(())
     }
 
     pub fn get_statistics(&self) -> ReplayStatistics {
-        let total_bytes_sent = self.timeline.iter()
+        let total_bytes_sent = self
+            .timeline
+            .iter()
             .filter(|e| matches!(e.event_type, EventType::DataSent))
             .filter_map(|e| e.data.payload.as_ref().map(|p| p.len()))
             .sum();
 
-        let total_bytes_received = self.timeline.iter()
+        let total_bytes_received = self
+            .timeline
+            .iter()
             .filter(|e| matches!(e.event_type, EventType::DataReceived))
             .filter_map(|e| e.data.payload.as_ref().map(|p| p.len()))
             .sum();
 
-        let breakpoint_hits = self.breakpoints.iter()
-            .map(|b| b.hit_count)
-            .sum();
+        let breakpoint_hits = self.breakpoints.iter().map(|b| b.hit_count).sum();
 
-        let memory_snapshots_total_size: usize = self.memory_snapshots.iter()
+        let memory_snapshots_total_size: usize = self
+            .memory_snapshots
+            .iter()
             .flat_map(|s| &s.regions)
             .map(|r| r.size)
             .sum();
@@ -354,7 +371,7 @@ pub fn create_example_replay() -> TalonReplay {
     let mut replay = TalonReplay::new(
         "Buffer Overflow ROP Chain Example",
         "TALON Team",
-        "Demonstrates a classic buffer overflow with ROP chain exploitation"
+        "Demonstrates a classic buffer overflow with ROP chain exploitation",
     );
 
     replay.metadata.target_binary = "vuln_binary".to_string();
@@ -373,7 +390,8 @@ let pop_rdi = libc_base + 0x2164f
 
 let payload = cyclic(offset) + pack64(pop_rdi) + pack64(binsh) + pack64(system)
 send(session, payload)
-interactive(session)"#.to_string();
+interactive(session)"#
+        .to_string();
 
     replay.add_event(
         EventType::Connection,
@@ -385,12 +403,12 @@ interactive(session)"#.to_string();
             register: None,
             value: None,
             extra: HashMap::new(),
-        }
+        },
     );
 
     replay.add_annotation(
         AnnotationType::Explanation,
-        "Offset of 112 bytes found using cyclic pattern matching"
+        "Offset of 112 bytes found using cyclic pattern matching",
     );
 
     replay.add_breakpoint(0x400656, "Return from vulnerable function", None);

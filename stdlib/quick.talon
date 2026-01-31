@@ -109,7 +109,7 @@ define function leak_network_info()
 end
 
 # ═══════════════════════════════════════════════════════════════
-# 🚀 NEW CTF/PENTESTING HELPERS
+#  NEW CTF/PENTESTING HELPERS
 # ═══════════════════════════════════════════════════════════════
 
 # Web Exploitation
@@ -247,7 +247,7 @@ define function syn_scan_range(target, start_port, end_port)
 end
 
 # ═══════════════════════════════════════════════════════════════
-# 🌟 WORLD-CLASS EXPLOIT DEV HELPERS
+#  WORLD-CLASS EXPLOIT DEV HELPERS
 # ═══════════════════════════════════════════════════════════════
 
 # Packing/Unpacking (pwntools-style)

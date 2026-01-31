@@ -1,8 +1,8 @@
 use std::collections::HashMap;
-use std::sync::Arc;
-use tokio::sync::{RwLock, broadcast};
-use std::pin::Pin;
 use std::future::Future;
+use std::pin::Pin;
+use std::sync::Arc;
+use tokio::sync::{broadcast, RwLock};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum EventType {
@@ -118,7 +118,7 @@ pub struct EventLoop {
 impl EventLoop {
     pub fn new(channel_capacity: usize) -> Self {
         let (tx, rx) = broadcast::channel(channel_capacity);
-        
+
         EventLoop {
             running: Arc::new(RwLock::new(false)),
             handlers: Arc::new(RwLock::new(HashMap::new())),
@@ -130,16 +130,13 @@ impl EventLoop {
         }
     }
 
-    pub async fn register_handler<F, Fut>(
-        &self,
-        event_type: EventType,
-        handler: F,
-    ) -> u64
+    pub async fn register_handler<F, Fut>(&self, event_type: EventType, handler: F) -> u64
     where
         F: Fn(Event) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = ()> + Send + 'static,
     {
-        self.register_handler_with_priority(event_type, handler, 0).await
+        self.register_handler_with_priority(event_type, handler, 0)
+            .await
     }
 
     pub async fn register_handler_with_priority<F, Fut>(
@@ -159,9 +156,7 @@ impl EventLoop {
             id
         };
 
-        let handler_fn: HandlerFn = Arc::new(move |event| {
-            Box::pin(handler(event))
-        });
+        let handler_fn: HandlerFn = Arc::new(move |event| Box::pin(handler(event)));
 
         let event_handler = EventHandler {
             id: handler_id,
@@ -200,9 +195,7 @@ impl EventLoop {
             id
         };
 
-        let handler_fn: HandlerFn = Arc::new(move |event| {
-            Box::pin(handler(event))
-        });
+        let handler_fn: HandlerFn = Arc::new(move |event| Box::pin(handler(event)));
 
         let event_handler = EventHandler {
             id: handler_id,
@@ -223,7 +216,10 @@ impl EventLoop {
         handler_id
     }
 
-    async fn sort_handlers_by_priority(&self, handlers: &mut HashMap<EventType, Vec<EventHandler>>) {
+    async fn sort_handlers_by_priority(
+        &self,
+        handlers: &mut HashMap<EventType, Vec<EventHandler>>,
+    ) {
         for handler_list in handlers.values_mut() {
             handler_list.sort_by(|a, b| b.priority.cmp(&a.priority));
         }
@@ -231,14 +227,14 @@ impl EventLoop {
 
     pub async fn unregister_handler(&self, handler_id: u64) -> bool {
         let mut handlers = self.handlers.write().await;
-        
+
         for handler_list in handlers.values_mut() {
             if let Some(pos) = handler_list.iter().position(|h| h.id == handler_id) {
                 handler_list.remove(pos);
                 return true;
             }
         }
-        
+
         false
     }
 
@@ -310,13 +306,13 @@ impl EventLoop {
         event: Event,
     ) {
         let handlers_guard = handlers.read().await;
-        
+
         if let Some(handler_list) = handlers_guard.get(&event.event_type) {
             for handler in handler_list {
                 if Self::matches_filter(&handler.filter, &event) {
                     let handler_fn = Arc::clone(&handler.handler);
                     let event_clone = event.clone();
-                    
+
                     tokio::spawn(async move {
                         handler_fn(event_clone).await;
                     });
@@ -328,48 +324,36 @@ impl EventLoop {
     fn matches_filter(filter: &Option<EventFilter>, event: &Event) -> bool {
         match filter {
             None => true,
-            Some(EventFilter::Address(addr)) => {
-                match &event.data {
-                    EventData::MemoryAccess { address, .. } => address == addr,
-                    EventData::BreakpointHit { address, .. } => address == addr,
-                    EventData::FunctionInvocation { address, .. } => address == addr,
-                    EventData::ExceptionRaised { address, .. } => address == addr,
-                    _ => false,
-                }
-            }
-            Some(EventFilter::AddressRange(start, end)) => {
-                match &event.data {
-                    EventData::MemoryAccess { address, .. } => address >= start && address <= end,
-                    EventData::BreakpointHit { address, .. } => address >= start && address <= end,
-                    EventData::FunctionInvocation { address, .. } => address >= start && address <= end,
-                    EventData::ExceptionRaised { address, .. } => address >= start && address <= end,
-                    _ => false,
-                }
-            }
-            Some(EventFilter::RegisterName(name)) => {
-                match &event.data {
-                    EventData::RegisterChange { register, .. } => register == name,
-                    _ => false,
-                }
-            }
-            Some(EventFilter::FunctionName(name)) => {
-                match &event.data {
-                    EventData::FunctionInvocation { name: fn_name, .. } => fn_name == name,
-                    _ => false,
-                }
-            }
-            Some(EventFilter::SignalNumber(num)) => {
-                match &event.data {
-                    EventData::SignalReceived { signal_number, .. } => signal_number == num,
-                    _ => false,
-                }
-            }
-            Some(EventFilter::ExceptionCode(code)) => {
-                match &event.data {
-                    EventData::ExceptionRaised { exception_code, .. } => exception_code == code,
-                    _ => false,
-                }
-            }
+            Some(EventFilter::Address(addr)) => match &event.data {
+                EventData::MemoryAccess { address, .. } => address == addr,
+                EventData::BreakpointHit { address, .. } => address == addr,
+                EventData::FunctionInvocation { address, .. } => address == addr,
+                EventData::ExceptionRaised { address, .. } => address == addr,
+                _ => false,
+            },
+            Some(EventFilter::AddressRange(start, end)) => match &event.data {
+                EventData::MemoryAccess { address, .. } => address >= start && address <= end,
+                EventData::BreakpointHit { address, .. } => address >= start && address <= end,
+                EventData::FunctionInvocation { address, .. } => address >= start && address <= end,
+                EventData::ExceptionRaised { address, .. } => address >= start && address <= end,
+                _ => false,
+            },
+            Some(EventFilter::RegisterName(name)) => match &event.data {
+                EventData::RegisterChange { register, .. } => register == name,
+                _ => false,
+            },
+            Some(EventFilter::FunctionName(name)) => match &event.data {
+                EventData::FunctionInvocation { name: fn_name, .. } => fn_name == name,
+                _ => false,
+            },
+            Some(EventFilter::SignalNumber(num)) => match &event.data {
+                EventData::SignalReceived { signal_number, .. } => signal_number == num,
+                _ => false,
+            },
+            Some(EventFilter::ExceptionCode(code)) => match &event.data {
+                EventData::ExceptionRaised { exception_code, .. } => exception_code == code,
+                _ => false,
+            },
             Some(EventFilter::Custom(predicate)) => predicate(event),
         }
     }
@@ -383,9 +367,13 @@ impl EventLoop {
         *self.running.read().await
     }
 
-    pub async fn wait_for_event(&self, event_type: EventType, timeout: Option<std::time::Duration>) -> Option<Event> {
+    pub async fn wait_for_event(
+        &self,
+        event_type: EventType,
+        timeout: Option<std::time::Duration>,
+    ) -> Option<Event> {
         let mut rx = self.event_sender.subscribe();
-        
+
         let result = if let Some(duration) = timeout {
             tokio::time::timeout(duration, async {
                 loop {
@@ -395,7 +383,8 @@ impl EventLoop {
                         Err(_) => return None,
                     }
                 }
-            }).await
+            })
+            .await
         } else {
             Ok(async {
                 loop {
@@ -405,7 +394,8 @@ impl EventLoop {
                         Err(_) => return None,
                     }
                 }
-            }.await)
+            }
+            .await)
         };
 
         result.ok().flatten()
@@ -451,113 +441,153 @@ mod tests {
     #[tokio::test]
     async fn test_event_loop_basic() {
         let event_loop = EventLoop::new(100);
-        
+
         let received = Arc::new(RwLock::new(Vec::new()));
         let received_clone = Arc::clone(&received);
-        
-        event_loop.register_handler(EventType::MemoryWrite, move |event| {
-            let received = Arc::clone(&received_clone);
-            async move {
-                let mut r = received.write().await;
-                r.push(event.id);
-            }
-        }).await;
-        
+
+        event_loop
+            .register_handler(EventType::MemoryWrite, move |event| {
+                let received = Arc::clone(&received_clone);
+                async move {
+                    let mut r = received.write().await;
+                    r.push(event.id);
+                }
+            })
+            .await;
+
         event_loop.start().await.unwrap();
-        
-        event_loop.emit(EventType::MemoryWrite, EventData::MemoryAccess {
-            address: 0x1000,
-            size: 4,
-            data: vec![0x41, 0x42, 0x43, 0x44],
-        }).await.unwrap();
-        
+
+        event_loop
+            .emit(
+                EventType::MemoryWrite,
+                EventData::MemoryAccess {
+                    address: 0x1000,
+                    size: 4,
+                    data: vec![0x41, 0x42, 0x43, 0x44],
+                },
+            )
+            .await
+            .unwrap();
+
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-        
+
         let r = received.read().await;
         assert_eq!(r.len(), 1);
-        
+
         event_loop.stop().await;
     }
 
     #[tokio::test]
     async fn test_event_filter() {
         let event_loop = EventLoop::new(100);
-        
+
         let received = Arc::new(RwLock::new(Vec::new()));
         let received_clone = Arc::clone(&received);
-        
-        event_loop.register_handler_with_filter(
-            EventType::MemoryWrite,
-            EventFilter::Address(0x1000),
-            move |event| {
-                let received = Arc::clone(&received_clone);
-                async move {
-                    let mut r = received.write().await;
-                    r.push(event.id);
-                }
-            },
-            0,
-        ).await;
-        
+
+        event_loop
+            .register_handler_with_filter(
+                EventType::MemoryWrite,
+                EventFilter::Address(0x1000),
+                move |event| {
+                    let received = Arc::clone(&received_clone);
+                    async move {
+                        let mut r = received.write().await;
+                        r.push(event.id);
+                    }
+                },
+                0,
+            )
+            .await;
+
         event_loop.start().await.unwrap();
-        
-        event_loop.emit(EventType::MemoryWrite, EventData::MemoryAccess {
-            address: 0x1000,
-            size: 4,
-            data: vec![0x41, 0x42, 0x43, 0x44],
-        }).await.unwrap();
-        
-        event_loop.emit(EventType::MemoryWrite, EventData::MemoryAccess {
-            address: 0x2000,
-            size: 4,
-            data: vec![0x41, 0x42, 0x43, 0x44],
-        }).await.unwrap();
-        
+
+        event_loop
+            .emit(
+                EventType::MemoryWrite,
+                EventData::MemoryAccess {
+                    address: 0x1000,
+                    size: 4,
+                    data: vec![0x41, 0x42, 0x43, 0x44],
+                },
+            )
+            .await
+            .unwrap();
+
+        event_loop
+            .emit(
+                EventType::MemoryWrite,
+                EventData::MemoryAccess {
+                    address: 0x2000,
+                    size: 4,
+                    data: vec![0x41, 0x42, 0x43, 0x44],
+                },
+            )
+            .await
+            .unwrap();
+
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-        
+
         let r = received.read().await;
         assert_eq!(r.len(), 1);
-        
+
         event_loop.stop().await;
     }
 
     #[tokio::test]
     async fn test_handler_priority() {
         let event_loop = EventLoop::new(100);
-        
+
         let order = Arc::new(RwLock::new(Vec::new()));
         let order_clone1 = Arc::clone(&order);
         let order_clone2 = Arc::clone(&order);
-        
-        event_loop.register_handler_with_priority(EventType::MemoryWrite, move |_event| {
-            let order = Arc::clone(&order_clone1);
-            async move {
-                let mut o = order.write().await;
-                o.push(1);
-            }
-        }, 1).await;
-        
-        event_loop.register_handler_with_priority(EventType::MemoryWrite, move |_event| {
-            let order = Arc::clone(&order_clone2);
-            async move {
-                let mut o = order.write().await;
-                o.push(2);
-            }
-        }, 10).await;
-        
+
+        event_loop
+            .register_handler_with_priority(
+                EventType::MemoryWrite,
+                move |_event| {
+                    let order = Arc::clone(&order_clone1);
+                    async move {
+                        let mut o = order.write().await;
+                        o.push(1);
+                    }
+                },
+                1,
+            )
+            .await;
+
+        event_loop
+            .register_handler_with_priority(
+                EventType::MemoryWrite,
+                move |_event| {
+                    let order = Arc::clone(&order_clone2);
+                    async move {
+                        let mut o = order.write().await;
+                        o.push(2);
+                    }
+                },
+                10,
+            )
+            .await;
+
         event_loop.start().await.unwrap();
-        
-        event_loop.emit(EventType::MemoryWrite, EventData::MemoryAccess {
-            address: 0x1000,
-            size: 4,
-            data: vec![0x41, 0x42, 0x43, 0x44],
-        }).await.unwrap();
-        
+
+        event_loop
+            .emit(
+                EventType::MemoryWrite,
+                EventData::MemoryAccess {
+                    address: 0x1000,
+                    size: 4,
+                    data: vec![0x41, 0x42, 0x43, 0x44],
+                },
+            )
+            .await
+            .unwrap();
+
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
-        
+
         let o = order.read().await;
         assert_eq!(o.len(), 2);
-        
+
         event_loop.stop().await;
     }
 }

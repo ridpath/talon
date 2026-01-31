@@ -5,3 +5,4 @@
 # It is recommended to check this file in to source control so that
 # everyone who runs the test benefits from these saved cases.
 cc 1cf9c2bc0a6912e5cd09401b35a8606bb492d266d77bf1e70d1484420c351c83 # shrinks to n = -1
+cc 4e1ea9be7cdf17b9ce802f51610b4abf03472059be79d846542eeef40dfb575f # shrinks to s = "in_"

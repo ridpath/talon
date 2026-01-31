@@ -1,5 +1,5 @@
-use std::fs;
 use std::collections::HashMap;
+use std::fs;
 
 pub struct ExampleLibrary {
     examples: HashMap<String, Example>,
@@ -20,7 +20,7 @@ impl ExampleLibrary {
         lib.load_builtin_examples();
         lib
     }
-    
+
     fn load_builtin_examples(&mut self) {
         self.add_example(
             "buffer-overflow",
@@ -49,9 +49,9 @@ connect to "target.com" on port 1337
 send payload
 let flag = recv 1024
 print "Flag: " + flag
-"#
+"#,
         );
-        
+
         self.add_example(
             "heap-tcache",
             "Heap Exploitation",
@@ -94,9 +94,9 @@ send p64(one_gadget)
 malloc 0x10
 let shell = recv 1024
 print "Shell: " + shell
-"#
+"#,
         );
-        
+
         self.add_example(
             "format-string",
             "Format String",
@@ -133,9 +133,9 @@ send "/bin/sh"
 
 let shell = recv 1024
 print "Shell: " + shell
-"#
+"#,
         );
-        
+
         self.add_example(
             "ret2libc",
             "ROP",
@@ -168,9 +168,9 @@ stage2 = stage2 + [pop_rdi, bin_sh, system] | bytes
 send stage2
 let shell = recv 1024
 print "Got shell: " + shell
-"#
+"#,
         );
-        
+
         self.add_example(
             "simple-rop",
             "ROP",
@@ -200,9 +200,9 @@ let payload = "A" * offset + rop_chain | bytes
 connect to "localhost" on port 9999
 send payload
 interactive
-"#
+"#,
         );
-        
+
         self.add_example(
             "web-sqli",
             "Web Exploitation",
@@ -222,7 +222,7 @@ for payload in payloads
         username: payload,
         password: "anything"
     }
-    
+
     if response | contains "Welcome"
         print "SQLi successful with: " + payload
         break
@@ -237,9 +237,9 @@ let data = http_post url {
 }
 
 print "Extracted data: " + data
-"#
+"#,
         );
-        
+
         self.add_example(
             "shellcode-basic",
             "Shellcode",
@@ -268,9 +268,9 @@ let payload = nop_sled + shellcode + "A" * (offset - 100 - 21) + p64(stack_addr)
 connect to "target.com" on port 4444
 send payload
 interactive
-"#
+"#,
         );
-        
+
         self.add_example(
             "kernel-exploit",
             "Kernel Exploitation",
@@ -308,10 +308,10 @@ kernel_write "/dev/vulnerable", payload
 
 // Return to userspace with root shell
 print "Root shell obtained"
-"#
+"#,
         );
     }
-    
+
     fn add_example(&mut self, name: &str, category: &str, description: &str, code: &str) {
         self.examples.insert(
             name.to_string(),
@@ -320,22 +320,23 @@ print "Root shell obtained"
                 category: category.to_string(),
                 description: description.to_string(),
                 code: code.to_string(),
-            }
+            },
         );
     }
-    
+
     pub fn list(&self) {
         println!("\n╔═══════════════════════════════════════════════════════════════════════════╗");
         println!("║                        TALON EXAMPLE LIBRARY                              ║");
         println!("╚═══════════════════════════════════════════════════════════════════════════╝\n");
-        
+
         let mut by_category: HashMap<String, Vec<&Example>> = HashMap::new();
         for example in self.examples.values() {
-            by_category.entry(example.category.clone())
-                .or_insert_with(Vec::new)
+            by_category
+                .entry(example.category.clone())
+                .or_default()
                 .push(example);
         }
-        
+
         for (category, examples) in by_category.iter() {
             println!("{}:", category);
             for example in examples {
@@ -343,54 +344,61 @@ print "Root shell obtained"
             }
             println!();
         }
-        
+
         println!("Usage:");
         println!("  talon examples show <name>    - View example code");
         println!("  talon examples run <name>     - Execute example interactively");
         println!("  talon examples copy <name>    - Copy to current directory");
         println!();
     }
-    
+
     pub fn show(&self, name: &str) {
         if let Some(example) = self.examples.get(name) {
-            println!("\n╔═══════════════════════════════════════════════════════════════════════════╗");
+            println!(
+                "\n╔═══════════════════════════════════════════════════════════════════════════╗"
+            );
             println!("║ Example: {} - {}", example.name, example.category);
-            println!("╚═══════════════════════════════════════════════════════════════════════════╝");
+            println!(
+                "╚═══════════════════════════════════════════════════════════════════════════╝"
+            );
             println!("\n{}", example.description);
             println!("\n{}", "─".repeat(80));
             println!("{}", example.code);
             println!("{}\n", "─".repeat(80));
         } else {
-            println!("Example '{}' not found. Use 'talon examples list' to see available examples.", name);
+            println!(
+                "Example '{}' not found. Use 'talon examples list' to see available examples.",
+                name
+            );
         }
     }
-    
+
     pub fn run(&self, name: &str) -> Result<(), String> {
         if let Some(example) = self.examples.get(name) {
             println!("Running example: {}", example.name);
             println!("{}", "─".repeat(80));
-            
+
             let cmds = crate::parser::parse_script(&example.code)
                 .map_err(|e| format!("Parse error: {}", e))?;
-            
+
             let rt = tokio::runtime::Runtime::new().unwrap();
             rt.block_on(crate::interpreter::interpret(&cmds))
                 .map_err(|e| format!("Execution error: {}", e))?;
-            
+
             Ok(())
         } else {
             Err(format!("Example '{}' not found", name))
         }
     }
-    
+
     pub fn copy(&self, name: &str, dest_name: Option<&str>) -> Result<(), String> {
         if let Some(example) = self.examples.get(name) {
             let default_name = format!("{}.tal", example.name);
             let filename = dest_name.unwrap_or(&default_name);
-            
+
             fs::write(filename, &example.code)
                 .map_err(|e| format!("Failed to write file: {}", e))?;
-            
+
             println!("Example copied to: {}", filename);
             Ok(())
         } else {

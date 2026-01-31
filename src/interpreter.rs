@@ -1,28 +1,27 @@
-use std::process::{Command as SysCommand, Stdio};
-use std::fs;
-use std::io::{Read, Seek, SeekFrom, Write};
-use std::time::Duration;
-use std::collections::{HashMap, HashSet};
-use std::sync::Arc;
-use tokio::sync::{RwLock, Mutex};
-use regex::Regex;
-use tokio; // For async runtime
-use reqwest::blocking::Client;
-use base64::{encode, decode};
-use rand::Rng;
-use hex;
-use capstone::{Capstone, arch::x86::ArchMode, arch::BuildsCapstone};
+use base64::{decode, encode};
+use capstone::{arch::x86::ArchMode, arch::BuildsCapstone, Capstone};
 #[cfg(unix)]
 use libc;
+use rand::Rng;
+use regex::Regex;
+use reqwest::blocking::Client;
+use std::collections::{HashMap, HashSet};
+use std::fs;
+use std::io::{Read, Seek, SeekFrom, Write};
+use std::process::{Command as SysCommand, Stdio};
+use std::sync::Arc;
+use std::time::Duration;
+ // For async runtime
+use tokio::sync::{Mutex, RwLock};
 
 use crate::ast::{
-    Command, Expr, Literal, Control, TypeHint, TypedVar,
-    FunctionDef, MatchBlock, TryCatch, MacroDef,
+    Command, Control, Expr, FunctionDef, Literal, MacroDef, MatchBlock, TryCatch, TypeHint,
+    TypedVar,
 };
 use crate::parser::parse_script;
 // use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
 // use crate::ctf_helpers::FlagFinder;
-use crate::interactive_io::{Socket, Process};
+use crate::interactive_io::{Process, Socket};
 
 #[derive(Debug, Clone)]
 struct SafetyConfig {
@@ -62,11 +61,14 @@ impl RuntimeSafety {
     fn new(config: SafetyConfig) -> Self {
         RuntimeSafety { config }
     }
-    
+
     fn get_stats(&self) -> SafetyStats {
-        SafetyStats { config: self.config.clone(), warnings: Vec::new() }
+        SafetyStats {
+            config: self.config.clone(),
+            warnings: Vec::new(),
+        }
     }
-    
+
     fn update_config(&mut self, config: SafetyConfig) {
         self.config = config;
     }
@@ -80,8 +82,13 @@ struct SafetyStats {
 
 impl std::fmt::Display for SafetyStats {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SafetyStats {{ buffer_overflow: {}, integer_overflow: {}, warnings: {} }}", 
-            self.config.buffer_overflow, self.config.integer_overflow, self.warnings.len())
+        write!(
+            f,
+            "SafetyStats {{ buffer_overflow: {}, integer_overflow: {}, warnings: {} }}",
+            self.config.buffer_overflow,
+            self.config.integer_overflow,
+            self.warnings.len()
+        )
     }
 }
 
@@ -113,21 +120,21 @@ impl ConnectionRegistry {
             next_id: 1,
         }
     }
-    
+
     fn add_socket(&mut self, socket: Socket) -> ConnectionId {
         let id = self.next_id;
         self.next_id += 1;
         self.connections.insert(id, Connection::Socket(socket));
         id
     }
-    
+
     fn add_process(&mut self, process: Process) -> ConnectionId {
         let id = self.next_id;
         self.next_id += 1;
         self.connections.insert(id, Connection::Process(process));
         id
     }
-    
+
     fn get_mut(&mut self, id: ConnectionId) -> Option<&mut Connection> {
         self.connections.get_mut(&id)
     }
@@ -148,7 +155,10 @@ pub async fn interpret(commands: &[Command]) -> Result<(), String> {
     let functions = Arc::new(RwLock::new(HashMap::new()));
     let macros = Arc::new(RwLock::new(HashMap::new()));
     let safety = Arc::new(RwLock::new(RuntimeSafety::new(SafetyConfig::default())));
-    interpret_with_scope(commands, variables, constants, functions, macros, shellcode, safety).await?;
+    interpret_with_scope(
+        commands, variables, constants, functions, macros, shellcode, safety,
+    )
+    .await?;
     Ok(())
 }
 
@@ -169,9 +179,27 @@ impl std::fmt::Display for Value {
         match self {
             Value::Number(n) => write!(f, "{}", n),
             Value::String(s) => write!(f, "{}", s),
-            Value::List(l) => write!(f, "[{}]", l.iter().map(|v| v.to_string()).collect::<Vec<_>>().join(", ")),
-            Value::Map(m) => write!(f, "{{{}}}", m.iter().map(|(k, v)| format!("{}: {}", k, v)).collect::<Vec<_>>().join(", ")),
-            Value::Set(s) => write!(f, "#{{{}}}", s.iter().map(|x| x.as_str()).collect::<Vec<_>>().join(", ")),
+            Value::List(l) => write!(
+                f,
+                "[{}]",
+                l.iter()
+                    .map(|v| v.to_string())
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Value::Map(m) => write!(
+                f,
+                "{{{}}}",
+                m.iter()
+                    .map(|(k, v)| format!("{}: {}", k, v))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            Value::Set(s) => write!(
+                f,
+                "#{{{}}}",
+                s.iter().map(|x| x.as_str()).collect::<Vec<_>>().join(", ")
+            ),
             Value::Bytes(b) => write!(f, "0x{}", hex::encode(b)),
             Value::Null => write!(f, "null"),
         }
@@ -186,30 +214,51 @@ fn interpret_with_scope<'a>(
     macros: Arc<RwLock<HashMap<String, MacroDef>>>,
     shellcode: Arc<RwLock<Option<Vec<u8>>>>,
     safety: Arc<RwLock<RuntimeSafety>>,
-) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Option<Value>, String>> + Send + 'a>> {
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Option<Value>, String>> + Send + 'a>>
+{
     Box::pin(async move {
-    for cmd in commands {
-        match cmd {
-            Command::Import { module, items } => {
-                let content = fs::read_to_string(module).map_err(|e| format!("Failed to read module {}: {}", module, e))?;
-                let imported_cmds = parse_script(&content)?;
-                let mut filtered = Vec::new();
-                if let Some(items) = items {
-                    for c in &imported_cmds {
-                        match c {
-                            Command::DefineFunction(f) if items.contains(&f.name) => filtered.push(c.clone()),
-                            Command::DefineMacro(m) if items.contains(&m.name) => filtered.push(c.clone()),
-                            _ => {}
+        for cmd in commands {
+            match cmd {
+                Command::Import { module, items } => {
+                    let content = fs::read_to_string(module)
+                        .map_err(|e| format!("Failed to read module {}: {}", module, e))?;
+                    let imported_cmds = parse_script(&content)?;
+                    let mut filtered = Vec::new();
+                    if let Some(items) = items {
+                        for c in &imported_cmds {
+                            match c {
+                                Command::DefineFunction(f) if items.contains(&f.name) => {
+                                    filtered.push(c.clone())
+                                }
+                                Command::DefineMacro(m) if items.contains(&m.name) => {
+                                    filtered.push(c.clone())
+                                }
+                                _ => {}
+                            }
                         }
+                    } else {
+                        filtered = imported_cmds;
                     }
-                } else {
-                    filtered = imported_cmds;
+                    interpret_with_scope(
+                        &filtered,
+                        variables.clone(),
+                        constants.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                        shellcode.clone(),
+                        safety.clone(),
+                    )
+                    .await?;
                 }
-                interpret_with_scope(&filtered, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await?;
-            }
-            Command::TypedDecl(TypedVar { name, var_type, value }) => {
-                let val = eval_expr(value, variables.clone(), functions.clone(), macros.clone()).await?;
-                let typed_val = match var_type {
+                Command::TypedDecl(TypedVar {
+                    name,
+                    var_type,
+                    value,
+                }) => {
+                    let val =
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                    let typed_val = match var_type {
                     TypeHint::Int => Value::Number(val.to_string().parse::<i64>()
                         .map_err(|e| format!("[ERROR] Type Error: Expected integer, got '{}'\nMake sure the value is a valid number: {}", val, e))?),
                     TypeHint::String => Value::String(val.to_string()),
@@ -221,132 +270,246 @@ fn interpret_with_scope<'a>(
                     TypeHint::Set => Value::Set(val.to_string().split(',').map(|s| s.trim().to_string()).collect()),
                     TypeHint::Bytes => Value::Bytes(hex::decode(val.to_string().trim_start_matches("0x")).map_err(|e| e.to_string())?),
                     TypeHint::Unknown => val,
-                    TypeHint::Null => if val == Value::Null { val } else { 
+                    TypeHint::Null => if val == Value::Null { val } else {
                         return Err(format!("[ERROR] Type Error: Expected null, got '{}'\nUse 'null' for null values", val));
                     },
                 };
-                variables.write().await.insert(name.clone(), typed_val);
-            }
-            Command::ConstDecl { name, value } => {
-                let val = eval_expr(value, variables.clone(), functions.clone(), macros.clone()).await?;
-                constants.write().await.insert(name.clone(), val);
-            }
-            Command::DestructuringDecl { vars, value } => {
-                let val = eval_expr(value, variables.clone(), functions.clone(), macros.clone()).await?;
-                let val_str = val.to_string();
-                let parts: Vec<&str> = val_str.split(':').collect();
-                if parts.len() != vars.len() {
-                    return Err(format!("Destructuring mismatch: {} vars, {} values", vars.len(), parts.len()));
+                    variables.write().await.insert(name.clone(), typed_val);
                 }
-                for (var, part) in vars.iter().zip(parts) {
-                    variables.write().await.insert(var.clone(), Value::String(part.trim().to_string()));
+                Command::ConstDecl { name, value } => {
+                    let val =
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                    constants.write().await.insert(name.clone(), val);
                 }
-            }
-            Command::VarDecl { name, value } => {
-                let val = eval_expr(value, variables.clone(), functions.clone(), macros.clone()).await?;
-                variables.write().await.insert(name.clone(), val);
-            }
-            Command::Assignment { name, value } => {
-                if constants.read().await.contains_key(name) {
-                    return Err(format!("Cannot reassign constant {}", name));
-                }
-                let val = eval_expr(value, variables.clone(), functions.clone(), macros.clone()).await?;
-                variables.write().await.insert(name.clone(), val);
-            }
-            Command::DefineFunction(func_def) => {
-                functions.write().await.insert(func_def.name.clone(), func_def.clone());
-            }
-            Command::DefineMacro(macro_def) => {
-                macros.write().await.insert(macro_def.name.clone(), macro_def.clone());
-            }
-            Command::CallMacro { name, args } => {
-                let macro_def = macros.read().await.get(name).cloned();
-                if let Some(macro_def) = macro_def {
-                    let local_vars = Arc::new(RwLock::new(variables.read().await.clone()));
-                    let mut arg_values = Vec::new();
-                    for e in args {
-                        arg_values.push(eval_expr(e, variables.clone(), functions.clone(), macros.clone()).await?);
+                Command::DestructuringDecl { vars, value } => {
+                    let val =
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                    let val_str = val.to_string();
+                    let parts: Vec<&str> = val_str.split(':').collect();
+                    if parts.len() != vars.len() {
+                        return Err(format!(
+                            "Destructuring mismatch: {} vars, {} values",
+                            vars.len(),
+                            parts.len()
+                        ));
                     }
-                    for (param, val) in macro_def.args.iter().zip(arg_values) {
-                        local_vars.write().await.insert(param.clone(), val);
+                    for (var, part) in vars.iter().zip(parts) {
+                        variables
+                            .write()
+                            .await
+                            .insert(var.clone(), Value::String(part.trim().to_string()));
                     }
-                    if let Some(ret) = interpret_with_scope(&macro_def.body, local_vars, constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
-                        println!("[MACRO RETURN] {}", ret);
-                    }
-                } else {
-                    return Err(format!("Unknown macro: {}", name));
                 }
-            }
-            Command::CallFunction { name, args } => {
-                let func = functions.read().await.get(name).cloned();
-                if let Some(func) = func {
-                    let local_vars = Arc::new(RwLock::new(variables.read().await.clone()));
-                    let mut arg_values = Vec::new();
-                    for (i, (param_name, default)) in func.args.iter().enumerate() {
-                        let arg_val = match args.get(i) {
-                            Some((n, e)) => {
-                                if let Some(n) = n {
-                                    if n == param_name {
-                                        eval_expr(e, variables.clone(), functions.clone(), macros.clone()).await?
+                Command::VarDecl { name, value } => {
+                    let val =
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                    variables.write().await.insert(name.clone(), val);
+                }
+                Command::Assignment { name, value } => {
+                    if constants.read().await.contains_key(name) {
+                        return Err(format!("Cannot reassign constant {}", name));
+                    }
+                    let val =
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                    variables.write().await.insert(name.clone(), val);
+                }
+                Command::DefineFunction(func_def) => {
+                    functions
+                        .write()
+                        .await
+                        .insert(func_def.name.clone(), func_def.clone());
+                }
+                Command::DefineMacro(macro_def) => {
+                    macros
+                        .write()
+                        .await
+                        .insert(macro_def.name.clone(), macro_def.clone());
+                }
+                Command::CallMacro { name, args } => {
+                    let macro_def = macros.read().await.get(name).cloned();
+                    if let Some(macro_def) = macro_def {
+                        let local_vars = Arc::new(RwLock::new(variables.read().await.clone()));
+                        let mut arg_values = Vec::new();
+                        for e in args {
+                            arg_values.push(
+                                eval_expr(e, variables.clone(), functions.clone(), macros.clone())
+                                    .await?,
+                            );
+                        }
+                        for (param, val) in macro_def.args.iter().zip(arg_values) {
+                            local_vars.write().await.insert(param.clone(), val);
+                        }
+                        if let Some(ret) = interpret_with_scope(
+                            &macro_def.body,
+                            local_vars,
+                            constants.clone(),
+                            functions.clone(),
+                            macros.clone(),
+                            shellcode.clone(),
+                            safety.clone(),
+                        )
+                        .await?
+                        {
+                            println!("[MACRO RETURN] {}", ret);
+                        }
+                    } else {
+                        return Err(format!("Unknown macro: {}", name));
+                    }
+                }
+                Command::CallFunction { name, args } => {
+                    let func = functions.read().await.get(name).cloned();
+                    if let Some(func) = func {
+                        let local_vars = Arc::new(RwLock::new(variables.read().await.clone()));
+                        let mut arg_values = Vec::new();
+                        for (i, (param_name, default)) in func.args.iter().enumerate() {
+                            let arg_val = match args.get(i) {
+                                Some((n, e)) => {
+                                    if let Some(n) = n {
+                                        if n == param_name {
+                                            eval_expr(
+                                                e,
+                                                variables.clone(),
+                                                functions.clone(),
+                                                macros.clone(),
+                                            )
+                                            .await?
+                                        } else {
+                                            return Err("Argument name mismatch".to_string());
+                                        }
                                     } else {
-                                        return Err("Argument name mismatch".to_string());
+                                        eval_expr(
+                                            e,
+                                            variables.clone(),
+                                            functions.clone(),
+                                            macros.clone(),
+                                        )
+                                        .await?
                                     }
-                                } else {
-                                    eval_expr(e, variables.clone(), functions.clone(), macros.clone()).await?
                                 }
-                            }
-                            None => {
-                                if let Some(d) = default {
-                                    eval_expr(d, variables.clone(), functions.clone(), macros.clone()).await?
-                                } else {
-                                    return Err(format!("[ERROR] Missing Argument: '{}'\n\nTIP: This function requires: {}", 
-                                        param_name, 
+                                None => {
+                                    if let Some(d) = default {
+                                        eval_expr(
+                                            d,
+                                            variables.clone(),
+                                            functions.clone(),
+                                            macros.clone(),
+                                        )
+                                        .await?
+                                    } else {
+                                        return Err(format!("[ERROR] Missing Argument: '{}'\n\nTIP: This function requires: {}",
+                                        param_name,
                                         func.args.iter().map(|(n, _)| n.as_str()).collect::<Vec<_>>().join(", ")));
+                                    }
                                 }
-                            }
-                        };
-                        arg_values.push(arg_val);
+                            };
+                            arg_values.push(arg_val);
+                        }
+                        for ((param_name, _), val) in func.args.iter().zip(arg_values) {
+                            local_vars.write().await.insert(param_name.clone(), val);
+                        }
+                        if func.is_async {
+                            let consts = constants.clone();
+                            let funcs = functions.clone();
+                            let macs = macros.clone();
+                            let sc = shellcode.clone();
+                            let saf = safety.clone();
+                            let body = func.body.clone();
+                            tokio::spawn(async move {
+                                interpret_with_scope(
+                                    &body, local_vars, consts, funcs, macs, sc, saf,
+                                )
+                                .await
+                                .unwrap();
+                            })
+                            .await
+                            .map_err(|e| e.to_string())?;
+                        } else if let Some(ret_val) = interpret_with_scope(
+                            &func.body,
+                            local_vars,
+                            constants.clone(),
+                            functions.clone(),
+                            macros.clone(),
+                            shellcode.clone(),
+                            safety.clone(),
+                        )
+                        .await?
+                        {
+                            println!("[RETURN] {}", ret_val);
+                        }
+                    } else {
+                        return Err(format!("Unknown function: {}", name));
                     }
-                    for ((param_name, _), val) in func.args.iter().zip(arg_values) {
-                        local_vars.write().await.insert(param_name.clone(), val);
-                    }
-                    if func.is_async {
-                        let consts = constants.clone();
-                        let funcs = functions.clone();
-                        let macs = macros.clone();
-                        let sc = shellcode.clone();
-                        let saf = safety.clone();
-                        let body = func.body.clone();
-                        tokio::spawn(async move {
-                            interpret_with_scope(&body, local_vars, consts, funcs, macs, sc, saf).await.unwrap();
-                        }).await.map_err(|e| e.to_string())?;
-                    } else if let Some(ret_val) = interpret_with_scope(&func.body, local_vars, constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
-                        println!("[RETURN] {}", ret_val);
-                    }
-                } else {
-                    return Err(format!("Unknown function: {}", name));
                 }
-            }
-            Command::Expr(Expr::Return(expr)) => {
-                let ret_val = eval_expr(expr, variables.clone(), functions.clone(), macros.clone()).await?;
-                return Ok(Some(ret_val));
-            }
-            Command::Expr(expr) => {
-                let _val = eval_expr(expr, variables.clone(), functions.clone(), macros.clone()).await?;
-            }
-            Command::Control(Control::If { condition, then_body, else_body }) => {
-                let cond = eval_expr(condition, variables.clone(), functions.clone(), macros.clone()).await?;
-                if cond.to_string() == "true" || cond.to_string().parse::<i64>().is_ok_and(|n| n != 0) {
-                    if let Some(ret) = interpret_with_scope(then_body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
+                Command::Expr(Expr::Return(expr)) => {
+                    let ret_val =
+                        eval_expr(expr, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                    return Ok(Some(ret_val));
+                }
+                Command::Expr(expr) => {
+                    let _val =
+                        eval_expr(expr, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                }
+                Command::Control(Control::If {
+                    condition,
+                    then_body,
+                    else_body,
+                }) => {
+                    let cond = eval_expr(
+                        condition,
+                        variables.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                    )
+                    .await?;
+                    if cond.to_string() == "true"
+                        || cond.to_string().parse::<i64>().is_ok_and(|n| n != 0)
+                    {
+                        if let Some(ret) = interpret_with_scope(
+                            then_body,
+                            variables.clone(),
+                            constants.clone(),
+                            functions.clone(),
+                            macros.clone(),
+                            shellcode.clone(),
+                            safety.clone(),
+                        )
+                        .await?
+                        {
+                            return Ok(Some(ret));
+                        }
+                    } else if let Some(ret) = interpret_with_scope(
+                        else_body,
+                        variables.clone(),
+                        constants.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                        shellcode.clone(),
+                        safety.clone(),
+                    )
+                    .await?
+                    {
                         return Ok(Some(ret));
                     }
-                } else if let Some(ret) = interpret_with_scope(else_body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
-                    return Ok(Some(ret));
                 }
-            }
-            Command::Control(Control::For { var, iterable, body }) => {
-                let items = eval_expr(iterable, variables.clone(), functions.clone(), macros.clone()).await?;
-                match items {
+                Command::Control(Control::For {
+                    var,
+                    iterable,
+                    body,
+                }) => {
+                    let items = eval_expr(
+                        iterable,
+                        variables.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                    )
+                    .await?;
+                    match items {
                     Value::List(list) => {
                         for item in list {
                             variables.write().await.insert(var.clone(), item);
@@ -380,10 +543,15 @@ fn interpret_with_scope<'a>(
                     }
                     _ => return Err("[ERROR] For Loop Error: Requires a list or range\n\nTIP: Examples:\n  for i in 0..10\n  for item in my_list".into()),
                 }
-            }
-            Command::Control(Control::While { condition, body }) => {
-                loop {
-                    let cond = eval_expr(condition, variables.clone(), functions.clone(), macros.clone()).await?;
+                }
+                Command::Control(Control::While { condition, body }) => loop {
+                    let cond = eval_expr(
+                        condition,
+                        variables.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                    )
+                    .await?;
                     let cond_bool = match cond {
                         Value::Number(n) => n != 0,
                         Value::String(s) => s == "true" || s.parse::<i64>().is_ok_and(|n| n != 0),
@@ -392,305 +560,409 @@ fn interpret_with_scope<'a>(
                     if !cond_bool {
                         break;
                     }
-                    match interpret_with_scope(body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await {
+                    match interpret_with_scope(
+                        body,
+                        variables.clone(),
+                        constants.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                        shellcode.clone(),
+                        safety.clone(),
+                    )
+                    .await
+                    {
                         Ok(Some(ret)) => return Ok(Some(ret)),
                         Err(e) if e == "continue" => continue,
                         Err(e) if e == "break" => break,
                         Err(e) => return Err(e),
-                        Ok(None) => {},
+                        Ok(None) => {}
+                    }
+                },
+                Command::Control(Control::Break) => {
+                    return Err("break".into());
+                }
+                Command::Control(Control::Continue) => {
+                    return Err("continue".into());
+                }
+                Command::Control(Control::Parallel { body }) => {
+                    let mut handles = Vec::new();
+                    for cmd in body {
+                        let cmd = cmd.clone();
+                        let vars = variables.clone();
+                        let consts = constants.clone();
+                        let funcs = functions.clone();
+                        let macs = macros.clone();
+                        let sc = shellcode.clone();
+                        let saf = safety.clone();
+                        handles.push(tokio::spawn(async move {
+                            interpret_with_scope(&[cmd], vars, consts, funcs, macs, sc, saf).await
+                        }));
+                    }
+                    for handle in handles {
+                        handle.await.map_err(|e| e.to_string())??;
                     }
                 }
-            }
-            Command::Control(Control::Break) => {
-                return Err("break".into());
-            }
-            Command::Control(Control::Continue) => {
-                return Err("continue".into());
-            }
-            Command::Control(Control::Parallel { body }) => {
-                let mut handles = Vec::new();
-                for cmd in body {
-                    let cmd = cmd.clone();
-                    let vars = variables.clone();
-                    let consts = constants.clone();
-                    let funcs = functions.clone();
-                    let macs = macros.clone();
-                    let sc = shellcode.clone();
-                    let saf = safety.clone();
-                    handles.push(tokio::spawn(async move {
-                        interpret_with_scope(&[cmd], vars, consts, funcs, macs, sc, saf).await
-                    }));
-                }
-                for handle in handles {
-                    handle.await.map_err(|e| e.to_string())??;
-                }
-            }
-            Command::Match(MatchBlock { expr, arms }) => {
-                let val = eval_expr(expr, variables.clone(), functions.clone(), macros.clone()).await?;
-                for arm in arms {
-                    let _pat_val = eval_expr(&arm.pattern, variables.clone(), functions.clone(), macros.clone()).await?;
-                    let matches = match (&arm.pattern, &val) {
-                        (Expr::Literal(Literal::String(s)), Value::String(v)) => s == v,
-                        (Expr::Literal(Literal::Number(n)), Value::Number(v)) => n == v,
-                        _ => false,
-                    };
-                    let guard_ok = if let Some(g) = &arm.guard {
-                        let guard_val = eval_expr(g, variables.clone(), functions.clone(), macros.clone()).await?;
-                        guard_val.to_string() == "true"
-                    } else {
-                        true
-                    };
-                    if matches && guard_ok {
-                        if let Some(ret) = interpret_with_scope(&arm.body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
-                            return Ok(Some(ret));
+                Command::Match(MatchBlock { expr, arms }) => {
+                    let val = eval_expr(expr, variables.clone(), functions.clone(), macros.clone())
+                        .await?;
+                    for arm in arms {
+                        let _pat_val = eval_expr(
+                            &arm.pattern,
+                            variables.clone(),
+                            functions.clone(),
+                            macros.clone(),
+                        )
+                        .await?;
+                        let matches = match (&arm.pattern, &val) {
+                            (Expr::Literal(Literal::String(s)), Value::String(v)) => s == v,
+                            (Expr::Literal(Literal::Number(n)), Value::Number(v)) => n == v,
+                            _ => false,
+                        };
+                        let guard_ok = if let Some(g) = &arm.guard {
+                            let guard_val =
+                                eval_expr(g, variables.clone(), functions.clone(), macros.clone())
+                                    .await?;
+                            guard_val.to_string() == "true"
+                        } else {
+                            true
+                        };
+                        if matches && guard_ok {
+                            if let Some(ret) = interpret_with_scope(
+                                &arm.body,
+                                variables.clone(),
+                                constants.clone(),
+                                functions.clone(),
+                                macros.clone(),
+                                shellcode.clone(),
+                                safety.clone(),
+                            )
+                            .await?
+                            {
+                                return Ok(Some(ret));
+                            }
+                            break;
                         }
-                        break;
                     }
                 }
-            }
-            Command::TryCatch(TryCatch { try_body, catch_var, catch_body }) => {
-                match interpret_with_scope(try_body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await {
-                    Ok(Some(ret)) => return Ok(Some(ret)),
-                    Err(e) => {
-                        variables.write().await.insert(catch_var.clone(), Value::String(e));
-                        if let Some(ret) = interpret_with_scope(catch_body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
-                            return Ok(Some(ret));
-                        }
-                    }
-                    _ => {}
-                }
-            }
-            Command::RunCommand { command } => {
-                let output = SysCommand::new("sh").arg("-c").arg(command).output().map_err(|e| e.to_string())?;
-                println!("{}", String::from_utf8_lossy(&output.stdout));
-            }
-            Command::BitwiseOp { op, left, right } => {
-                let l = eval_expr(left, variables.clone(), functions.clone(), macros.clone()).await?;
-                let r = eval_expr(right, variables.clone(), functions.clone(), macros.clone()).await?;
-                let l_num = l.to_string().parse::<i64>().unwrap_or(0);
-                let r_num = r.to_string().parse::<i64>().unwrap_or(0);
-                let result = match op.as_str() {
-                    "&" => l_num & r_num,
-                    "|" => l_num | r_num,
-                    "^" => l_num ^ r_num,
-                    "<<" => l_num << r_num,
-                    ">>" => l_num >> r_num,
-                    _ => return Err(format!("Unknown bitwise op: {}", op)),
-                };
-                variables.write().await.insert("result".to_string(), Value::Number(result));
-            }
-            Command::ToolExec { tool, args } => {
-                let mut arg_vals = Vec::new();
-                for e in args {
-                    arg_vals.push(eval_expr(e, variables.clone(), functions.clone(), macros.clone()).await?);
-                }
-                match tool.as_str() {
-                    "metasploit" => println!("[METASPLOIT] Args: {:?}", arg_vals),
-                    "capstone" => println!("[CAPSTONE] Args: {:?}", arg_vals),
-                    _ => return Err(format!("Unknown tool: {}", tool)),
-                }
-            }
-            Command::Beacon { url, interval } => {
-                let url = url.clone();
-                let int = *interval;
-                tokio::spawn(async move {
-                    let client = Client::new();
-                    loop {
-                        let _ = client.get(&url).send();
-                        tokio::time::sleep(Duration::from_secs(int)).await;
-                    }
-                });
-            }
-            Command::Download { url, path } => {
-                let data = Client::new().get(url).send().map_err(|e| e.to_string())?.bytes().map_err(|e| e.to_string())?;
-                fs::write(path, &data).map_err(|e| e.to_string())?;
-            }
-            Command::EncodeBase64 { data } => {
-                let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone()).await?;
-                println!("[ENCODED] {}", encode(val.to_string()));
-            }
-            Command::DecodeBase64 { data } => {
-                let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone()).await?;
-                let raw = decode(val.to_string()).map_err(|e| e.to_string())?;
-                println!("[DECODED] {}", String::from_utf8_lossy(&raw));
-            }
-            Command::Assemble { code } => {
-                println!("[ASM] Assembly feature disabled. Use external assembler (nasm/as) instead.");
-                println!("[ASM] Code: {}", code);
-            }
-            Command::LoadShellcode { path } => {
-                *shellcode.write().await = Some(fs::read(path).map_err(|e| e.to_string())?);
-            }
-            Command::ExecuteShellcode => {
-                if let Some(code) = shellcode.read().await.as_ref() {
-                    println!("[SHELLCODE] Executing {} bytes", code.len());
-                    let cs = Capstone::new().x86().mode(ArchMode::Mode64).build().ok();
-                    if let Some(cs) = cs {
-                        if let Ok(insns) = cs.disasm_all(code, 0x1000) {
-                            println!("[TRACE]");
-                            for i in insns.iter().take(20) {
-                                println!("   0x{:x}: {}", i.address(), i);
+                Command::TryCatch(TryCatch {
+                    try_body,
+                    catch_var,
+                    catch_body,
+                }) => {
+                    match interpret_with_scope(
+                        try_body,
+                        variables.clone(),
+                        constants.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                        shellcode.clone(),
+                        safety.clone(),
+                    )
+                    .await
+                    {
+                        Ok(Some(ret)) => return Ok(Some(ret)),
+                        Err(e) => {
+                            variables
+                                .write()
+                                .await
+                                .insert(catch_var.clone(), Value::String(e));
+                            if let Some(ret) = interpret_with_scope(
+                                catch_body,
+                                variables.clone(),
+                                constants.clone(),
+                                functions.clone(),
+                                macros.clone(),
+                                shellcode.clone(),
+                                safety.clone(),
+                            )
+                            .await?
+                            {
+                                return Ok(Some(ret));
                             }
                         }
-                    }
-
-                    #[cfg(unix)]
-                    {
-                        let addr = unsafe {
-                            libc::mmap(
-                                ptr::null_mut(),
-                                code.len(),
-                                libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
-                                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
-                                -1, 0
-                            )
-                        };
-                        if addr == libc::MAP_FAILED {
-                            return Err("mmap failed".into());
-                        }
-
-                        unsafe {
-                            ptr::copy_nonoverlapping(code.as_ptr(), addr as *mut u8, code.len());
-                            let shell_fn: fn() = mem::transmute(addr);
-                            shell_fn();
-                        }
-                    }
-                    #[cfg(not(unix))]
-                    {
-                        println!("[SHELLCODE] Execution is only supported on Unix platforms");
-                    }
-                } else {
-                    println!("[SHELLCODE] No shellcode loaded.");
-                }
-            }
-            Command::DumpMemory { address, length } => {
-                let mut file = fs::File::open("/proc/self/mem").map_err(|e| e.to_string())?;
-                file.seek(SeekFrom::Start(*address)).map_err(|e| e.to_string())?;
-                let mut buffer = vec![0u8; *length as usize];
-                file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
-                println!("[DUMP]");
-                for (i, b) in buffer.iter().enumerate() {
-                    if i % 16 == 0 { print!("\n{:08x}: ", address + i as u64); }
-                    print!("{:02x} ", b);
-                }
-                println!();
-            }
-            Command::NopSled { length } => {
-                println!("[NOP] {}", "90 ".repeat(*length as usize));
-            }
-            Command::HeapSpray { data } => {
-                println!("[HEAP] Spray: {:?}", data.as_bytes());
-            }
-            Command::Fuzz { binary, seed, cycles } => {
-                let seed_data = fs::read(seed).map_err(|e| e.to_string())?;
-                for i in 0..*cycles {
-                    let mut input = seed_data.clone();
-                    let mut rng = rand::thread_rng();
-                    for _ in 0..rng.gen_range(1..5) {
-                        let idx = rng.gen_range(0..input.len());
-                        input[idx] = rng.gen();
-                    }
-                    let mut child = SysCommand::new(binary)
-                        .stdin(Stdio::piped())
-                        .stdout(Stdio::null())
-                        .spawn().map_err(|e| e.to_string())?;
-                    if let Some(stdin) = child.stdin.as_mut() {
-                        stdin.write_all(&input).map_err(|e| e.to_string())?;
-                    }
-                    let status = child.wait().map_err(|e| e.to_string())?;
-                    if !status.success() {
-                        let path = format!("crash_{}.bin", i);
-                        fs::write(&path, &input).map_err(|e| e.to_string())?;
-                        println!("[FUZZ] Crash saved to {}", path);
+                        _ => {}
                     }
                 }
-            }
-            Command::CTF(ctf_cmd) => {
-                use crate::ast::CTFCommand;
-                match ctf_cmd {
-                    CTFCommand::NewSession { name } => {
-                        println!("[CTF] Creating new session: {}", name);
-                    }
-                    CTFCommand::AddChallenge { id: _, name, category, points } => {
-                        println!("[CTF] Adding challenge: {} ({}) - {} pts", name, category, points);
-                    }
-                    CTFCommand::SetConnection { challenge_id, host, port, protocol } => {
-                        println!("[CTF] Setting connection for {}: {}:{} ({})", challenge_id, host, port, protocol);
-                    }
-                    CTFCommand::AddNote { challenge_id, note } => {
-                        println!("[CTF] Note for {}: {}", challenge_id, note);
-                    }
-                    CTFCommand::SetStatus { challenge_id, status } => {
-                        println!("[CTF] Status for {}: {}", challenge_id, status);
-                    }
-                    CTFCommand::SubmitFlag { challenge_id, flag } => {
-                        println!("[CTF] Submitting flag for {}: {}", challenge_id, flag);
-                    }
-                    CTFCommand::SaveSession { path } => {
-                        println!("[CTF] Saving session to: {}", path);
-                    }
-                    CTFCommand::LoadSession { path } => {
-                        println!("[CTF] Loading session from: {}", path);
-                    }
-                    CTFCommand::ShowStats => {
-                        println!("[CTF] Showing session statistics");
-                    }
-                    CTFCommand::ListChallenges => {
-                        println!("[CTF] Listing challenges");
-                    }
+                Command::RunCommand { command } => {
+                    let output = SysCommand::new("sh")
+                        .arg("-c")
+                        .arg(command)
+                        .output()
+                        .map_err(|e| e.to_string())?;
+                    println!("{}", String::from_utf8_lossy(&output.stdout));
                 }
-            }
-            Command::DiffFuzz(spec) => {
-                use crate::diff_fuzzer::{DifferentialFuzzer, DetectionMode};
-                
-                println!("[DIFF-FUZZ] Initializing differential fuzzer");
-                
-                let mut fuzzer = DifferentialFuzzer::new(
-                    spec.target_old.clone(),
-                    spec.target_new.clone()
-                );
-                
-                fuzzer.load_corpus(&spec.corpus)?;
-                
-                if let Some(iterations) = spec.iterations {
-                    fuzzer.set_iterations(iterations);
-                }
-                
-                if let Some(timeout) = spec.timeout_ms {
-                    fuzzer.set_timeout(timeout);
-                }
-                
-                for mode_str in &spec.detect_modes {
-                    let mode = match mode_str.as_str() {
-                        "crashes_only_in_old" => DetectionMode::CrashesOnlyInOld,
-                        "crashes_only_in_new" => DetectionMode::CrashesOnlyInNew,
-                        "behavior_change" => DetectionMode::BehaviorChange,
-                        "output_divergence" => DetectionMode::OutputDivergence,
-                        "timing_divergence" => DetectionMode::TimingDivergence,
-                        "sanitizer_violations" => DetectionMode::SanitizerViolations,
-                        "return_code_change" => DetectionMode::ReturnCodeChange,
-                        _ => return Err(format!("Unknown detection mode: {}", mode_str)),
+                Command::BitwiseOp { op, left, right } => {
+                    let l = eval_expr(left, variables.clone(), functions.clone(), macros.clone())
+                        .await?;
+                    let r = eval_expr(right, variables.clone(), functions.clone(), macros.clone())
+                        .await?;
+                    let l_num = l.to_string().parse::<i64>().unwrap_or(0);
+                    let r_num = r.to_string().parse::<i64>().unwrap_or(0);
+                    let result = match op.as_str() {
+                        "&" => l_num & r_num,
+                        "|" => l_num | r_num,
+                        "^" => l_num ^ r_num,
+                        "<<" => l_num << r_num,
+                        ">>" => l_num >> r_num,
+                        _ => return Err(format!("Unknown bitwise op: {}", op)),
                     };
-                    fuzzer.add_detection_mode(mode);
+                    variables
+                        .write()
+                        .await
+                        .insert("result".to_string(), Value::Number(result));
                 }
-                
-                fuzzer.fuzz()?;
-                
-                if spec.auto_exploit {
-                    fuzzer.save_report("differential_fuzz_report.json")?;
+                Command::ToolExec { tool, args } => {
+                    let mut arg_vals = Vec::new();
+                    for e in args {
+                        arg_vals.push(
+                            eval_expr(e, variables.clone(), functions.clone(), macros.clone())
+                                .await?,
+                        );
+                    }
+                    match tool.as_str() {
+                        "metasploit" => println!("[METASPLOIT] Args: {:?}", arg_vals),
+                        "capstone" => println!("[CAPSTONE] Args: {:?}", arg_vals),
+                        _ => return Err(format!("Unknown tool: {}", tool)),
+                    }
                 }
-            }
-            Command::TaintAnalysis(spec) => {
-                use crate::advanced_fuzzer::{TaintTracker, TaintSink, LeakType};
-                
-                println!("[TAINT] Initializing taint analysis");
-                println!("[TAINT]   Binary: {}", spec.binary);
-                println!("[TAINT]   Source: {}", spec.source);
-                
-                let mut tracker = TaintTracker::new();
-                
-                for sink_str in &spec.track_to {
-                    let sink = match sink_str.as_str() {
+                Command::Beacon { url, interval } => {
+                    let url = url.clone();
+                    let int = *interval;
+                    tokio::spawn(async move {
+                        let client = Client::new();
+                        loop {
+                            let _ = client.get(&url).send();
+                            tokio::time::sleep(Duration::from_secs(int)).await;
+                        }
+                    });
+                }
+                Command::Download { url, path } => {
+                    let data = Client::new()
+                        .get(url)
+                        .send()
+                        .map_err(|e| e.to_string())?
+                        .bytes()
+                        .map_err(|e| e.to_string())?;
+                    fs::write(path, &data).map_err(|e| e.to_string())?;
+                }
+                Command::EncodeBase64 { data } => {
+                    let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone())
+                        .await?;
+                    println!("[ENCODED] {}", encode(val.to_string()));
+                }
+                Command::DecodeBase64 { data } => {
+                    let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone())
+                        .await?;
+                    let raw = decode(val.to_string()).map_err(|e| e.to_string())?;
+                    println!("[DECODED] {}", String::from_utf8_lossy(&raw));
+                }
+                Command::Assemble { code } => {
+                    println!("[ASM] Assembly feature disabled. Use external assembler (nasm/as) instead.");
+                    println!("[ASM] Code: {}", code);
+                }
+                Command::LoadShellcode { path } => {
+                    *shellcode.write().await = Some(fs::read(path).map_err(|e| e.to_string())?);
+                }
+                Command::ExecuteShellcode => {
+                    if let Some(code) = shellcode.read().await.as_ref() {
+                        println!("[SHELLCODE] Executing {} bytes", code.len());
+                        let cs = Capstone::new().x86().mode(ArchMode::Mode64).build().ok();
+                        if let Some(cs) = cs {
+                            if let Ok(insns) = cs.disasm_all(code, 0x1000) {
+                                println!("[TRACE]");
+                                for i in insns.iter().take(20) {
+                                    println!("   0x{:x}: {}", i.address(), i);
+                                }
+                            }
+                        }
+
+                        #[cfg(unix)]
+                        {
+                            let addr = unsafe {
+                                libc::mmap(
+                                    ptr::null_mut(),
+                                    code.len(),
+                                    libc::PROT_READ | libc::PROT_WRITE | libc::PROT_EXEC,
+                                    libc::MAP_PRIVATE | libc::MAP_ANONYMOUS,
+                                    -1,
+                                    0,
+                                )
+                            };
+                            if addr == libc::MAP_FAILED {
+                                return Err("mmap failed".into());
+                            }
+
+                            unsafe {
+                                ptr::copy_nonoverlapping(
+                                    code.as_ptr(),
+                                    addr as *mut u8,
+                                    code.len(),
+                                );
+                                let shell_fn: fn() = mem::transmute(addr);
+                                shell_fn();
+                            }
+                        }
+                        #[cfg(not(unix))]
+                        {
+                            println!("[SHELLCODE] Execution is only supported on Unix platforms");
+                        }
+                    } else {
+                        println!("[SHELLCODE] No shellcode loaded.");
+                    }
+                }
+                Command::DumpMemory { address, length } => {
+                    let mut file = fs::File::open("/proc/self/mem").map_err(|e| e.to_string())?;
+                    file.seek(SeekFrom::Start(*address))
+                        .map_err(|e| e.to_string())?;
+                    let mut buffer = vec![0u8; *length as usize];
+                    file.read_exact(&mut buffer).map_err(|e| e.to_string())?;
+                    println!("[DUMP]");
+                    for (i, b) in buffer.iter().enumerate() {
+                        if i % 16 == 0 {
+                            print!("\n{:08x}: ", address + i as u64);
+                        }
+                        print!("{:02x} ", b);
+                    }
+                    println!();
+                }
+                Command::NopSled { length } => {
+                    println!("[NOP] {}", "90 ".repeat(*length as usize));
+                }
+                Command::HeapSpray { data } => {
+                    println!("[HEAP] Spray: {:?}", data.as_bytes());
+                }
+                Command::Fuzz {
+                    binary,
+                    seed,
+                    cycles,
+                } => {
+                    let seed_data = fs::read(seed).map_err(|e| e.to_string())?;
+                    for i in 0..*cycles {
+                        let mut input = seed_data.clone();
+                        let mut rng = rand::thread_rng();
+                        for _ in 0..rng.gen_range(1..5) {
+                            let idx = rng.gen_range(0..input.len());
+                            input[idx] = rng.gen();
+                        }
+                        let mut child = SysCommand::new(binary)
+                            .stdin(Stdio::piped())
+                            .stdout(Stdio::null())
+                            .spawn()
+                            .map_err(|e| e.to_string())?;
+                        if let Some(stdin) = child.stdin.as_mut() {
+                            stdin.write_all(&input).map_err(|e| e.to_string())?;
+                        }
+                        let status = child.wait().map_err(|e| e.to_string())?;
+                        if !status.success() {
+                            let path = format!("crash_{}.bin", i);
+                            fs::write(&path, &input).map_err(|e| e.to_string())?;
+                            println!("[FUZZ] Crash saved to {}", path);
+                        }
+                    }
+                }
+                Command::CTF(ctf_cmd) => {
+                    use crate::ast::CTFCommand;
+                    match ctf_cmd {
+                        CTFCommand::NewSession { name } => {
+                            println!("[CTF] Creating new session: {}", name);
+                        }
+                        CTFCommand::AddChallenge {
+                            id: _,
+                            name,
+                            category,
+                            points,
+                        } => {
+                            println!(
+                                "[CTF] Adding challenge: {} ({}) - {} pts",
+                                name, category, points
+                            );
+                        }
+                        CTFCommand::SetConnection {
+                            challenge_id,
+                            host,
+                            port,
+                            protocol,
+                        } => {
+                            println!(
+                                "[CTF] Setting connection for {}: {}:{} ({})",
+                                challenge_id, host, port, protocol
+                            );
+                        }
+                        CTFCommand::AddNote { challenge_id, note } => {
+                            println!("[CTF] Note for {}: {}", challenge_id, note);
+                        }
+                        CTFCommand::SetStatus {
+                            challenge_id,
+                            status,
+                        } => {
+                            println!("[CTF] Status for {}: {}", challenge_id, status);
+                        }
+                        CTFCommand::SubmitFlag { challenge_id, flag } => {
+                            println!("[CTF] Submitting flag for {}: {}", challenge_id, flag);
+                        }
+                        CTFCommand::SaveSession { path } => {
+                            println!("[CTF] Saving session to: {}", path);
+                        }
+                        CTFCommand::LoadSession { path } => {
+                            println!("[CTF] Loading session from: {}", path);
+                        }
+                        CTFCommand::ShowStats => {
+                            println!("[CTF] Showing session statistics");
+                        }
+                        CTFCommand::ListChallenges => {
+                            println!("[CTF] Listing challenges");
+                        }
+                    }
+                }
+                Command::DiffFuzz(spec) => {
+                    use crate::diff_fuzzer::{DetectionMode, DifferentialFuzzer};
+
+                    println!("[DIFF-FUZZ] Initializing differential fuzzer");
+
+                    let mut fuzzer =
+                        DifferentialFuzzer::new(spec.target_old.clone(), spec.target_new.clone());
+
+                    fuzzer.load_corpus(&spec.corpus)?;
+
+                    if let Some(iterations) = spec.iterations {
+                        fuzzer.set_iterations(iterations);
+                    }
+
+                    if let Some(timeout) = spec.timeout_ms {
+                        fuzzer.set_timeout(timeout);
+                    }
+
+                    for mode_str in &spec.detect_modes {
+                        let mode = match mode_str.as_str() {
+                            "crashes_only_in_old" => DetectionMode::CrashesOnlyInOld,
+                            "crashes_only_in_new" => DetectionMode::CrashesOnlyInNew,
+                            "behavior_change" => DetectionMode::BehaviorChange,
+                            "output_divergence" => DetectionMode::OutputDivergence,
+                            "timing_divergence" => DetectionMode::TimingDivergence,
+                            "sanitizer_violations" => DetectionMode::SanitizerViolations,
+                            "return_code_change" => DetectionMode::ReturnCodeChange,
+                            _ => return Err(format!("Unknown detection mode: {}", mode_str)),
+                        };
+                        fuzzer.add_detection_mode(mode);
+                    }
+
+                    fuzzer.fuzz()?;
+
+                    if spec.auto_exploit {
+                        fuzzer.save_report("differential_fuzz_report.json")?;
+                    }
+                }
+                Command::TaintAnalysis(spec) => {
+                    use crate::advanced_fuzzer::{LeakType, TaintSink, TaintTracker};
+
+                    println!("[TAINT] Initializing taint analysis");
+                    println!("[TAINT]   Binary: {}", spec.binary);
+                    println!("[TAINT]   Source: {}", spec.source);
+
+                    let mut tracker = TaintTracker::new();
+
+                    for sink_str in &spec.track_to {
+                        let sink = match sink_str.as_str() {
                         "stdout" => TaintSink::Stdout,
                         "stderr" => TaintSink::Stderr,
                         s if s.starts_with("socket:") => {
@@ -701,11 +973,11 @@ fn interpret_with_scope<'a>(
                         }
                         _ => return Err(format!("[ERROR] Unknown sink: {}\n\nTIP: Valid sinks: stdout, stderr, socket:<addr>, file_write:<path>", sink_str)),
                     };
-                    tracker.add_sink(sink);
-                }
-                
-                for alert_str in &spec.alert_on {
-                    let alert = match alert_str.as_str() {
+                        tracker.add_sink(sink);
+                    }
+
+                    for alert_str in &spec.alert_on {
+                        let alert = match alert_str.as_str() {
                         "stack_address_leak" => LeakType::StackAddressLeak,
                         "heap_address_leak" => LeakType::HeapAddressLeak,
                         "canary_leak" => LeakType::CanaryLeak,
@@ -714,47 +986,58 @@ fn interpret_with_scope<'a>(
                         "generic_info_leak" => LeakType::GenericInfoLeak,
                         _ => return Err(format!("[ERROR] Unknown leak type: {}\n\nTIP: Valid types: stack_address_leak, heap_address_leak, canary_leak, pie_base_leak, libc_base_leak, generic_info_leak", alert_str)),
                     };
-                    tracker.add_alert_pattern(alert);
-                }
-                
-                let result = tracker.analyze_binary(&spec.binary)?;
-                
-                println!("\n[TAINT] ═══════════════════════════════════════════════════════════════");
-                println!("[TAINT] TAINT ANALYSIS SUMMARY");
-                println!("[TAINT] ═══════════════════════════════════════════════════════════════");
-                println!("[TAINT]   Binary: {}", result.binary);
-                println!("[TAINT]   Test Inputs: {}", result.total_inputs_tested);
-                println!("[TAINT]   Total Leaks: {}", result.leaks_detected.len());
-                println!("[TAINT]   Critical: {}", result.critical_count);
-                println!("[TAINT]   High: {}", result.high_count);
-                println!("[TAINT] ═══════════════════════════════════════════════════════════════");
-                
-                if !result.leaks_detected.is_empty() {
-                    println!("\n[TAINT] WARNING: LEAKS DETECTED:");
-                    for (i, leak) in result.leaks_detected.iter().take(5).enumerate() {
-                        println!("[TAINT]   {}. {:?} - Severity: {:?} (Exploitability: {:.0}%)", 
-                                 i + 1, leak.leak_type, leak.severity, leak.exploitability);
+                        tracker.add_alert_pattern(alert);
                     }
-                    if result.leaks_detected.len() > 5 {
-                        println!("[TAINT]   ... and {} more", result.leaks_detected.len() - 5);
+
+                    let result = tracker.analyze_binary(&spec.binary)?;
+
+                    println!(
+                        "\n[TAINT] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[TAINT] TAINT ANALYSIS SUMMARY");
+                    println!(
+                        "[TAINT] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[TAINT]   Binary: {}", result.binary);
+                    println!("[TAINT]   Test Inputs: {}", result.total_inputs_tested);
+                    println!("[TAINT]   Total Leaks: {}", result.leaks_detected.len());
+                    println!("[TAINT]   Critical: {}", result.critical_count);
+                    println!("[TAINT]   High: {}", result.high_count);
+                    println!(
+                        "[TAINT] ═══════════════════════════════════════════════════════════════"
+                    );
+
+                    if !result.leaks_detected.is_empty() {
+                        println!("\n[TAINT] WARNING: LEAKS DETECTED:");
+                        for (i, leak) in result.leaks_detected.iter().take(5).enumerate() {
+                            println!(
+                                "[TAINT]   {}. {:?} - Severity: {:?} (Exploitability: {:.0}%)",
+                                i + 1,
+                                leak.leak_type,
+                                leak.severity,
+                                leak.exploitability
+                            );
+                        }
+                        if result.leaks_detected.len() > 5 {
+                            println!("[TAINT]   ... and {} more", result.leaks_detected.len() - 5);
+                        }
+                        println!("\n[TAINT] Detailed reports saved as: taint_leak_*.txt");
                     }
-                    println!("\n[TAINT] Detailed reports saved as: taint_leak_*.txt");
                 }
-            }
-            Command::AutoROP(spec) => {
-                use crate::rop_tools::{AutoROPSolver, ROPGoal, Constraint, ROPStrategy};
-                
-                println!("[AUTO-ROP] Initializing automated ROP solver");
-                println!("[AUTO-ROP]   Binary: {}", spec.binary);
-                
-                let mut solver = AutoROPSolver::new(&spec.binary)?;
-                
-                if let Some(libc_path) = &spec.libc_path {
-                    solver.set_libc(libc_path, spec.libc_base)?;
-                }
-                
-                for constraint_str in &spec.constraints {
-                    let constraint = match constraint_str.as_str() {
+                Command::AutoROP(spec) => {
+                    use crate::rop_tools::{AutoROPSolver, Constraint, ROPGoal, ROPStrategy};
+
+                    println!("[AUTO-ROP] Initializing automated ROP solver");
+                    println!("[AUTO-ROP]   Binary: {}", spec.binary);
+
+                    let mut solver = AutoROPSolver::new(&spec.binary)?;
+
+                    if let Some(libc_path) = &spec.libc_path {
+                        solver.set_libc(libc_path, spec.libc_base)?;
+                    }
+
+                    for constraint_str in &spec.constraints {
+                        let constraint = match constraint_str.as_str() {
                         "no_nulls" => Constraint::NoNullBytes,
                         "alphanumeric" => Constraint::AlphanumericOnly,
                         s if s.starts_with("max_length:") => {
@@ -768,26 +1051,32 @@ fn interpret_with_scope<'a>(
                         }
                         _ => return Err(format!("[ERROR] Unknown constraint: {}\n\nTIP: Valid constraints: no_nulls, alphanumeric, max_length:<n>, preserve_<reg>", constraint_str)),
                     };
-                    solver.add_constraint(constraint);
-                }
-                
-                let goal = if spec.goal.starts_with("system(") {
-                    let cmd = spec.goal.strip_prefix("system(").and_then(|s| s.strip_suffix(")"))
-                        .unwrap_or("/bin/sh");
-                    ROPGoal::System(cmd.trim_matches('"').to_string())
-                } else if spec.goal.starts_with("execve(") {
-                    let cmd = spec.goal.strip_prefix("execve(").and_then(|s| s.strip_suffix(")"))
-                        .unwrap_or("/bin/sh");
-                    ROPGoal::Execve(cmd.trim_matches('"').to_string(), vec![])
-                } else if spec.goal.starts_with("mprotect_rwx") {
-                    ROPGoal::Mprotect(0x600000, 0x1000, 7)
-                } else {
-                    ROPGoal::Custom(spec.goal.clone())
-                };
-                
-                let mut strategies = Vec::new();
-                for pref in &spec.prefer {
-                    let strategy = match pref.as_str() {
+                        solver.add_constraint(constraint);
+                    }
+
+                    let goal = if spec.goal.starts_with("system(") {
+                        let cmd = spec
+                            .goal
+                            .strip_prefix("system(")
+                            .and_then(|s| s.strip_suffix(")"))
+                            .unwrap_or("/bin/sh");
+                        ROPGoal::System(cmd.trim_matches('"').to_string())
+                    } else if spec.goal.starts_with("execve(") {
+                        let cmd = spec
+                            .goal
+                            .strip_prefix("execve(")
+                            .and_then(|s| s.strip_suffix(")"))
+                            .unwrap_or("/bin/sh");
+                        ROPGoal::Execve(cmd.trim_matches('"').to_string(), vec![])
+                    } else if spec.goal.starts_with("mprotect_rwx") {
+                        ROPGoal::Mprotect(0x600000, 0x1000, 7)
+                    } else {
+                        ROPGoal::Custom(spec.goal.clone())
+                    };
+
+                    let mut strategies = Vec::new();
+                    for pref in &spec.prefer {
+                        let strategy = match pref.as_str() {
                         "one_gadget" => ROPStrategy::OneGadget,
                         "ret2libc" => ROPStrategy::Ret2Libc,
                         "mprotect_rwx" => ROPStrategy::MprotectRWX,
@@ -798,60 +1087,76 @@ fn interpret_with_scope<'a>(
                         "stack_pivot" => ROPStrategy::StackPivot,
                         _ => return Err(format!("[ERROR] Unknown strategy: {}\n\nTIP: Valid strategies: one_gadget, ret2libc, mprotect_rwx, ret2syscall, srop, jop, cop, stack_pivot", pref)),
                     };
-                    strategies.push(strategy);
+                        strategies.push(strategy);
+                    }
+
+                    let solution = solver.solve(goal, strategies)?;
+
+                    println!("\n[AUTO-ROP] ═══════════════════════════════════════════════════════════════");
+                    println!("[AUTO-ROP] ROP CHAIN SOLUTION");
+                    println!("[AUTO-ROP] ═══════════════════════════════════════════════════════════════");
+                    println!("[AUTO-ROP]   Strategy: {}", solution.strategy);
+                    println!(
+                        "[AUTO-ROP]   Chain length: {} gadgets",
+                        solution.gadgets_used.len()
+                    );
+                    println!(
+                        "[AUTO-ROP]   Payload size: {} bytes",
+                        solution.chain_bytes.len()
+                    );
+                    println!(
+                        "[AUTO-ROP]   Success probability: {:.1}%",
+                        solution.success_probability * 100.0
+                    );
+                    println!("[AUTO-ROP]   Description: {}", solution.payload_description);
+                    println!("[AUTO-ROP] ═══════════════════════════════════════════════════════════════");
+
+                    println!("\n[AUTO-ROP] GADGETS USED:");
+                    for (i, gadget) in solution.gadgets_used.iter().enumerate() {
+                        println!(
+                            "[AUTO-ROP]   {}. 0x{:016x} - {}",
+                            i + 1,
+                            gadget.address,
+                            gadget.purpose
+                        );
+                        println!("[AUTO-ROP]      {}", gadget.instructions.join("; "));
+                    }
+
+                    println!("\n[AUTO-ROP] ROP CHAIN:");
+                    for (i, addr) in solution.chain.iter().enumerate() {
+                        println!("[AUTO-ROP]   [{}] 0x{:016x}", i, addr);
+                    }
+
+                    let output_file = "rop_solution.json";
+                    solver.save_solution(&solution, output_file)?;
+                    println!("\n[AUTO-ROP] Full solution saved to: {}", output_file);
+
+                    let payload_file = "rop_payload.bin";
+                    std::fs::write(payload_file, &solution.chain_bytes)
+                        .map_err(|e| format!("Failed to write payload: {}", e))?;
+                    println!("[AUTO-ROP] Binary payload saved to: {}", payload_file);
                 }
-                
-                let solution = solver.solve(goal, strategies)?;
-                
-                println!("\n[AUTO-ROP] ═══════════════════════════════════════════════════════════════");
-                println!("[AUTO-ROP] ROP CHAIN SOLUTION");
-                println!("[AUTO-ROP] ═══════════════════════════════════════════════════════════════");
-                println!("[AUTO-ROP]   Strategy: {}", solution.strategy);
-                println!("[AUTO-ROP]   Chain length: {} gadgets", solution.gadgets_used.len());
-                println!("[AUTO-ROP]   Payload size: {} bytes", solution.chain_bytes.len());
-                println!("[AUTO-ROP]   Success probability: {:.1}%", solution.success_probability * 100.0);
-                println!("[AUTO-ROP]   Description: {}", solution.payload_description);
-                println!("[AUTO-ROP] ═══════════════════════════════════════════════════════════════");
-                
-                println!("\n[AUTO-ROP] GADGETS USED:");
-                for (i, gadget) in solution.gadgets_used.iter().enumerate() {
-                    println!("[AUTO-ROP]   {}. 0x{:016x} - {}", i + 1, gadget.address, gadget.purpose);
-                    println!("[AUTO-ROP]      {}", gadget.instructions.join("; "));
-                }
-                
-                println!("\n[AUTO-ROP] ROP CHAIN:");
-                for (i, addr) in solution.chain.iter().enumerate() {
-                    println!("[AUTO-ROP]   [{}] 0x{:016x}", i, addr);
-                }
-                
-                let output_file = "rop_solution.json";
-                solver.save_solution(&solution, output_file)?;
-                println!("\n[AUTO-ROP] Full solution saved to: {}", output_file);
-                
-                let payload_file = "rop_payload.bin";
-                std::fs::write(payload_file, &solution.chain_bytes)
-                    .map_err(|e| format!("Failed to write payload: {}", e))?;
-                println!("[AUTO-ROP] Binary payload saved to: {}", payload_file);
-            }
-            Command::HeapExploit(spec) => {
-                use crate::heap_tools::{ModernHeapExploit, GlibcVersion, HeapTechnique, HeapTarget};
-                
-                println!("[HEAP] Initializing modern heap exploit framework");
-                println!("[HEAP]   Binary: {}", spec.binary);
-                println!("[HEAP]   Glibc version: {}", spec.glibc_version);
-                
-                let glibc_version = GlibcVersion::from_string(&spec.glibc_version)?;
-                let mut exploit = ModernHeapExploit::new(&spec.binary, glibc_version);
-                
-                if let Some(heap_base) = spec.heap_base {
-                    exploit.set_heap_base(heap_base);
-                }
-                
-                if let Some(libc_base) = spec.libc_base {
-                    exploit.set_libc_base(libc_base);
-                }
-                
-                let technique = match spec.technique.as_str() {
+                Command::HeapExploit(spec) => {
+                    use crate::heap_tools::{
+                        GlibcVersion, HeapTarget, HeapTechnique, ModernHeapExploit,
+                    };
+
+                    println!("[HEAP] Initializing modern heap exploit framework");
+                    println!("[HEAP]   Binary: {}", spec.binary);
+                    println!("[HEAP]   Glibc version: {}", spec.glibc_version);
+
+                    let glibc_version = GlibcVersion::from_string(&spec.glibc_version)?;
+                    let mut exploit = ModernHeapExploit::new(&spec.binary, glibc_version);
+
+                    if let Some(heap_base) = spec.heap_base {
+                        exploit.set_heap_base(heap_base);
+                    }
+
+                    if let Some(libc_base) = spec.libc_base {
+                        exploit.set_libc_base(libc_base);
+                    }
+
+                    let technique = match spec.technique.as_str() {
                     "tcache_poisoning" => {
                         if let Some(bypass) = &spec.bypass {
                             match bypass.as_str() {
@@ -873,9 +1178,9 @@ fn interpret_with_scope<'a>(
                     "house_of_orange" => HeapTechnique::HouseOfOrange,
                     _ => return Err(format!("[ERROR] Unknown technique: {}\n\nTIP: Valid techniques: tcache_poisoning, fastbin_attack, unsorted_bin_attack, largebin_attack, house_of_force, house_of_spirit, house_of_io, house_of_apple, house_of_orange", spec.technique)),
                 };
-                exploit.set_technique(technique);
-                
-                let target = match spec.target.to_lowercase().as_str() {
+                    exploit.set_technique(technique);
+
+                    let target = match spec.target.to_lowercase().as_str() {
                     "__malloc_hook" | "malloc_hook" => HeapTarget::MallocHook,
                     "__free_hook" | "free_hook" => HeapTarget::FreeHook,
                     "__realloc_hook" | "realloc_hook" => HeapTarget::ReallocHook,
@@ -887,701 +1192,1012 @@ fn interpret_with_scope<'a>(
                     }
                     _ => return Err(format!("[ERROR] Unknown target: {}\n\nTIP: Valid targets: __malloc_hook, __free_hook, __realloc_hook, _io_list_all, or hex address (0x...)", spec.target)),
                 };
-                exploit.set_target(target);
-                
-                let overwrite_value = if spec.overwrite_with.to_lowercase() == "system" {
-                    exploit.libc_base.ok_or("Libc base required for 'system' target")? + 0x50d60
-                } else if spec.overwrite_with.starts_with("0x") {
-                    u64::from_str_radix(spec.overwrite_with.strip_prefix("0x").unwrap(), 16)
-                        .map_err(|_| format!("[ERROR] Invalid hex value: {}", spec.overwrite_with))?
-                } else {
-                    return Err(format!("[ERROR] Unknown overwrite value: {}\n\nTIP: Valid values: system, or hex address (0x...)", spec.overwrite_with));
-                };
-                exploit.set_overwrite_value(overwrite_value);
-                
-                let result = exploit.solve()?;
-                
-                println!("\n[HEAP] ═══════════════════════════════════════════════════════════════");
-                println!("[HEAP] HEAP EXPLOIT SOLUTION");
-                println!("[HEAP] ═══════════════════════════════════════════════════════════════");
-                println!("[HEAP]   Technique: {}", result.technique);
-                println!("[HEAP]   Glibc version: {}", result.glibc_version);
-                println!("[HEAP]   Target: 0x{:016x}", result.target_address);
-                println!("[HEAP]   Overwrite with: 0x{:016x}", result.overwrite_value);
-                println!("[HEAP]   Payload size: {} bytes", result.payload_size);
-                println!("[HEAP]   Success probability: {:.1}%", result.success_probability * 100.0);
-                println!("[HEAP] ═══════════════════════════════════════════════════════════════");
-                
-                println!("\n[HEAP] EXPLOITATION STEPS:");
-                for step in &result.steps {
-                    println!("[HEAP]   {}", step);
-                }
-                
-                if !result.constraints.is_empty() {
-                    println!("\n[HEAP] WARNING: CONSTRAINTS:");
-                    for constraint in &result.constraints {
-                        println!("[HEAP]   - {}", constraint);
-                    }
-                }
-                
-                let output_file = "heap_exploit.json";
-                exploit.save_results(&result, output_file)?;
-                
-                println!("\n[HEAP] Full solution saved to: {}", output_file);
-                println!("[HEAP] Binary payload saved to: heap_exploit_payload.bin");
-            }
-            
-            Command::KernelExploit(spec) => {
-                use crate::kernel_exploiter::KernelExploiter;
-                
-                println!("[KERNEL] Initializing automated kernel exploitation");
-                println!("[KERNEL] ═══════════════════════════════════════════════════════════════");
-                
-                let mut exploiter = KernelExploiter::new();
-                
-                let result = if spec.auto_detect {
-                    println!("[KERNEL] Auto-detection mode enabled");
-                    exploiter.generate_automated_exploit()?
-                } else {
-                    println!("[KERNEL] Manual mode");
-                    
-                    let kernel_info = exploiter.gather_kernel_info()?;
-                    
-                    let mut bypass_chains = Vec::new();
-                    let mut exploit_steps = Vec::new();
-                    let mut payload = Vec::new();
-                    let success_prob = 85.0;
-                    
-                    if spec.bypass_kaslr {
-                        println!("[KERNEL] Bypassing KASLR...");
-                        exploit_steps.push("Bypass KASLR via /proc/kallsyms".to_string());
-                        if let Ok(kbase) = exploiter.bypass_kaslr() {
-                            use crate::kernel_exploiter::BypassChain;
-                            bypass_chains.push(BypassChain {
-                                protection: "KASLR".to_string(),
-                                technique: "kallsyms leak".to_string(),
-                                gadgets: vec![kbase],
-                                description: format!("Leaked kernel base: 0x{:016x}", kbase),
-                            });
-                        }
-                    }
-                    
-                    if spec.bypass_smep || spec.bypass_smap {
-                        println!("[KERNEL] Bypassing SMEP/SMAP...");
-                        exploit_steps.push("Bypass SMEP/SMAP via CR4 register flip".to_string());
-                        if let Ok(smep_payload) = exploiter.bypass_smep_smap("cr4_flip") {
-                            use crate::kernel_exploiter::BypassChain;
-                            bypass_chains.push(BypassChain {
-                                protection: "SMEP/SMAP".to_string(),
-                                technique: "CR4 flip".to_string(),
-                                gadgets: vec![],
-                                description: "Disable SMEP/SMAP via CR4 register modification".to_string(),
-                            });
-                            payload.extend_from_slice(&smep_payload);
-                        }
-                    }
-                    
-                    exploit_steps.push("Build privilege escalation chain".to_string());
-                    let _ = exploiter.escalate_privileges("commit_creds");
-                    exploit_steps.push("  → commit_creds(prepare_kernel_cred(NULL))".to_string());
-                    
-                    if spec.disable_selinux {
-                        println!("[KERNEL] 🔓 Disabling SELinux...");
-                        exploit_steps.push("Disable SELinux enforcement".to_string());
-                        let _ = exploiter.disable_selinux();
-                    }
-                    
-                    if spec.container_escape {
-                        let in_container = exploiter.detect_container_environment().unwrap_or(false);
-                        if in_container {
-                            let escape_vectors = exploiter.check_container_escape_vectors();
-                            exploit_steps.push("Container escape vectors:".to_string());
-                            for vector in &escape_vectors {
-                                exploit_steps.push(format!("  → {}", vector));
-                            }
-                        }
-                    }
-                    
-                    exploit_steps.push("Spawn root shell".to_string());
-                    
-                    use crate::kernel_exploiter::KernelExploitResult;
-                    KernelExploitResult {
-                        vuln_detected: if let Some(cve) = &spec.target_cve {
-                            vec![cve.clone()]
-                        } else {
-                            Vec::new()
-                        },
-                        kernel_version: kernel_info.version.clone(),
-                        protections: {
-                            let mut prots = Vec::new();
-                            if kernel_info.protections.kaslr { prots.push("KASLR".to_string()); }
-                            if kernel_info.protections.smep { prots.push("SMEP".to_string()); }
-                            if kernel_info.protections.smap { prots.push("SMAP".to_string()); }
-                            if kernel_info.protections.kpti { prots.push("KPTI".to_string()); }
-                            prots
-                        },
-                        bypass_chains,
-                        exploit_steps,
-                        payload_bytes: payload,
-                        success_probability: success_prob,
-                        container_escape: spec.container_escape,
-                    }
-                };
-                
-                println!("\n[KERNEL] ═══════════════════════════════════════════════════════════════");
-                println!("[KERNEL] KERNEL EXPLOIT AUTOMATION RESULT");
-                println!("[KERNEL] ═══════════════════════════════════════════════════════════════");
-                println!("[KERNEL]   Kernel Version: {}", result.kernel_version);
-                println!("[KERNEL]   Vulnerabilities: {}", result.vuln_detected.join(", "));
-                println!("[KERNEL]   Active Protections: {}", result.protections.join(", "));
-                println!("[KERNEL]   Container Environment: {}", if result.container_escape { "Yes" } else { "No" });
-                println!("[KERNEL]   Success Probability: {:.1}%", result.success_probability);
-                println!("[KERNEL] ═══════════════════════════════════════════════════════════════");
-                
-                println!("\n[KERNEL] EXPLOITATION STEPS:");
-                for step in &result.exploit_steps {
-                    println!("[KERNEL]   {}", step);
-                }
-                
-                if !result.bypass_chains.is_empty() {
-                    println!("\n[KERNEL] BYPASS CHAINS:");
-                    for chain in &result.bypass_chains {
-                        println!("[KERNEL]   {} → {}", chain.protection, chain.technique);
-                        println!("[KERNEL]     {}", chain.description);
-                    }
-                }
-                
-                let output_file = "kernel_exploit.json";
-                exploiter.save_exploit_result(&result, output_file)?;
-                
-                println!("\n[KERNEL] Full solution saved to: {}", output_file);
-                if !result.payload_bytes.is_empty() {
-                    println!("[KERNEL] Binary payload saved to: kernel_exploit_payload.bin");
-                }
-            }
-            
-            Command::CVEScan(spec) => {
-                use crate::cve_scanner::CVEScanner;
-                
-                println!("[CVE] Initializing CVE Scanner & Impact Assessment");
-                println!("[CVE] ═══════════════════════════════════════════════════════════════");
-                
-                let scanner = CVEScanner::new();
-                
-                let result = scanner.scan_target(
-                    &spec.target,
-                    &spec.cve_list,
-                    spec.suggest_exploit,
-                    spec.generate_poc,
-                )?;
-                
-                println!("\n[CVE] ═══════════════════════════════════════════════════════════════");
-                println!("[CVE] VULNERABILITY ASSESSMENT");
-                println!("[CVE] ═══════════════════════════════════════════════════════════════");
-                
-                for vuln in &result.vulnerabilities_found {
-                    if vuln.is_vulnerable {
-                        println!("[CVE] WARNING: {} - VULNERABLE", vuln.cve_id);
-                        println!("[CVE]     Confidence: {:.1}%", vuln.confidence);
-                        
-                        if let Some(ref version) = vuln.detected_version {
-                            println!("[CVE]     Detected Version: {}", version);
-                        }
-                        
-                        println!("[CVE]     Evidence:");
-                        for evidence in &vuln.evidence {
-                            println!("[CVE]       - {}", evidence);
-                        }
-                        
-                        if let Some(ref exploit) = vuln.suggested_exploit {
-                            println!("[CVE]     Suggested Exploit: {}", exploit);
-                        }
-                        
-                        if vuln.poc_generated {
-                            println!("[CVE]     [OK] PoC generated: poc_{}.py", vuln.cve_id.replace("-", "_").to_lowercase());
-                        }
+                    exploit.set_target(target);
+
+                    let overwrite_value = if spec.overwrite_with.to_lowercase() == "system" {
+                        exploit
+                            .libc_base
+                            .ok_or("Libc base required for 'system' target")?
+                            + 0x50d60
+                    } else if spec.overwrite_with.starts_with("0x") {
+                        u64::from_str_radix(spec.overwrite_with.strip_prefix("0x").unwrap(), 16)
+                            .map_err(|_| {
+                                format!("[ERROR] Invalid hex value: {}", spec.overwrite_with)
+                            })?
                     } else {
-                        println!("[CVE] [OK] {} - NOT VULNERABLE (confidence: {:.1}%)", vuln.cve_id, vuln.confidence);
+                        return Err(format!("[ERROR] Unknown overwrite value: {}\n\nTIP: Valid values: system, or hex address (0x...)", spec.overwrite_with));
+                    };
+                    exploit.set_overwrite_value(overwrite_value);
+
+                    let result = exploit.solve()?;
+
+                    println!(
+                        "\n[HEAP] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[HEAP] HEAP EXPLOIT SOLUTION");
+                    println!(
+                        "[HEAP] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[HEAP]   Technique: {}", result.technique);
+                    println!("[HEAP]   Glibc version: {}", result.glibc_version);
+                    println!("[HEAP]   Target: 0x{:016x}", result.target_address);
+                    println!("[HEAP]   Overwrite with: 0x{:016x}", result.overwrite_value);
+                    println!("[HEAP]   Payload size: {} bytes", result.payload_size);
+                    println!(
+                        "[HEAP]   Success probability: {:.1}%",
+                        result.success_probability * 100.0
+                    );
+                    println!(
+                        "[HEAP] ═══════════════════════════════════════════════════════════════"
+                    );
+
+                    println!("\n[HEAP] EXPLOITATION STEPS:");
+                    for step in &result.steps {
+                        println!("[HEAP]   {}", step);
                     }
-                    println!();
-                }
-                
-                println!("[CVE] ═══════════════════════════════════════════════════════════════");
-                println!("[CVE] RISK ASSESSMENT");
-                println!("[CVE] ═══════════════════════════════════════════════════════════════");
-                println!("[CVE]   Risk Score: {:.1}/10.0", result.risk_score);
-                println!("[CVE]   Vulnerable: {}/{}", result.vulnerable_count, result.total_cves_checked);
-                println!("[CVE]   Exploitable: {}", result.exploitable_count);
-                println!("[CVE] ═══════════════════════════════════════════════════════════════");
-                
-                if !result.recommendations.is_empty() {
-                    println!("\n[CVE] RECOMMENDATIONS:");
-                    for rec in &result.recommendations {
-                        println!("[CVE]   • {}", rec);
-                    }
-                }
-                
-                let output_file = "cve_scan_results.json";
-                scanner.save_scan_result(&result, output_file)?;
-                
-                println!("\n[CVE] Full scan results saved to: {}", output_file);
-            }
-            
-            Command::BinarySimilarity(spec) => {
-                use crate::binary_similarity::SimilarityEngine;
-                
-                println!("[SIMILARITY] Initializing Binary Similarity Analysis Engine");
-                println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
-                
-                let mut engine = SimilarityEngine::new();
-                
-                let result = engine.analyze_similarity(
-                    &spec.reference,
-                    &spec.search_in,
-                    spec.threshold,
-                    &spec.output,
-                )?;
-                
-                println!("\n[SIMILARITY] ═══════════════════════════════════════════════════════════════");
-                println!("[SIMILARITY] ANALYSIS SUMMARY");
-                println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
-                println!("[SIMILARITY]   Reference Binary: {}", result.reference_binary);
-                println!("[SIMILARITY]   Binaries Searched: {}", result.searched_binaries.len());
-                println!("[SIMILARITY]   Functions Analyzed: {}", result.total_functions_analyzed);
-                println!("[SIMILARITY]   Matches Found: {}", result.matches_found);
-                println!("[SIMILARITY]   High Confidence: {}", result.high_confidence_matches);
-                println!("[SIMILARITY]   Vulnerable Patterns: {}", result.vulnerable_patterns);
-                println!("[SIMILARITY]   Vendor Reuse: {}", result.vendor_reuse_detected);
-                println!("[SIMILARITY]   Analysis Time: {}ms", result.analysis_time_ms);
-                println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
-                
-                if !result.matches.is_empty() {
-                    println!("\n[SIMILARITY] TOP MATCHES (sorted by similarity):");
-                    println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
-                    
-                    for (idx, match_item) in result.matches.iter().take(10).enumerate() {
-                        println!("\n[SIMILARITY] Match #{}: ", idx + 1);
-                        println!("[SIMILARITY]   Reference: {}", match_item.reference_function);
-                        println!("[SIMILARITY]   Matched: {} ({})", match_item.matched_function, match_item.matched_binary);
-                        println!("[SIMILARITY]   Similarity: {:.1}%", match_item.similarity_score * 100.0);
-                        println!("[SIMILARITY]   Confidence: {:.1}%", match_item.confidence * 100.0);
-                        println!("[SIMILARITY]   Type: {:?}", match_item.match_type);
-                        
-                        if !match_item.vulnerable_indicators.is_empty() {
-                            println!("[SIMILARITY]   WARNING: VULNERABLE PATTERNS DETECTED:");
-                            for indicator in &match_item.vulnerable_indicators {
-                                println!("[SIMILARITY]     • {}", indicator);
-                            }
-                        }
-                        
-                        if idx < 3 {
-                            println!("[SIMILARITY]   Evidence:");
-                            for evidence in &match_item.evidence {
-                                println!("[SIMILARITY]     • {}", evidence);
-                            }
+
+                    if !result.constraints.is_empty() {
+                        println!("\n[HEAP] WARNING: CONSTRAINTS:");
+                        for constraint in &result.constraints {
+                            println!("[HEAP]   - {}", constraint);
                         }
                     }
-                    
-                    if result.matches.len() > 10 {
-                        println!("\n[SIMILARITY] ... and {} more matches", result.matches.len() - 10);
-                    }
+
+                    let output_file = "heap_exploit.json";
+                    exploit.save_results(&result, output_file)?;
+
+                    println!("\n[HEAP] Full solution saved to: {}", output_file);
+                    println!("[HEAP] Binary payload saved to: heap_exploit_payload.bin");
                 }
-                
-                if result.vulnerable_patterns > 0 {
-                    println!("\n[SIMILARITY] WARNING: SECURITY ALERT:");
-                    println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
-                    println!("[SIMILARITY] Found {} functions matching known vulnerable patterns!", result.vulnerable_patterns);
-                    println!("[SIMILARITY] Review similarity_results.json for detailed analysis");
-                    println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
-                }
-                
-                if result.vendor_reuse_detected > 0 {
-                    println!("\n[SIMILARITY] Vendor Code Reuse Detected:");
-                    println!("[SIMILARITY]   {} functions match known vendor signatures", result.vendor_reuse_detected);
-                }
-                
-                println!("\n[SIMILARITY] Full results saved to: similarity_results.json");
-            }
-            
-            Command::ChainConnect { host, port, timeout } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    ExploitChain::new()
-                };
-                
-                chain.connect(host, *port, timeout.unwrap_or(5))?;
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainSend { data } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let payload = eval_expr(data, variables.clone(), functions.clone(), macros.clone()).await?;
-                let payload_bytes = match payload {
-                    Value::Bytes(b) => b,
-                    Value::String(s) => s.into_bytes(),
-                    _ => return Err("Payload must be bytes or string".to_string()),
-                };
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    return Err("No active exploit chain. Use connect_to first.".to_string());
-                };
-                
-                chain.send(&payload_bytes)?;
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainReceive { size } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    return Err("No active exploit chain. Use connect_to first.".to_string());
-                };
-                
-                let data = chain.receive(*size)?;
-                
-                let text = String::from_utf8_lossy(&data);
-                let flags = FlagFinder::find_in_text(&text);
-                if !flags.is_empty() {
-                    println!("[AUTO-FLAG] Detected {} flag(s) in received data", flags.len());
-                    variables.write().await.insert("auto_flags".to_string(), Value::List(
-                        flags.iter().map(|f| Value::String(f.clone())).collect()
-                    ));
-                }
-                
-                variables.write().await.insert("received_data".to_string(), Value::Bytes(data));
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainReceiveUntil { delimiter, max_size } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    return Err("No active exploit chain. Use connect_to first.".to_string());
-                };
-                
-                let data = chain.receive_until(delimiter.as_bytes(), *max_size)?;
-                
-                let text = String::from_utf8_lossy(&data);
-                let flags = FlagFinder::find_in_text(&text);
-                if !flags.is_empty() {
-                    println!("[AUTO-FLAG] Detected {} flag(s) in received data", flags.len());
-                    variables.write().await.insert("auto_flags".to_string(), Value::List(
-                        flags.iter().map(|f| Value::String(f.clone())).collect()
-                    ));
-                }
-                
-                variables.write().await.insert("received_data".to_string(), Value::Bytes(data));
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainExploitLeak { stage_name, payload, offset, size } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let payload_val = eval_expr(payload, variables.clone(), functions.clone(), macros.clone()).await?;
-                let payload_bytes = match payload_val {
-                    Value::Bytes(b) => b,
-                    Value::String(s) => s.into_bytes(),
-                    _ => return Err("Payload must be bytes or string".to_string()),
-                };
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    return Err("No active exploit chain. Use connect_to first.".to_string());
-                };
-                
-                let leak_result = chain.exploit_leak(stage_name, &payload_bytes, *offset, *size)?;
-                variables.write().await.insert("leaked_value".to_string(), Value::Number(leak_result.leaked_value as i64));
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainCalculateBase { leaked_addr, offset, name } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let leaked = eval_expr(leaked_addr, variables.clone(), functions.clone(), macros.clone()).await?;
-                let leaked_value = match leaked {
-                    Value::Number(n) => n as u64,
-                    _ => return Err("Leaked address must be a number".to_string()),
-                };
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    ExploitChain::new()
-                };
-                
-                let base = chain.calculate_base(leaked_value, *offset, name);
-                variables.write().await.insert(name.clone(), Value::Number(base as i64));
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainBruteforceASLR { attempts, payload, offset } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let payload_val = eval_expr(payload, variables.clone(), functions.clone(), macros.clone()).await?;
-                let payload_bytes = match payload_val {
-                    Value::Bytes(b) => b,
-                    Value::String(s) => s.into_bytes(),
-                    _ => return Err("Payload must be bytes or string".to_string()),
-                };
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    return Err("No active exploit chain. Use connect_to first.".to_string());
-                };
-                
-                let leaked = chain.bruteforce_aslr(*attempts, &payload_bytes, *offset)?;
-                variables.write().await.insert("leaked_value".to_string(), Value::Number(leaked as i64));
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainInteractive => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let chain_key = "exploit_chain";
-                let mut chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    return Err("No active exploit chain. Use connect_to first.".to_string());
-                };
-                
-                chain.interactive()?;
-                
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainSaveState { path } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let chain_key = "exploit_chain";
-                let chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    ExploitChain::new()
-                };
-                
-                chain.save_state(path)?;
-            }
-            
-            Command::ChainLoadState { path } => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let mut chain = ExploitChain::new();
-                chain.load_state(path)?;
-                
-                let chain_key = "exploit_chain";
-                let state_json = serde_json::to_string(&chain).unwrap_or_default();
-                variables.write().await.insert(chain_key.to_string(), Value::String(state_json));
-            }
-            
-            Command::ChainPrintSummary => {
-                use crate::exploit_chaining::ExploitChain;
-                
-                let chain_key = "exploit_chain";
-                let chain = if let Some(Value::String(state_json)) = variables.read().await.get(chain_key) {
-                    serde_json::from_str::<ExploitChain>(state_json).unwrap_or_else(|_| ExploitChain::new())
-                } else {
-                    ExploitChain::new()
-                };
-                
-                chain.print_summary();
-            }
-            
-            Command::SetTimeout { milliseconds } => {
-                let mut config = safety.read().await.get_stats().config;
-                config.max_execution_time_ms = *milliseconds;
-                safety.write().await.update_config(config);
-                println!("[SAFETY] Execution timeout set to {}ms", milliseconds);
-            }
-            
-            Command::SetMemoryLimit { megabytes } => {
-                let mut config = safety.read().await.get_stats().config;
-                config.max_memory_bytes = (*megabytes as u64) * 1024 * 1024;
-                safety.write().await.update_config(config);
-                println!("[SAFETY] Memory limit set to {}MB", megabytes);
-            }
-            
-            Command::SetRecursionLimit { max_depth } => {
-                let mut config = safety.read().await.get_stats().config;
-                config.max_recursion_depth = *max_depth;
-                safety.write().await.update_config(config);
-                println!("[SAFETY] Recursion limit set to {}", max_depth);
-            }
-            
-            Command::EnableStrictMode => {
-                let mut config = safety.read().await.get_stats().config;
-                config.strict_mode = true;
-                config.type_checking = true;
-                config.bounds_checking = true;
-                config.overflow_checking = true;
-                safety.write().await.update_config(config);
-                println!("[SAFETY] Strict mode ENABLED - All safety checks active");
-            }
-            
-            Command::DisableStrictMode => {
-                let mut config = safety.read().await.get_stats().config;
-                config.strict_mode = false;
-                safety.write().await.update_config(config);
-                println!("[SAFETY] Strict mode DISABLED - Safety checks relaxed");
-            }
-            
-            Command::GetSafetyStats => {
-                let stats = safety.read().await.get_stats();
-                println!("{}", stats);
-            }
-            
-            Command::ResetSafety => {
-                *safety.write().await = RuntimeSafety::new(SafetyConfig::default());
-                println!("[SAFETY] Safety system reset to defaults");
-            }
-            
-            Command::ParallelExploit { targets, payload } => {
-                use crate::parallel_exploit::exploit_parallel;
-                
-                let payload_value = eval_expr(payload, variables.clone(), functions.clone(), macros.clone()).await?;
-                let payload_bytes = match payload_value {
-                    Value::Bytes(b) => b,
-                    Value::String(s) => s.as_bytes().to_vec(),
-                    _ => return Err("Parallel exploit requires bytes or string payload".to_string()),
-                };
-                
-                let results = exploit_parallel(targets.clone(), payload_bytes).await
-                    .map_err(|e| format!("Parallel exploitation failed: {}", e))?;
-                
-                let success_count = results.iter().filter(|r| r.success).count();
-                println!("[PARALLEL] Successfully exploited {}/{} targets", success_count, targets.len());
-            }
-            
-            Command::GenerateExploitAI { binary, vuln_type, arch } => {
-                use crate::ai_exploit_gen::{generate_exploit_ai, AIConfig};
-                use colored::*;
-                
-                println!("{} Generating exploit for {}", "[AI]".to_string().cyan(), binary.to_string().yellow());
-                println!("{} Vulnerability: {}", "  ".to_string().bright_black(), vuln_type.to_string().green());
-                println!("{} Architecture: {}\n", "  ".to_string().bright_black(), arch.to_string().cyan());
-                
-                let config = AIConfig::default();
-                match generate_exploit_ai(binary, vuln_type, arch, Some(config)) {
-                    Ok(response) => {
-                        if response.success {
-                            println!("{} {}", "[OK]".green(), "Exploit generated successfully".green().bold());
-                            println!("\n{}", "═".repeat(60).cyan());
-                            println!("{}", "GENERATED EXPLOIT CODE".cyan().bold());
-                            println!("{}\n", "═".repeat(60).cyan());
-                            println!("{}", response.exploit_code);
-                            println!("\n{}", "═".repeat(60).cyan());
-                            println!("{}", "EXPLANATION".yellow().bold());
-                            println!("{}\n", "═".repeat(60).cyan());
-                            println!("{}\n", response.explanation);
-                            
-                            if !response.warnings.is_empty() {
-                                println!("{}", "WARNINGS".red().bold());
-                                println!("{}", "═".repeat(60).bright_black());
-                                for warning in response.warnings {
-                                    println!("{} {}", "WARNING:".to_string().yellow(), warning.to_string().yellow());
+
+                Command::KernelExploit(spec) => {
+                    use crate::kernel_exploiter::KernelExploiter;
+
+                    println!("[KERNEL] Initializing automated kernel exploitation");
+                    println!(
+                        "[KERNEL] ═══════════════════════════════════════════════════════════════"
+                    );
+
+                    let mut exploiter = KernelExploiter::new();
+
+                    let result = if spec.auto_detect {
+                        println!("[KERNEL] Auto-detection mode enabled");
+                        exploiter.generate_automated_exploit()?
+                    } else {
+                        println!("[KERNEL] Manual mode");
+
+                        let kernel_info = exploiter.gather_kernel_info()?;
+
+                        let mut bypass_chains = Vec::new();
+                        let mut exploit_steps = Vec::new();
+                        let mut payload = Vec::new();
+                        let success_prob = 85.0;
+
+                        if spec.bypass_kaslr {
+                            println!("[KERNEL] Bypassing KASLR...");
+                            exploit_steps.push("Bypass KASLR via /proc/kallsyms".to_string());
+                            if let Ok(kbase) = exploiter.bypass_kaslr() {
+                                use crate::kernel_exploiter::BypassChain;
+                                bypass_chains.push(BypassChain {
+                                    protection: "KASLR".to_string(),
+                                    technique: "kallsyms leak".to_string(),
+                                    gadgets: vec![kbase],
+                                    description: format!("Leaked kernel base: 0x{:016x}", kbase),
+                                });
+                            }
+                        }
+
+                        if spec.bypass_smep || spec.bypass_smap {
+                            println!("[KERNEL] Bypassing SMEP/SMAP...");
+                            exploit_steps
+                                .push("Bypass SMEP/SMAP via CR4 register flip".to_string());
+                            if let Ok(smep_payload) = exploiter.bypass_smep_smap("cr4_flip") {
+                                use crate::kernel_exploiter::BypassChain;
+                                bypass_chains.push(BypassChain {
+                                    protection: "SMEP/SMAP".to_string(),
+                                    technique: "CR4 flip".to_string(),
+                                    gadgets: vec![],
+                                    description: "Disable SMEP/SMAP via CR4 register modification"
+                                        .to_string(),
+                                });
+                                payload.extend_from_slice(&smep_payload);
+                            }
+                        }
+
+                        exploit_steps.push("Build privilege escalation chain".to_string());
+                        let _ = exploiter.escalate_privileges("commit_creds");
+                        exploit_steps
+                            .push("  → commit_creds(prepare_kernel_cred(NULL))".to_string());
+
+                        if spec.disable_selinux {
+                            println!("[KERNEL]  Disabling SELinux...");
+                            exploit_steps.push("Disable SELinux enforcement".to_string());
+                            let _ = exploiter.disable_selinux();
+                        }
+
+                        if spec.container_escape {
+                            let in_container =
+                                exploiter.detect_container_environment().unwrap_or(false);
+                            if in_container {
+                                let escape_vectors = exploiter.check_container_escape_vectors();
+                                exploit_steps.push("Container escape vectors:".to_string());
+                                for vector in &escape_vectors {
+                                    exploit_steps.push(format!("  → {}", vector));
                                 }
-                                println!();
                             }
-                            
-                            println!("Confidence: {:.0}%", response.confidence * 100.0);
-                        } else {
-                            println!("{} {}", "[ERROR]".red(), "Exploit generation failed".red());
+                        }
+
+                        exploit_steps.push("Spawn root shell".to_string());
+
+                        use crate::kernel_exploiter::KernelExploitResult;
+                        KernelExploitResult {
+                            vuln_detected: if let Some(cve) = &spec.target_cve {
+                                vec![cve.clone()]
+                            } else {
+                                Vec::new()
+                            },
+                            kernel_version: kernel_info.version.clone(),
+                            protections: {
+                                let mut prots = Vec::new();
+                                if kernel_info.protections.kaslr {
+                                    prots.push("KASLR".to_string());
+                                }
+                                if kernel_info.protections.smep {
+                                    prots.push("SMEP".to_string());
+                                }
+                                if kernel_info.protections.smap {
+                                    prots.push("SMAP".to_string());
+                                }
+                                if kernel_info.protections.kpti {
+                                    prots.push("KPTI".to_string());
+                                }
+                                prots
+                            },
+                            bypass_chains,
+                            exploit_steps,
+                            payload_bytes: payload,
+                            success_probability: success_prob,
+                            container_escape: spec.container_escape,
+                        }
+                    };
+
+                    println!("\n[KERNEL] ═══════════════════════════════════════════════════════════════");
+                    println!("[KERNEL] KERNEL EXPLOIT AUTOMATION RESULT");
+                    println!(
+                        "[KERNEL] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[KERNEL]   Kernel Version: {}", result.kernel_version);
+                    println!(
+                        "[KERNEL]   Vulnerabilities: {}",
+                        result.vuln_detected.join(", ")
+                    );
+                    println!(
+                        "[KERNEL]   Active Protections: {}",
+                        result.protections.join(", ")
+                    );
+                    println!(
+                        "[KERNEL]   Container Environment: {}",
+                        if result.container_escape { "Yes" } else { "No" }
+                    );
+                    println!(
+                        "[KERNEL]   Success Probability: {:.1}%",
+                        result.success_probability
+                    );
+                    println!(
+                        "[KERNEL] ═══════════════════════════════════════════════════════════════"
+                    );
+
+                    println!("\n[KERNEL] EXPLOITATION STEPS:");
+                    for step in &result.exploit_steps {
+                        println!("[KERNEL]   {}", step);
+                    }
+
+                    if !result.bypass_chains.is_empty() {
+                        println!("\n[KERNEL] BYPASS CHAINS:");
+                        for chain in &result.bypass_chains {
+                            println!("[KERNEL]   {} → {}", chain.protection, chain.technique);
+                            println!("[KERNEL]     {}", chain.description);
                         }
                     }
-                    Err(e) => {
-                        println!("{} {}", "[ERROR]".red(), e.red());
+
+                    let output_file = "kernel_exploit.json";
+                    exploiter.save_exploit_result(&result, output_file)?;
+
+                    println!("\n[KERNEL] Full solution saved to: {}", output_file);
+                    if !result.payload_bytes.is_empty() {
+                        println!("[KERNEL] Binary payload saved to: kernel_exploit_payload.bin");
                     }
                 }
-            }
-            
-            Command::Symlink { var_name, target_expr, link_type } => {
-                println!("[SYMBIOTIC] Creating symlink: {} -> {} (type: {})", var_name, target_expr, link_type);
-            }
-            
-            Command::UnsymlinkVariable { var_name } => {
-                println!("[SYMBIOTIC] Removing symlink: {}", var_name);
-            }
-            
-            Command::SyncSymlinks => {
-                println!("[SYMBIOTIC] Synchronizing all symlinks");
-            }
-            
-            Command::Achieve { goal, address: _, value: _, constraints, primitives } => {
-                println!("[GOAL-PLANNER] Synthesizing exploit for goal: {}", goal);
-                if !constraints.is_empty() {
-                    println!("[GOAL-PLANNER]   Constraints: {:?}", constraints);
+
+                Command::CVEScan(spec) => {
+                    use crate::cve_scanner::CVEScanner;
+
+                    println!("[CVE] Initializing CVE Scanner & Impact Assessment");
+                    println!(
+                        "[CVE] ═══════════════════════════════════════════════════════════════"
+                    );
+
+                    let scanner = CVEScanner::new();
+
+                    let result = scanner.scan_target(
+                        &spec.target,
+                        &spec.cve_list,
+                        spec.suggest_exploit,
+                        spec.generate_poc,
+                    )?;
+
+                    println!(
+                        "\n[CVE] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[CVE] VULNERABILITY ASSESSMENT");
+                    println!(
+                        "[CVE] ═══════════════════════════════════════════════════════════════"
+                    );
+
+                    for vuln in &result.vulnerabilities_found {
+                        if vuln.is_vulnerable {
+                            println!("[CVE] WARNING: {} - VULNERABLE", vuln.cve_id);
+                            println!("[CVE]     Confidence: {:.1}%", vuln.confidence);
+
+                            if let Some(ref version) = vuln.detected_version {
+                                println!("[CVE]     Detected Version: {}", version);
+                            }
+
+                            println!("[CVE]     Evidence:");
+                            for evidence in &vuln.evidence {
+                                println!("[CVE]       - {}", evidence);
+                            }
+
+                            if let Some(ref exploit) = vuln.suggested_exploit {
+                                println!("[CVE]     Suggested Exploit: {}", exploit);
+                            }
+
+                            if vuln.poc_generated {
+                                println!(
+                                    "[CVE]     [OK] PoC generated: poc_{}.py",
+                                    vuln.cve_id.replace("-", "_").to_lowercase()
+                                );
+                            }
+                        } else {
+                            println!(
+                                "[CVE] [OK] {} - NOT VULNERABLE (confidence: {:.1}%)",
+                                vuln.cve_id, vuln.confidence
+                            );
+                        }
+                        println!();
+                    }
+
+                    println!(
+                        "[CVE] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[CVE] RISK ASSESSMENT");
+                    println!(
+                        "[CVE] ═══════════════════════════════════════════════════════════════"
+                    );
+                    println!("[CVE]   Risk Score: {:.1}/10.0", result.risk_score);
+                    println!(
+                        "[CVE]   Vulnerable: {}/{}",
+                        result.vulnerable_count, result.total_cves_checked
+                    );
+                    println!("[CVE]   Exploitable: {}", result.exploitable_count);
+                    println!(
+                        "[CVE] ═══════════════════════════════════════════════════════════════"
+                    );
+
+                    if !result.recommendations.is_empty() {
+                        println!("\n[CVE] RECOMMENDATIONS:");
+                        for rec in &result.recommendations {
+                            println!("[CVE]   • {}", rec);
+                        }
+                    }
+
+                    let output_file = "cve_scan_results.json";
+                    scanner.save_scan_result(&result, output_file)?;
+
+                    println!("\n[CVE] Full scan results saved to: {}", output_file);
                 }
-                if !primitives.is_empty() {
-                    println!("[GOAL-PLANNER]   Primitives: {:?}", primitives);
+
+                Command::BinarySimilarity(spec) => {
+                    use crate::binary_similarity::SimilarityEngine;
+
+                    println!("[SIMILARITY] Initializing Binary Similarity Analysis Engine");
+                    println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
+
+                    let mut engine = SimilarityEngine::new();
+
+                    let result = engine.analyze_similarity(
+                        &spec.reference,
+                        &spec.search_in,
+                        spec.threshold,
+                        &spec.output,
+                    )?;
+
+                    println!("\n[SIMILARITY] ═══════════════════════════════════════════════════════════════");
+                    println!("[SIMILARITY] ANALYSIS SUMMARY");
+                    println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
+                    println!(
+                        "[SIMILARITY]   Reference Binary: {}",
+                        result.reference_binary
+                    );
+                    println!(
+                        "[SIMILARITY]   Binaries Searched: {}",
+                        result.searched_binaries.len()
+                    );
+                    println!(
+                        "[SIMILARITY]   Functions Analyzed: {}",
+                        result.total_functions_analyzed
+                    );
+                    println!("[SIMILARITY]   Matches Found: {}", result.matches_found);
+                    println!(
+                        "[SIMILARITY]   High Confidence: {}",
+                        result.high_confidence_matches
+                    );
+                    println!(
+                        "[SIMILARITY]   Vulnerable Patterns: {}",
+                        result.vulnerable_patterns
+                    );
+                    println!(
+                        "[SIMILARITY]   Vendor Reuse: {}",
+                        result.vendor_reuse_detected
+                    );
+                    println!(
+                        "[SIMILARITY]   Analysis Time: {}ms",
+                        result.analysis_time_ms
+                    );
+                    println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
+
+                    if !result.matches.is_empty() {
+                        println!("\n[SIMILARITY] TOP MATCHES (sorted by similarity):");
+                        println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
+
+                        for (idx, match_item) in result.matches.iter().take(10).enumerate() {
+                            println!("\n[SIMILARITY] Match #{}: ", idx + 1);
+                            println!(
+                                "[SIMILARITY]   Reference: {}",
+                                match_item.reference_function
+                            );
+                            println!(
+                                "[SIMILARITY]   Matched: {} ({})",
+                                match_item.matched_function, match_item.matched_binary
+                            );
+                            println!(
+                                "[SIMILARITY]   Similarity: {:.1}%",
+                                match_item.similarity_score * 100.0
+                            );
+                            println!(
+                                "[SIMILARITY]   Confidence: {:.1}%",
+                                match_item.confidence * 100.0
+                            );
+                            println!("[SIMILARITY]   Type: {:?}", match_item.match_type);
+
+                            if !match_item.vulnerable_indicators.is_empty() {
+                                println!("[SIMILARITY]   WARNING: VULNERABLE PATTERNS DETECTED:");
+                                for indicator in &match_item.vulnerable_indicators {
+                                    println!("[SIMILARITY]     • {}", indicator);
+                                }
+                            }
+
+                            if idx < 3 {
+                                println!("[SIMILARITY]   Evidence:");
+                                for evidence in &match_item.evidence {
+                                    println!("[SIMILARITY]     • {}", evidence);
+                                }
+                            }
+                        }
+
+                        if result.matches.len() > 10 {
+                            println!(
+                                "\n[SIMILARITY] ... and {} more matches",
+                                result.matches.len() - 10
+                            );
+                        }
+                    }
+
+                    if result.vulnerable_patterns > 0 {
+                        println!("\n[SIMILARITY] WARNING: SECURITY ALERT:");
+                        println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
+                        println!(
+                            "[SIMILARITY] Found {} functions matching known vulnerable patterns!",
+                            result.vulnerable_patterns
+                        );
+                        println!(
+                            "[SIMILARITY] Review similarity_results.json for detailed analysis"
+                        );
+                        println!("[SIMILARITY] ═══════════════════════════════════════════════════════════════");
+                    }
+
+                    if result.vendor_reuse_detected > 0 {
+                        println!("\n[SIMILARITY] Vendor Code Reuse Detected:");
+                        println!(
+                            "[SIMILARITY]   {} functions match known vendor signatures",
+                            result.vendor_reuse_detected
+                        );
+                    }
+
+                    println!("\n[SIMILARITY] Full results saved to: similarity_results.json");
                 }
+
+                Command::ChainConnect {
+                    host,
+                    port,
+                    timeout,
+                } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        ExploitChain::new()
+                    };
+
+                    chain.connect(host, *port, timeout.unwrap_or(5))?;
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainSend { data } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let payload =
+                        eval_expr(data, variables.clone(), functions.clone(), macros.clone())
+                            .await?;
+                    let payload_bytes = match payload {
+                        Value::Bytes(b) => b,
+                        Value::String(s) => s.into_bytes(),
+                        _ => return Err("Payload must be bytes or string".to_string()),
+                    };
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        return Err("No active exploit chain. Use connect_to first.".to_string());
+                    };
+
+                    chain.send(&payload_bytes)?;
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainReceive { size } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        return Err("No active exploit chain. Use connect_to first.".to_string());
+                    };
+
+                    let data = chain.receive(*size)?;
+
+                    let text = String::from_utf8_lossy(&data);
+                    let flags = FlagFinder::find_in_text(&text);
+                    if !flags.is_empty() {
+                        println!(
+                            "[AUTO-FLAG] Detected {} flag(s) in received data",
+                            flags.len()
+                        );
+                        variables.write().await.insert(
+                            "auto_flags".to_string(),
+                            Value::List(flags.iter().map(|f| Value::String(f.clone())).collect()),
+                        );
+                    }
+
+                    variables
+                        .write()
+                        .await
+                        .insert("received_data".to_string(), Value::Bytes(data));
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainReceiveUntil {
+                    delimiter,
+                    max_size,
+                } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        return Err("No active exploit chain. Use connect_to first.".to_string());
+                    };
+
+                    let data = chain.receive_until(delimiter.as_bytes(), *max_size)?;
+
+                    let text = String::from_utf8_lossy(&data);
+                    let flags = FlagFinder::find_in_text(&text);
+                    if !flags.is_empty() {
+                        println!(
+                            "[AUTO-FLAG] Detected {} flag(s) in received data",
+                            flags.len()
+                        );
+                        variables.write().await.insert(
+                            "auto_flags".to_string(),
+                            Value::List(flags.iter().map(|f| Value::String(f.clone())).collect()),
+                        );
+                    }
+
+                    variables
+                        .write()
+                        .await
+                        .insert("received_data".to_string(), Value::Bytes(data));
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainExploitLeak {
+                    stage_name,
+                    payload,
+                    offset,
+                    size,
+                } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let payload_val = eval_expr(
+                        payload,
+                        variables.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                    )
+                    .await?;
+                    let payload_bytes = match payload_val {
+                        Value::Bytes(b) => b,
+                        Value::String(s) => s.into_bytes(),
+                        _ => return Err("Payload must be bytes or string".to_string()),
+                    };
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        return Err("No active exploit chain. Use connect_to first.".to_string());
+                    };
+
+                    let leak_result =
+                        chain.exploit_leak(stage_name, &payload_bytes, *offset, *size)?;
+                    variables.write().await.insert(
+                        "leaked_value".to_string(),
+                        Value::Number(leak_result.leaked_value as i64),
+                    );
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainCalculateBase {
+                    leaked_addr,
+                    offset,
+                    name,
+                } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let leaked = eval_expr(
+                        leaked_addr,
+                        variables.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                    )
+                    .await?;
+                    let leaked_value = match leaked {
+                        Value::Number(n) => n as u64,
+                        _ => return Err("Leaked address must be a number".to_string()),
+                    };
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        ExploitChain::new()
+                    };
+
+                    let base = chain.calculate_base(leaked_value, *offset, name);
+                    variables
+                        .write()
+                        .await
+                        .insert(name.clone(), Value::Number(base as i64));
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainBruteforceASLR {
+                    attempts,
+                    payload,
+                    offset,
+                } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let payload_val = eval_expr(
+                        payload,
+                        variables.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                    )
+                    .await?;
+                    let payload_bytes = match payload_val {
+                        Value::Bytes(b) => b,
+                        Value::String(s) => s.into_bytes(),
+                        _ => return Err("Payload must be bytes or string".to_string()),
+                    };
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        return Err("No active exploit chain. Use connect_to first.".to_string());
+                    };
+
+                    let leaked = chain.bruteforce_aslr(*attempts, &payload_bytes, *offset)?;
+                    variables
+                        .write()
+                        .await
+                        .insert("leaked_value".to_string(), Value::Number(leaked as i64));
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainInteractive => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let chain_key = "exploit_chain";
+                    let mut chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        return Err("No active exploit chain. Use connect_to first.".to_string());
+                    };
+
+                    chain.interactive()?;
+
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainSaveState { path } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let chain_key = "exploit_chain";
+                    let chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        ExploitChain::new()
+                    };
+
+                    chain.save_state(path)?;
+                }
+
+                Command::ChainLoadState { path } => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let mut chain = ExploitChain::new();
+                    chain.load_state(path)?;
+
+                    let chain_key = "exploit_chain";
+                    let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                    variables
+                        .write()
+                        .await
+                        .insert(chain_key.to_string(), Value::String(state_json));
+                }
+
+                Command::ChainPrintSummary => {
+                    use crate::exploit_chaining::ExploitChain;
+
+                    let chain_key = "exploit_chain";
+                    let chain = if let Some(Value::String(state_json)) =
+                        variables.read().await.get(chain_key)
+                    {
+                        serde_json::from_str::<ExploitChain>(state_json)
+                            .unwrap_or_else(|_| ExploitChain::new())
+                    } else {
+                        ExploitChain::new()
+                    };
+
+                    chain.print_summary();
+                }
+
+                Command::SetTimeout { milliseconds } => {
+                    let mut config = safety.read().await.get_stats().config;
+                    config.max_execution_time_ms = *milliseconds;
+                    safety.write().await.update_config(config);
+                    println!("[SAFETY] Execution timeout set to {}ms", milliseconds);
+                }
+
+                Command::SetMemoryLimit { megabytes } => {
+                    let mut config = safety.read().await.get_stats().config;
+                    config.max_memory_bytes = (*megabytes as u64) * 1024 * 1024;
+                    safety.write().await.update_config(config);
+                    println!("[SAFETY] Memory limit set to {}MB", megabytes);
+                }
+
+                Command::SetRecursionLimit { max_depth } => {
+                    let mut config = safety.read().await.get_stats().config;
+                    config.max_recursion_depth = *max_depth;
+                    safety.write().await.update_config(config);
+                    println!("[SAFETY] Recursion limit set to {}", max_depth);
+                }
+
+                Command::EnableStrictMode => {
+                    let mut config = safety.read().await.get_stats().config;
+                    config.strict_mode = true;
+                    config.type_checking = true;
+                    config.bounds_checking = true;
+                    config.overflow_checking = true;
+                    safety.write().await.update_config(config);
+                    println!("[SAFETY] Strict mode ENABLED - All safety checks active");
+                }
+
+                Command::DisableStrictMode => {
+                    let mut config = safety.read().await.get_stats().config;
+                    config.strict_mode = false;
+                    safety.write().await.update_config(config);
+                    println!("[SAFETY] Strict mode DISABLED - Safety checks relaxed");
+                }
+
+                Command::GetSafetyStats => {
+                    let stats = safety.read().await.get_stats();
+                    println!("{}", stats);
+                }
+
+                Command::ResetSafety => {
+                    *safety.write().await = RuntimeSafety::new(SafetyConfig::default());
+                    println!("[SAFETY] Safety system reset to defaults");
+                }
+
+                Command::ParallelExploit { targets, payload } => {
+                    use crate::parallel_exploit::exploit_parallel;
+
+                    let payload_value = eval_expr(
+                        payload,
+                        variables.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                    )
+                    .await?;
+                    let payload_bytes = match payload_value {
+                        Value::Bytes(b) => b,
+                        Value::String(s) => s.as_bytes().to_vec(),
+                        _ => {
+                            return Err(
+                                "Parallel exploit requires bytes or string payload".to_string()
+                            )
+                        }
+                    };
+
+                    let results = exploit_parallel(targets.clone(), payload_bytes)
+                        .await
+                        .map_err(|e| format!("Parallel exploitation failed: {}", e))?;
+
+                    let success_count = results.iter().filter(|r| r.success).count();
+                    println!(
+                        "[PARALLEL] Successfully exploited {}/{} targets",
+                        success_count,
+                        targets.len()
+                    );
+                }
+
+                Command::GenerateExploitAI {
+                    binary,
+                    vuln_type,
+                    arch,
+                } => {
+                    use crate::ai_exploit_gen::{generate_exploit_ai, AIConfig};
+                    use colored::*;
+
+                    println!(
+                        "{} Generating exploit for {}",
+                        "[AI]".to_string().cyan(),
+                        binary.to_string().yellow()
+                    );
+                    println!(
+                        "{} Vulnerability: {}",
+                        "  ".to_string().bright_black(),
+                        vuln_type.to_string().green()
+                    );
+                    println!(
+                        "{} Architecture: {}\n",
+                        "  ".to_string().bright_black(),
+                        arch.to_string().cyan()
+                    );
+
+                    let config = AIConfig::default();
+                    match generate_exploit_ai(binary, vuln_type, arch, Some(config)) {
+                        Ok(response) => {
+                            if response.success {
+                                println!(
+                                    "{} {}",
+                                    "[OK]".green(),
+                                    "Exploit generated successfully".green().bold()
+                                );
+                                println!("\n{}", "═".repeat(60).cyan());
+                                println!("{}", "GENERATED EXPLOIT CODE".cyan().bold());
+                                println!("{}\n", "═".repeat(60).cyan());
+                                println!("{}", response.exploit_code);
+                                println!("\n{}", "═".repeat(60).cyan());
+                                println!("{}", "EXPLANATION".yellow().bold());
+                                println!("{}\n", "═".repeat(60).cyan());
+                                println!("{}\n", response.explanation);
+
+                                if !response.warnings.is_empty() {
+                                    println!("{}", "WARNINGS".red().bold());
+                                    println!("{}", "═".repeat(60).bright_black());
+                                    for warning in response.warnings {
+                                        println!(
+                                            "{} {}",
+                                            "WARNING:".to_string().yellow(),
+                                            warning.to_string().yellow()
+                                        );
+                                    }
+                                    println!();
+                                }
+
+                                println!("Confidence: {:.0}%", response.confidence * 100.0);
+                            } else {
+                                println!(
+                                    "{} {}",
+                                    "[ERROR]".red(),
+                                    "Exploit generation failed".red()
+                                );
+                            }
+                        }
+                        Err(e) => {
+                            println!("{} {}", "[ERROR]".red(), e.red());
+                        }
+                    }
+                }
+
+                Command::Symlink {
+                    var_name,
+                    target_expr,
+                    link_type,
+                } => {
+                    println!(
+                        "[SYMBIOTIC] Creating symlink: {} -> {} (type: {})",
+                        var_name, target_expr, link_type
+                    );
+                }
+
+                Command::UnsymlinkVariable { var_name } => {
+                    println!("[SYMBIOTIC] Removing symlink: {}", var_name);
+                }
+
+                Command::SyncSymlinks => {
+                    println!("[SYMBIOTIC] Synchronizing all symlinks");
+                }
+
+                Command::Achieve {
+                    goal,
+                    address: _,
+                    value: _,
+                    constraints,
+                    primitives,
+                } => {
+                    println!("[GOAL-PLANNER] Synthesizing exploit for goal: {}", goal);
+                    if !constraints.is_empty() {
+                        println!("[GOAL-PLANNER]   Constraints: {:?}", constraints);
+                    }
+                    if !primitives.is_empty() {
+                        println!("[GOAL-PLANNER]   Primitives: {:?}", primitives);
+                    }
+                }
+
+                Command::DefineStrategy {
+                    name,
+                    parameters,
+                    implementation: _,
+                } => {
+                    println!(
+                        "[STRATEGY] Defining strategy: {} with {} parameters",
+                        name,
+                        parameters.len()
+                    );
+                }
+
+                Command::ExecuteStrategy { name } => {
+                    println!("[STRATEGY] Executing strategy: {}", name);
+                }
+
+                Command::Speculate { commands } => {
+                    println!(
+                        "[SPECULATIVE] Running {} commands in sandbox",
+                        commands.len()
+                    );
+                }
+
+                Command::PrecomputeFutures { branches } => {
+                    println!(
+                        "[SPECULATIVE] Precomputing {} future branches",
+                        branches.len()
+                    );
+                }
+
+                Command::AssemblePrimitives { primitives } => {
+                    println!(
+                        "[FRACTAL] Assembling {} primitives into exploit chain",
+                        primitives.len()
+                    );
+                }
+
+                Command::AnalyzeTarget { binary_path } => {
+                    println!("[VULN-FORECAST] Analyzing target binary: {}", binary_path);
+                }
+
+                Command::DefenseSimulator {
+                    profile_name,
+                    exploit_commands,
+                    iterations,
+                } => {
+                    println!(
+                        "[DEFENSE-SIM] Testing {} commands against profile: {} ({} iterations)",
+                        exploit_commands.len(),
+                        profile_name,
+                        iterations
+                    );
+                }
+
+                _ => println!("[INTERPRETER] Unhandled command: {:?}", cmd),
             }
-            
-            Command::DefineStrategy { name, parameters, implementation: _ } => {
-                println!("[STRATEGY] Defining strategy: {} with {} parameters", name, parameters.len());
-            }
-            
-            Command::ExecuteStrategy { name } => {
-                println!("[STRATEGY] Executing strategy: {}", name);
-            }
-            
-            Command::Speculate { commands } => {
-                println!("[SPECULATIVE] Running {} commands in sandbox", commands.len());
-            }
-            
-            Command::PrecomputeFutures { branches } => {
-                println!("[SPECULATIVE] Precomputing {} future branches", branches.len());
-            }
-            
-            Command::AssemblePrimitives { primitives } => {
-                println!("[FRACTAL] Assembling {} primitives into exploit chain", primitives.len());
-            }
-            
-            Command::AnalyzeTarget { binary_path } => {
-                println!("[VULN-FORECAST] Analyzing target binary: {}", binary_path);
-            }
-            
-            Command::DefenseSimulator { profile_name, exploit_commands, iterations } => {
-                println!("[DEFENSE-SIM] Testing {} commands against profile: {} ({} iterations)", 
-                        exploit_commands.len(), profile_name, iterations);
-            }
-            
-            _ => println!("[INTERPRETER] Unhandled command: {:?}", cmd),
         }
-    }
-    Ok(None)
+        Ok(None)
     })
 }
 
@@ -1592,48 +2208,51 @@ fn eval_expr<'a>(
     macros: Arc<RwLock<HashMap<String, MacroDef>>>,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, String>> + Send + 'a>> {
     Box::pin(async move {
-    match expr {
-        Expr::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
-        Expr::Literal(Literal::Number(n)) => Ok(Value::Number(*n)),
-        Expr::Literal(Literal::Boolean(b)) => Ok(Value::Number(if *b { 1 } else { 0 })),
-        Expr::Literal(Literal::Null) => Ok(Value::Null),
-        Expr::Literal(Literal::ByteArray(s)) => Ok(Value::Bytes(hex::decode(s).map_err(|e| e.to_string())?)),
-        Expr::Ident(id) => {
-            if let Some(val) = vars.read().await.get(id) {
-                Ok(val.clone())
-            } else {
-                let available_vars: Vec<String> = vars.read().await.keys().cloned().collect();
-                if available_vars.is_empty() {
-                    Err(format!("UNDEFINED VARIABLE '{}'\n\nNo variables defined yet.\n\nDid you mean:\n  1. Define it first: let {} = <value>\n  2. Check for typos in variable name", id, id))
+        match expr {
+            Expr::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
+            Expr::Literal(Literal::Number(n)) => Ok(Value::Number(*n)),
+            Expr::Literal(Literal::Boolean(b)) => Ok(Value::Number(if *b { 1 } else { 0 })),
+            Expr::Literal(Literal::Null) => Ok(Value::Null),
+            Expr::Literal(Literal::ByteArray(s)) => {
+                Ok(Value::Bytes(hex::decode(s).map_err(|e| e.to_string())?))
+            }
+            Expr::Ident(id) => {
+                if let Some(val) = vars.read().await.get(id) {
+                    Ok(val.clone())
                 } else {
-                    let suggestions: Vec<&String> = available_vars.iter()
-                        .filter(|v| {
-                            let dist = levenshtein_distance(id, v);
-                            dist <= 2
-                        })
-                        .take(3)
-                        .collect();
-                    
-                    let mut msg = format!("UNDEFINED VARIABLE '{}'\n\n", id);
-                    if !suggestions.is_empty() {
-                        msg.push_str("Did you mean:\n");
-                        for (i, suggestion) in suggestions.iter().enumerate() {
-                            msg.push_str(&format!("  {}. {}\n", i + 1, suggestion));
-                        }
+                    let available_vars: Vec<String> = vars.read().await.keys().cloned().collect();
+                    if available_vars.is_empty() {
+                        Err(format!("UNDEFINED VARIABLE '{}'\n\nNo variables defined yet.\n\nDid you mean:\n  1. Define it first: let {} = <value>\n  2. Check for typos in variable name", id, id))
                     } else {
-                        msg.push_str("Available variables:\n");
-                        for (i, var) in available_vars.iter().take(5).enumerate() {
-                            msg.push_str(&format!("  {}. {}\n", i + 1, var));
+                        let suggestions: Vec<&String> = available_vars
+                            .iter()
+                            .filter(|v| {
+                                let dist = levenshtein_distance(id, v);
+                                dist <= 2
+                            })
+                            .take(3)
+                            .collect();
+
+                        let mut msg = format!("UNDEFINED VARIABLE '{}'\n\n", id);
+                        if !suggestions.is_empty() {
+                            msg.push_str("Did you mean:\n");
+                            for (i, suggestion) in suggestions.iter().enumerate() {
+                                msg.push_str(&format!("  {}. {}\n", i + 1, suggestion));
+                            }
+                        } else {
+                            msg.push_str("Available variables:\n");
+                            for (i, var) in available_vars.iter().take(5).enumerate() {
+                                msg.push_str(&format!("  {}. {}\n", i + 1, var));
+                            }
                         }
+                        Err(msg)
                     }
-                    Err(msg)
                 }
             }
-        }
-        Expr::BinaryOp { op, left, right } => {
-            let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
-            let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
-            match (&l, &r) {
+            Expr::BinaryOp { op, left, right } => {
+                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
+                match (&l, &r) {
                 (Value::Number(lv), Value::Number(rv)) => {
                     let out = match op.as_str() {
                         "+" => lv + rv,
@@ -1702,142 +2321,188 @@ fn eval_expr<'a>(
                     Err(format!("TYPE ERROR\nBinary operation requires numbers\n\nGot: {:?} {} {:?}\n\nFix:\n  1. Ensure both operands are numeric\n  2. Use explicit conversion if needed", l, op, r))
                 }
             }
-        }
-        Expr::List(items) => {
-            let mut values = Vec::new();
-            for e in items {
-                match e {
-                    Expr::Spread(inner) => {
-                        let spread_val = eval_expr(inner, vars.clone(), funcs.clone(), macros.clone()).await?;
-                        match spread_val {
-                            Value::List(list_items) => {
-                                values.extend(list_items);
-                            }
-                            Value::Bytes(bytes) => {
-                                for byte in bytes {
-                                    values.push(Value::Number(byte as i64));
+            }
+            Expr::List(items) => {
+                let mut values = Vec::new();
+                for e in items {
+                    match e {
+                        Expr::Spread(inner) => {
+                            let spread_val =
+                                eval_expr(inner, vars.clone(), funcs.clone(), macros.clone())
+                                    .await?;
+                            match spread_val {
+                                Value::List(list_items) => {
+                                    values.extend(list_items);
                                 }
+                                Value::Bytes(bytes) => {
+                                    for byte in bytes {
+                                        values.push(Value::Number(byte as i64));
+                                    }
+                                }
+                                _ => return Err("Spread operator requires list or bytes".into()),
                             }
-                            _ => return Err("Spread operator requires list or bytes".into()),
+                        }
+                        _ => {
+                            values.push(
+                                eval_expr(e, vars.clone(), funcs.clone(), macros.clone()).await?,
+                            );
                         }
                     }
+                }
+                Ok(Value::List(values))
+            }
+            Expr::Map(map) => {
+                let mut result = HashMap::new();
+                for (k, v) in map {
+                    result.insert(
+                        k.clone(),
+                        eval_expr(v, vars.clone(), funcs.clone(), macros.clone()).await?,
+                    );
+                }
+                Ok(Value::Map(result))
+            }
+            Expr::Set(items) => {
+                let mut values = HashSet::new();
+                for e in items {
+                    let val = eval_expr(e, vars.clone(), funcs.clone(), macros.clone()).await?;
+                    values.insert(val.to_string());
+                }
+                Ok(Value::Set(values))
+            }
+            Expr::Bytes(b) => Ok(Value::Bytes(b.clone())),
+            Expr::InterpolatedString(parts) => {
+                let mut result = String::new();
+                for part in parts {
+                    result.push_str(
+                        &eval_expr(part, vars.clone(), funcs.clone(), macros.clone())
+                            .await?
+                            .to_string(),
+                    );
+                }
+                Ok(Value::String(result))
+            }
+            Expr::MethodChain { base, calls } => {
+                let mut val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
+                for call in calls {
+                    val = match call.as_str() {
+                        "trim" => Value::String(val.to_string().trim().to_string()),
+                        "split" => Value::List(
+                            val.to_string()
+                                .split_whitespace()
+                                .map(|s| Value::String(s.to_string()))
+                                .collect(),
+                        ),
+                        _ => return Err(format!("Unknown method: {}", call)),
+                    };
+                }
+                Ok(val)
+            }
+            Expr::ListComprehension {
+                expr,
+                var,
+                iterable,
+            } => {
+                let items =
+                    eval_expr(iterable, vars.clone(), funcs.clone(), macros.clone()).await?;
+                if let Value::List(list) = items {
+                    let mut result = Vec::new();
+                    for item in list {
+                        let local_vars = Arc::new(RwLock::new(vars.read().await.clone()));
+                        local_vars.write().await.insert(var.clone(), item);
+                        result.push(
+                            eval_expr(expr, local_vars, funcs.clone(), macros.clone()).await?,
+                        );
+                    }
+                    Ok(Value::List(result))
+                } else {
+                    Err("Comprehension requires list".into())
+                }
+            }
+            Expr::Lambda { arg, body } => {
+                Ok(Value::String(format!("lambda({}) => {:?}", arg, body)))
+            }
+            Expr::Variant(name, Some(expr)) => {
+                let arg_expr = *expr.clone();
+                let call_expr = Expr::Call {
+                    name: name.clone(),
+                    args: vec![(None, arg_expr)],
+                };
+                eval_expr(&call_expr, vars.clone(), funcs.clone(), macros.clone()).await
+            }
+            Expr::Variant(name, None) => {
+                let call_expr = Expr::Call {
+                    name: name.clone(),
+                    args: vec![],
+                };
+                eval_expr(&call_expr, vars.clone(), funcs.clone(), macros.clone()).await
+            }
+            Expr::Env(key) => Ok(Value::String(std::env::var(key).unwrap_or_default())),
+            Expr::RegexMatch { regex, haystack } => {
+                let hay = eval_expr(haystack, vars.clone(), funcs.clone(), macros.clone())
+                    .await?
+                    .to_string();
+                let re = Regex::new(regex).map_err(|e| e.to_string())?;
+                Ok(Value::String(re.is_match(&hay).to_string()))
+            }
+            Expr::Await(expr) => eval_expr(expr, vars.clone(), funcs.clone(), macros.clone()).await, // Simplified async for now
+            Expr::ComparisonOp { op, left, right } => {
+                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let result = match (&l, &r) {
+                    (Value::Number(lv), Value::Number(rv)) => match op.as_str() {
+                        "==" => lv == rv,
+                        "!=" => lv != rv,
+                        "<" => lv < rv,
+                        ">" => lv > rv,
+                        "<=" => lv <= rv,
+                        ">=" => lv >= rv,
+                        _ => return Err(format!("Unknown comparison: {}", op)),
+                    },
+                    (Value::String(lv), Value::String(rv)) => match op.as_str() {
+                        "==" => lv == rv,
+                        "!=" => lv != rv,
+                        _ => return Err("Only == and != supported for strings".into()),
+                    },
                     _ => {
-                        values.push(eval_expr(e, vars.clone(), funcs.clone(), macros.clone()).await?);
+                        return Err(format!(
+                            "Type mismatch in comparison: {:?} {} {:?}",
+                            l, op, r
+                        ))
+                    }
+                };
+                Ok(Value::Number(if result { 1 } else { 0 }))
+            }
+            Expr::BitwiseOp { op, left, right } => {
+                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
+                if let (Value::Number(l), Value::Number(r)) = (l, r) {
+                    let result = match op.as_str() {
+                        "&" => l & r,
+                        "|" => l | r,
+                        "^" => l ^ r,
+                        "<<" => l << r,
+                        ">>" => l >> r,
+                        _ => return Err(format!("Unknown bitwise operator: {}", op)),
+                    };
+                    Ok(Value::Number(result))
+                } else {
+                    Err("Bitwise operations require numbers".into())
+                }
+            }
+            Expr::Call { name, args } => {
+                let mut arg_values = Vec::new();
+                let mut arg_map = HashMap::new();
+
+                for (arg_name, arg_expr) in args {
+                    let value =
+                        eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone()).await?;
+                    arg_values.push(value.clone());
+                    if let Some(name) = arg_name {
+                        arg_map.insert(name.clone(), value);
                     }
                 }
-            }
-            Ok(Value::List(values))
-        }
-        Expr::Map(map) => {
-            let mut result = HashMap::new();
-            for (k, v) in map {
-                result.insert(k.clone(), eval_expr(v, vars.clone(), funcs.clone(), macros.clone()).await?);
-            }
-            Ok(Value::Map(result))
-        }
-        Expr::Set(items) => {
-            let mut values = HashSet::new();
-            for e in items {
-                let val = eval_expr(e, vars.clone(), funcs.clone(), macros.clone()).await?;
-                values.insert(val.to_string());
-            }
-            Ok(Value::Set(values))
-        }
-        Expr::Bytes(b) => Ok(Value::Bytes(b.clone())),
-        Expr::InterpolatedString(parts) => {
-            let mut result = String::new();
-            for part in parts {
-                result.push_str(&eval_expr(part, vars.clone(), funcs.clone(), macros.clone()).await?.to_string());
-            }
-            Ok(Value::String(result))
-        }
-        Expr::MethodChain { base, calls } => {
-            let mut val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
-            for call in calls {
-                val = match call.as_str() {
-                    "trim" => Value::String(val.to_string().trim().to_string()),
-                    "split" => Value::List(val.to_string().split_whitespace().map(|s| Value::String(s.to_string())).collect()),
-                    _ => return Err(format!("Unknown method: {}", call)),
-                };
-            }
-            Ok(val)
-        }
-        Expr::ListComprehension { expr, var, iterable } => {
-            let items = eval_expr(iterable, vars.clone(), funcs.clone(), macros.clone()).await?;
-            if let Value::List(list) = items {
-                let mut result = Vec::new();
-                for item in list {
-                    let local_vars = Arc::new(RwLock::new(vars.read().await.clone()));
-                    local_vars.write().await.insert(var.clone(), item);
-                    result.push(eval_expr(expr, local_vars, funcs.clone(), macros.clone()).await?);
-                }
-                Ok(Value::List(result))
-            } else {
-                Err("Comprehension requires list".into())
-            }
-        }
-        Expr::Lambda { arg, body } => Ok(Value::String(format!("lambda({}) => {:?}", arg, body))),
-        Expr::Variant(name, Some(expr)) => Ok(Value::String(format!("{}({})", name, eval_expr(expr, vars.clone(), funcs.clone(), macros.clone()).await?))),
-        Expr::Variant(name, None) => Ok(Value::String(name.clone())),
-        Expr::Env(key) => Ok(Value::String(std::env::var(key).unwrap_or_default())),
-        Expr::RegexMatch { regex, haystack } => {
-            let hay = eval_expr(haystack, vars.clone(), funcs.clone(), macros.clone()).await?.to_string();
-            let re = Regex::new(regex).map_err(|e| e.to_string())?;
-            Ok(Value::String(re.is_match(&hay).to_string()))
-        }
-        Expr::Await(expr) => eval_expr(expr, vars.clone(), funcs.clone(), macros.clone()).await, // Simplified async for now
-        Expr::ComparisonOp { op, left, right } => {
-            let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
-            let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
-            let result = match (&l, &r) {
-                (Value::Number(lv), Value::Number(rv)) => match op.as_str() {
-                    "==" => lv == rv,
-                    "!=" => lv != rv,
-                    "<" => lv < rv,
-                    ">" => lv > rv,
-                    "<=" => lv <= rv,
-                    ">=" => lv >= rv,
-                    _ => return Err(format!("Unknown comparison: {}", op)),
-                },
-                (Value::String(lv), Value::String(rv)) => match op.as_str() {
-                    "==" => lv == rv,
-                    "!=" => lv != rv,
-                    _ => return Err("Only == and != supported for strings".into()),
-                },
-                _ => return Err(format!("Type mismatch in comparison: {:?} {} {:?}", l, op, r)),
-            };
-            Ok(Value::Number(if result { 1 } else { 0 }))
-        }
-        Expr::BitwiseOp { op, left, right } => {
-            let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
-            let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
-            if let (Value::Number(l), Value::Number(r)) = (l, r) {
-                let result = match op.as_str() {
-                    "&" => l & r,
-                    "|" => l | r,
-                    "^" => l ^ r,
-                    "<<" => l << r,
-                    ">>" => l >> r,
-                    _ => return Err(format!("Unknown bitwise operator: {}", op)),
-                };
-                Ok(Value::Number(result))
-            } else {
-                Err("Bitwise operations require numbers".into())
-            }
-        }
-        Expr::Call { name, args } => {
-            let mut arg_values = Vec::new();
-            let mut arg_map = HashMap::new();
-            
-            for (arg_name, arg_expr) in args {
-                let value = eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone()).await?;
-                arg_values.push(value.clone());
-                if let Some(name) = arg_name {
-                    arg_map.insert(name.clone(), value);
-                }
-            }
-            
-            match name.as_str() {
+
+                match name.as_str() {
                 "cyclic" => {
                     if arg_values.is_empty() {
                         return Err("cyclic() requires length argument".to_string());
@@ -1859,7 +2524,7 @@ fn eval_expr<'a>(
                         return Err("cyclic_find() requires bytes pattern as first argument".to_string());
                     };
                     let search = arg_values[1].to_string();
-                    
+
                     if let Some(offset) = crate::cyclic_pattern::cyclic_find(&pattern, &search) {
                         Ok(Value::Number(offset as i64))
                     } else {
@@ -1871,20 +2536,20 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
-                    
+
                     let payload_str = arg_map.get("payload")
                         .or_else(|| arg_values.get(1))
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "execve".to_string());
-                    
+
                     let arch = crate::shellcode_library::parse_arch(&arch_str)
                         .map_err(|e| format!("Invalid architecture: {}", e))?;
-                    
+
                     let payload = crate::shellcode_library::parse_payload(&payload_str)
                         .map_err(|e| format!("Invalid payload: {}", e))?;
-                    
+
                     let lib = crate::shellcode_library::ShellcodeLibrary::new();
-                    
+
                     let mut params_map = HashMap::new();
                     if let Some(lhost) = arg_map.get("lhost") {
                         params_map.insert("lhost".to_string(), lhost.to_string());
@@ -1892,10 +2557,10 @@ fn eval_expr<'a>(
                     if let Some(lport) = arg_map.get("lport") {
                         params_map.insert("lport".to_string(), lport.to_string());
                     }
-                    
+
                     let shellcode = lib.get_with_params(arch, payload, &params_map)
                         .map_err(|e| format!("Failed to generate shellcode: {}", e))?;
-                    
+
                     Ok(Value::Bytes(shellcode))
                 }
                 "shellcode_gen" => {
@@ -1903,19 +2568,19 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
-                    
+
                     let payload_str = arg_map.get("payload")
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "execve_sh".to_string());
-                    
+
                     let arch = crate::shellcode_library::parse_arch(&arch_str)
                         .map_err(|e| format!("Invalid architecture: {}", e))?;
-                    
+
                     let payload = crate::shellcode_library::parse_payload(&payload_str)
                         .map_err(|e| format!("Invalid payload: {}", e))?;
-                    
+
                     let lib = crate::shellcode_library::ShellcodeLibrary::new();
-                    
+
                     let mut params_map = HashMap::new();
                     if let Some(lhost) = arg_map.get("lhost") {
                         params_map.insert("lhost".to_string(), lhost.to_string());
@@ -1923,15 +2588,15 @@ fn eval_expr<'a>(
                     if let Some(lport) = arg_map.get("lport") {
                         params_map.insert("lport".to_string(), lport.to_string());
                     }
-                    
+
                     let mut shellcode = lib.get_with_params(arch, payload, &params_map)
                         .map_err(|e| format!("Failed to generate shellcode: {}", e))?;
-                    
+
                     // Apply encoding if requested
                     if let Some(encoder) = arg_map.get("encoder").map(|v| v.to_string()) {
                         use crate::shellcode_encoders::ShellcodeEncoder;
                         let enc = ShellcodeEncoder::new(shellcode.clone());
-                        
+
                         shellcode = match encoder.as_str() {
                             "xor" => {
                                 let key = if let Some(Value::Number(k)) = arg_map.get("key") {
@@ -1956,40 +2621,40 @@ fn eval_expr<'a>(
                             _ => shellcode,
                         };
                     }
-                    
+
                     // Add NOP sled if requested
                     if let Some(Value::Number(nop_size)) = arg_map.get("nop_sled") {
                         let nops = vec![0x90; *nop_size as usize];
                         shellcode = [nops, shellcode].concat();
                     }
-                    
+
                     use colored::Colorize;
-                    println!("{} Generated {} shellcode ({} bytes)", 
-                        "[SHELLCODE]".to_string().cyan(), 
-                        payload_str.to_string().yellow(), 
+                    println!("{} Generated {} shellcode ({} bytes)",
+                        "[SHELLCODE]".to_string().cyan(),
+                        payload_str.to_string().yellow(),
                         shellcode.len().to_string().green());
-                    
+
                     Ok(Value::Bytes(shellcode))
                 }
                 "shellcode_encode" => {
                     if arg_values.is_empty() {
                         return Err("shellcode_encode() requires shellcode bytes".to_string());
                     }
-                    
+
                     let shellcode = if let Value::Bytes(bytes) = &arg_values[0] {
                         bytes.clone()
                     } else {
                         return Err("shellcode_encode() requires bytes as first argument".to_string());
                     };
-                    
+
                     let encoder_type = arg_map.get("encoder")
                         .or_else(|| arg_values.get(1))
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "xor".to_string());
-                    
+
                     use crate::shellcode_encoders::ShellcodeEncoder;
                     let mut encoder = ShellcodeEncoder::new(shellcode.clone());
-                    
+
                     // Set bad chars if provided
                     if let Some(Value::List(bad_chars_list)) = arg_map.get("bad_chars") {
                         let bad_chars: Vec<u8> = bad_chars_list.iter()
@@ -2003,7 +2668,7 @@ fn eval_expr<'a>(
                             .collect();
                         encoder.set_bad_chars(bad_chars);
                     }
-                    
+
                     let encoded = match encoder_type.as_str() {
                         "xor" => {
                             let key = if let Some(Value::Number(k)) = arg_map.get("key") {
@@ -2027,14 +2692,14 @@ fn eval_expr<'a>(
                         }
                         _ => return Err(format!("Unknown encoder type: {}", encoder_type)),
                     };
-                    
+
                     use colored::Colorize;
-                    println!("{} Encoded shellcode using {} ({} → {} bytes)", 
-                        "[ENCODE]".to_string().cyan(), 
-                        encoder_type.to_string().yellow(), 
+                    println!("{} Encoded shellcode using {} ({} → {} bytes)",
+                        "[ENCODE]".to_string().cyan(),
+                        encoder_type.to_string().yellow(),
                         shellcode.len().to_string().red(),
                         encoded.len().to_string().green());
-                    
+
                     Ok(Value::Bytes(encoded))
                 }
                 "shellcode_reverse_tcp" => {
@@ -2042,36 +2707,36 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .ok_or("shellcode_reverse_tcp() requires lhost parameter")?;
-                    
+
                     let lport = if let Some(Value::Number(p)) = arg_map.get("lport").or_else(|| arg_values.get(1)) {
                         *p as u16
                     } else {
                         return Err("shellcode_reverse_tcp() requires lport parameter".to_string());
                     };
-                    
+
                     let arch_str = arg_map.get("arch")
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
-                    
+
                     let arch = crate::shellcode_library::parse_arch(&arch_str)
                         .map_err(|e| format!("Invalid architecture: {}", e))?;
-                    
+
                     let lib = crate::shellcode_library::ShellcodeLibrary::new();
                     let mut params_map = HashMap::new();
                     params_map.insert("lhost".to_string(), lhost.clone());
                     params_map.insert("lport".to_string(), lport.to_string());
-                    
+
                     let payload = crate::shellcode_library::Payload::ShellReverseTcp;
                     let shellcode = lib.get_with_params(arch, payload, &params_map)
                         .map_err(|e| format!("Failed to generate reverse TCP shellcode: {}", e))?;
-                    
+
                     use colored::Colorize;
-                    println!("{} Reverse TCP shell: {}:{} ({} bytes)", 
-                        "[SHELLCODE]".to_string().cyan(), 
-                        lhost.to_string().yellow(), 
+                    println!("{} Reverse TCP shell: {}:{} ({} bytes)",
+                        "[SHELLCODE]".to_string().cyan(),
+                        lhost.to_string().yellow(),
                         lport.to_string().yellow(),
                         shellcode.len().to_string().green());
-                    
+
                     Ok(Value::Bytes(shellcode))
                 }
                 "shellcode_bind_tcp" => {
@@ -2080,28 +2745,28 @@ fn eval_expr<'a>(
                     } else {
                         return Err("shellcode_bind_tcp() requires lport parameter".to_string());
                     };
-                    
+
                     let arch_str = arg_map.get("arch")
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
-                    
+
                     let arch = crate::shellcode_library::parse_arch(&arch_str)
                         .map_err(|e| format!("Invalid architecture: {}", e))?;
-                    
+
                     let lib = crate::shellcode_library::ShellcodeLibrary::new();
                     let mut params_map = HashMap::new();
                     params_map.insert("lport".to_string(), lport.to_string());
-                    
+
                     let payload = crate::shellcode_library::Payload::ShellBindTcp;
                     let shellcode = lib.get_with_params(arch, payload, &params_map)
                         .map_err(|e| format!("Failed to generate bind TCP shellcode: {}", e))?;
-                    
+
                     use colored::Colorize;
-                    println!("{} Bind TCP shell on port {} ({} bytes)", 
-                        "[SHELLCODE]".to_string().cyan(), 
+                    println!("{} Bind TCP shell on port {} ({} bytes)",
+                        "[SHELLCODE]".to_string().cyan(),
                         lport.to_string().yellow(),
                         shellcode.len().to_string().green());
-                    
+
                     Ok(Value::Bytes(shellcode))
                 }
                 "nop_sled" => {
@@ -2110,33 +2775,33 @@ fn eval_expr<'a>(
                     } else {
                         return Err("nop_sled() requires size argument".to_string());
                     };
-                    
+
                     let polymorphic = arg_map.get("polymorphic")
                         .map(|v| v.to_string())
                         .map(|s| s == "true" || s == "1")
                         .unwrap_or(false);
-                    
+
                     use crate::shellcode_encoders;
                     let nops = if polymorphic {
                         shellcode_encoders::polymorphic_nop_sled(size)
                     } else {
                         shellcode_encoders::nop_sled(size)
                     };
-                    
+
                     use colored::Colorize;
                     let mode_str = if polymorphic { "polymorphic".to_string().yellow() } else { "static".to_string().white() };
-                    println!("{} NOP sled: {} bytes ({})", 
-                        "[NOP]".to_string().cyan(), 
+                    println!("{} NOP sled: {} bytes ({})",
+                        "[NOP]".to_string().cyan(),
                         size.to_string().green(),
                         mode_str);
-                    
+
                     Ok(Value::Bytes(nops))
                 }
                 "shellcode_list" => {
                     use crate::shellcode_db;
                     let db = shellcode_db::get_shellcode_db();
                     let all = db.list();
-                    
+
                     use colored::Colorize;
                     println!("{} Available shellcodes:", "[SHELLCODE]".to_string().cyan());
                     println!();
@@ -2147,7 +2812,7 @@ fn eval_expr<'a>(
                             entry.bytes.len().to_string().green(),
                             format!("{:?}", entry.arch).to_string().blue());
                     }
-                    
+
                     Ok(Value::Null)
                 }
                 "rop_find" => {
@@ -2158,14 +2823,14 @@ fn eval_expr<'a>(
                     let pattern = arg_map.get("pattern")
                         .or_else(|| arg_values.get(1))
                         .map(|v| v.to_string());
-                    
+
                     let mut finder = crate::rop_gadget_finder::ROPGadgetFinder::new(
                         crate::rop_gadget_finder::Architecture::X64
                     ).map_err(|e| format!("Failed to create ROP finder: {}", e))?;
-                    
+
                     finder.analyze_file(&binary)
                         .map_err(|e| format!("Failed to analyze binary: {}", e))?;
-                    
+
                     if let Some(pat) = pattern {
                         let gadgets = finder.find_gadgets_by_pattern(&pat);
                         let addresses: Vec<Value> = gadgets.iter()
@@ -2185,16 +2850,16 @@ fn eval_expr<'a>(
                         return Err("rop_new() requires binary path argument".to_string());
                     }
                     let binary = arg_values[0].to_string();
-                    
+
                     let chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
+
                     use colored::Colorize;
                     println!("{} ROP chain initialized", "[ROP]".cyan());
                     println!("  Binary: {}", binary.yellow());
                     println!("  Gadgets found: {}", chain.gadgets.len().to_string().green());
                     println!("  Architecture: {:?}", chain.arch);
-                    
+
                     Ok(Value::String(format!("RopChain[{}]", binary)))
                 }
                 "rop_set_libc" => {
@@ -2207,11 +2872,11 @@ fn eval_expr<'a>(
                     } else {
                         return Err("rop_set_libc() requires numeric libc base address".to_string());
                     };
-                    
+
                     let mut chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
                     chain.set_libc_base(base);
-                    
+
                     use colored::Colorize;
                     println!("{} libc base set to 0x{:x}", "[ROP]".cyan(), base);
                     Ok(Value::Null)
@@ -2222,10 +2887,10 @@ fn eval_expr<'a>(
                     }
                     let binary = arg_values[0].to_string();
                     let pattern = arg_values[1].to_string();
-                    
+
                     let chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
+
                     if let Some(addr) = chain.find_gadget(&pattern) {
                         use colored::Colorize;
                         println!("{} Gadget found: {} @ 0x{:016x}", "[ROP]".cyan(), pattern.yellow(), addr);
@@ -2240,14 +2905,14 @@ fn eval_expr<'a>(
                     }
                     let binary = arg_values[0].to_string();
                     let pattern = arg_values[1].to_string();
-                    
+
                     let chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
+
                     let gadgets = chain.find_gadgets(&pattern);
                     use colored::Colorize;
                     println!("{} Found {} gadgets matching '{}'", "[ROP]".cyan(), gadgets.len().to_string().green(), pattern.yellow());
-                    
+
                     let addresses: Vec<Value> = gadgets.iter()
                         .map(|g| Value::Number(g.address as i64))
                         .collect();
@@ -2258,7 +2923,7 @@ fn eval_expr<'a>(
                         return Err("rop_build_chain() requires binary path and address list".to_string());
                     }
                     let binary = arg_values[0].to_string();
-                    
+
                     let addresses: Vec<u64> = if let Value::List(list) = &arg_values[1] {
                         list.iter()
                             .map(|v| match v {
@@ -2269,17 +2934,17 @@ fn eval_expr<'a>(
                     } else {
                         return Err("rop_build_chain() requires list of addresses".to_string());
                     };
-                    
+
                     let chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
+
                     let chain_bytes = chain.build_chain(&addresses);
                     use colored::Colorize;
-                    println!("{} ROP chain built: {} gadgets, {} bytes", 
-                        "[ROP]".cyan(), 
-                        addresses.len().to_string().green(), 
+                    println!("{} ROP chain built: {} gadgets, {} bytes",
+                        "[ROP]".cyan(),
+                        addresses.len().to_string().green(),
                         chain_bytes.len().to_string().yellow());
-                    
+
                     Ok(Value::Bytes(chain_bytes))
                 }
                 "rop_ret2libc" => {
@@ -2288,22 +2953,22 @@ fn eval_expr<'a>(
                     }
                     let binary = arg_values[0].to_string();
                     let cmd = arg_values[1].to_string();
-                    
+
                     let mut chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
+
                     if let Some(Value::Number(base)) = arg_map.get("libc_base") {
                         chain.set_libc_base(*base as u64);
                     }
-                    
+
                     let addresses = chain.ret2libc(&cmd)
                         .map_err(|e| format!("ret2libc failed: {}", e))?;
-                    
+
                     use colored::Colorize;
                     println!("{} ret2libc chain created", "[ROP]".cyan());
                     println!("  Command: {}", cmd.yellow());
                     println!("  Chain length: {} gadgets", addresses.len().to_string().green());
-                    
+
                     let chain_bytes = chain.build_chain(&addresses);
                     Ok(Value::Bytes(chain_bytes))
                 }
@@ -2312,20 +2977,20 @@ fn eval_expr<'a>(
                 }
                 "rop_solve" => {
                     use crate::rop_tools::{AutoROPSolver, ROPGoal, ROPStrategy};
-                    
+
                     if arg_values.len() < 2 {
                         return Err("rop_solve() requires binary path and goal type".to_string());
                     }
                     let binary = arg_values[0].to_string();
                     let goal_type = arg_values[1].to_string();
-                    
+
                     let mut solver = AutoROPSolver::new(&binary)
                         .map_err(|e| format!("Failed to create ROP solver: {}", e))?;
-                    
+
                     if let Some(Value::Number(base)) = arg_map.get("libc_base") {
                         solver.libc_base = Some(*base as u64);
                     }
-                    
+
                     let goal = match goal_type.as_str() {
                         "system" => {
                             let cmd = arg_map.get("cmd")
@@ -2349,7 +3014,7 @@ fn eval_expr<'a>(
                         }
                         _ => return Err(format!("Unknown goal type: {}", goal_type)),
                     };
-                    
+
                     let strategies = if let Some(Value::List(strats)) = arg_map.get("strategies") {
                         strats.iter()
                             .filter_map(|v| {
@@ -2369,17 +3034,17 @@ fn eval_expr<'a>(
                     } else {
                         vec![ROPStrategy::Ret2Libc, ROPStrategy::Ret2Syscall]
                     };
-                    
+
                     let solution = solver.solve(goal, strategies)
                         .map_err(|e| format!("ROP solver failed: {}", e))?;
-                    
+
                     use colored::Colorize;
                     println!("{} ROP solution found!", "[SOLVER]".cyan().bold());
                     println!("  Strategy: {}", solution.strategy.green());
                     println!("  Gadgets used: {}", solution.gadgets_used.len().to_string().yellow());
                     println!("  Payload size: {} bytes", solution.chain_bytes.len().to_string().yellow());
                     println!("  Success probability: {:.1}%", (solution.success_probability * 100.0).to_string().green());
-                    
+
                     Ok(Value::Bytes(solution.chain_bytes))
                 }
                 "rop_list_gadgets" => {
@@ -2387,10 +3052,10 @@ fn eval_expr<'a>(
                         return Err("rop_list_gadgets() requires binary path".to_string());
                     }
                     let binary = arg_values[0].to_string();
-                    
+
                     let chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
+
                     crate::rop_tools::list_common_gadgets(&chain);
                     Ok(Value::Null)
                 }
@@ -2400,28 +3065,28 @@ fn eval_expr<'a>(
                     }
                     let binary = arg_values[0].to_string();
                     let pattern = arg_values[1].to_string();
-                    
+
                     let chain = crate::rop_tools::RopChain::new(&binary)
                         .map_err(|e| format!("Failed to create ROP chain: {}", e))?;
-                    
+
                     let gadgets = chain.find_gadgets(&pattern);
-                    
+
                     use colored::Colorize;
                     println!("{} ROP Gadget Search Results", "[ROP]".cyan().bold());
                     println!("  Pattern: {}", pattern.yellow());
                     println!("  Found: {} gadgets\n", gadgets.len().to_string().green());
-                    
+
                     for (i, gadget) in gadgets.iter().take(20).enumerate() {
-                        println!("  {}. 0x{:016x}: {}", 
-                            i + 1, 
-                            gadget.address, 
+                        println!("  {}. 0x{:016x}: {}",
+                            i + 1,
+                            gadget.address,
                             gadget.instructions.join("; ").cyan());
                     }
-                    
+
                     if gadgets.len() > 20 {
                         println!("\n  ... and {} more", gadgets.len() - 20);
                     }
-                    
+
                     let addresses: Vec<Value> = gadgets.iter()
                         .map(|g| Value::Number(g.address as i64))
                         .collect();
@@ -2433,7 +3098,7 @@ fn eval_expr<'a>(
                     } else {
                         return Err("fmtstr_payload() requires offset argument".to_string());
                     };
-                    
+
                     let writes = if let Some(Value::Map(w)) = arg_map.get("writes").or_else(|| arg_values.get(1)) {
                         w.iter()
                             .map(|(k, v)| {
@@ -2449,16 +3114,16 @@ fn eval_expr<'a>(
                     } else {
                         Vec::new()
                     };
-                    
+
                     let arch = if arg_map.get("arch").map(|v| v.to_string()).as_deref() == Some("x86") {
                         crate::format_string::Architecture::X86
                     } else {
                         crate::format_string::Architecture::X64
                     };
-                    
+
                     let payload = crate::format_string::create_format_string_payload(offset, writes, arch)
                         .map_err(|e| format!("Failed to generate format string payload: {}", e))?;
-                    
+
                     Ok(Value::Bytes(payload))
                 }
                 "fmtstr_leak" => {
@@ -2467,15 +3132,15 @@ fn eval_expr<'a>(
                     } else {
                         return Err("fmtstr_leak() requires offset argument".to_string());
                     };
-                    
+
                     let payload = crate::fmtstr_tools::fmtstr_leak(offset);
-                    
+
                     use colored::Colorize;
-                    println!("{} Leak payload for offset {}: {}", 
-                        "[FMTSTR]".cyan(), 
+                    println!("{} Leak payload for offset {}: {}",
+                        "[FMTSTR]".cyan(),
                         offset.to_string().yellow(),
                         payload.green());
-                    
+
                     Ok(Value::String(payload))
                 }
                 "fmtstr_leak_stack" => {
@@ -2484,21 +3149,21 @@ fn eval_expr<'a>(
                     } else {
                         return Err("fmtstr_leak_stack() requires start offset".to_string());
                     };
-                    
+
                     let count = if let Some(Value::Number(c)) = arg_map.get("count").or_else(|| arg_values.get(1)) {
                         *c as usize
                     } else {
                         10
                     };
-                    
+
                     let payload = crate::fmtstr_tools::fmtstr_leak_stack(start, count);
-                    
+
                     use colored::Colorize;
-                    println!("{} Stack leak payload: offsets {} to {}", 
-                        "[FMTSTR]".cyan(), 
+                    println!("{} Stack leak payload: offsets {} to {}",
+                        "[FMTSTR]".cyan(),
                         start.to_string().yellow(),
                         (start + count - 1).to_string().yellow());
-                    
+
                     Ok(Value::String(payload))
                 }
                 "fmtstr_write" => {
@@ -2507,28 +3172,28 @@ fn eval_expr<'a>(
                     } else {
                         return Err("fmtstr_write() requires address argument".to_string());
                     };
-                    
+
                     let value = if let Some(Value::Number(val)) = arg_map.get("value").or_else(|| arg_values.get(1)) {
                         *val as u64
                     } else {
                         return Err("fmtstr_write() requires value argument".to_string());
                     };
-                    
+
                     let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(2)) {
                         *off as usize
                     } else {
                         return Err("fmtstr_write() requires offset argument".to_string());
                     };
-                    
+
                     let payload = crate::fmtstr_tools::fmtstr_write(address, value, offset);
-                    
+
                     use colored::Colorize;
-                    println!("{} Write payload: 0x{:x} = 0x{:x} (offset {})", 
-                        "[FMTSTR]".cyan(), 
+                    println!("{} Write payload: 0x{:x} = 0x{:x} (offset {})",
+                        "[FMTSTR]".cyan(),
                         address,
                         value,
                         offset.to_string().yellow());
-                    
+
                     Ok(Value::Bytes(payload))
                 }
                 "fmtstr_got_overwrite" => {
@@ -2537,26 +3202,26 @@ fn eval_expr<'a>(
                     } else {
                         return Err("fmtstr_got_overwrite() requires GOT entry address".to_string());
                     };
-                    
+
                     let target = if let Some(Value::Number(t)) = arg_map.get("target").or_else(|| arg_values.get(1)) {
                         *t as u64
                     } else {
                         return Err("fmtstr_got_overwrite() requires target address".to_string());
                     };
-                    
+
                     let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(2)) {
                         *off as usize
                     } else {
                         return Err("fmtstr_got_overwrite() requires offset argument".to_string());
                     };
-                    
+
                     let payload = crate::fmtstr_tools::fmtstr_write(got_entry, target, offset);
-                    
+
                     use colored::Colorize;
                     println!("{} GOT overwrite payload:", "[FMTSTR]".cyan());
                     println!("  GOT[0x{:x}] → 0x{:x}", got_entry, target);
                     println!("  Payload size: {} bytes", payload.len().to_string().green());
-                    
+
                     Ok(Value::Bytes(payload))
                 }
                 "fmtstr_find_offset" => {
@@ -2564,13 +3229,13 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "AAAA".to_string());
-                    
+
                     let max_offset = if let Some(Value::Number(m)) = arg_map.get("max") {
                         *m as usize
                     } else {
                         50
                     };
-                    
+
                     use colored::Colorize;
                     println!("{} Finding format string offset...", "[FMTSTR]".cyan());
                     println!("  Pattern: {}", pattern.yellow());
@@ -2580,7 +3245,7 @@ fn eval_expr<'a>(
                     println!("  {}", format!("{}{}", pattern, ".%p".repeat(max_offset)).green());
                     println!();
                     println!("  Then use cyclic_find() to determine the offset");
-                    
+
                     Ok(Value::String(format!("{}{}", pattern, ".%p".repeat(max_offset))))
                 }
                 "fmtstr_dump" => {
@@ -2589,23 +3254,23 @@ fn eval_expr<'a>(
                     } else {
                         1
                     };
-                    
+
                     let count = if let Some(Value::Number(c)) = arg_map.get("count").or_else(|| arg_values.get(1)) {
                         *c as usize
                     } else {
                         20
                     };
-                    
+
                     let mut payload = String::new();
                     for offset in start_offset..(start_offset + count) {
                         payload.push_str(&format!("[{}] %{}$p ", offset, offset));
                     }
-                    
+
                     use colored::Colorize;
-                    println!("{} Memory dump payload: {} offsets", 
-                        "[FMTSTR]".cyan(), 
+                    println!("{} Memory dump payload: {} offsets",
+                        "[FMTSTR]".cyan(),
                         count.to_string().yellow());
-                    
+
                     Ok(Value::String(payload))
                 }
                 "fmtstr_analyze" => {
@@ -2613,10 +3278,10 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .ok_or("fmtstr_analyze() requires binary path")?;
-                    
+
                     use colored::Colorize;
-                    println!("{} Analyzing {} for format string vulnerabilities", 
-                        "[FMTSTR]".cyan(), 
+                    println!("{} Analyzing {} for format string vulnerabilities",
+                        "[FMTSTR]".cyan(),
                         binary.yellow());
                     println!();
                     println!("  {}:", "Dangerous functions".yellow());
@@ -2629,14 +3294,14 @@ fn eval_expr<'a>(
                     println!("    2. Leak addresses (fmtstr_leak, fmtstr_leak_stack)");
                     println!("    3. Overwrite GOT entries (fmtstr_got_overwrite)");
                     println!("    4. Chain to shellcode or ROP");
-                    
+
                     Ok(Value::Null)
                 }
                 "interactive" => {
                     if arg_values.is_empty() {
                         return Err("interactive() requires connection object or host/port".to_string());
                     }
-                    
+
                     let (host, port) = if let Value::Map(m) = &arg_values[0] {
                         let h = m.get("host")
                             .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
@@ -2650,7 +3315,7 @@ fn eval_expr<'a>(
                             .or_else(|| arg_values.first())
                             .map(|v| v.to_string())
                             .unwrap_or_else(|| "127.0.0.1".to_string());
-                        
+
                         let p = if let Some(Value::Number(n)) = arg_map.get("port").or_else(|| arg_values.get(1)) {
                             *n as u16
                         } else {
@@ -2658,27 +3323,27 @@ fn eval_expr<'a>(
                         };
                         (h, p)
                     };
-                    
+
                     use colored::Colorize;
                     println!("{} Switching to interactive mode ({}:{})", "[INTERACTIVE]".green(), host, port);
                     println!("{} Press Ctrl+C to exit", "[INTERACTIVE]".yellow());
-                    
+
                     let mut shell = crate::interactive_shell::create_interactive_shell(&host, port)
                         .map_err(|e| format!("Failed to create interactive shell: {}", e))?;
-                    
+
                     shell.start()
                         .map_err(|e| format!("Interactive shell error: {}", e))?;
-                    
+
                     Ok(Value::String("Interactive session closed".to_string()))
                 }
                 "disasm" => {
                     if arg_values.is_empty() {
                         return Err("disasm() requires bytes or file path argument".to_string());
                     }
-                    
+
                     let disasm = crate::disasm_visualizer::DisassemblerVisualizer::new_x64()
                         .map_err(|e| format!("Failed to create disassembler: {}", e))?;
-                    
+
                     let output = if let Value::Bytes(bytes) = &arg_values[0] {
                         let addr = if let Some(Value::Number(a)) = arg_map.get("addr") {
                             *a as u64
@@ -2707,48 +3372,48 @@ fn eval_expr<'a>(
                         disasm.disassemble_file(&path, offset, length, addr)
                             .map_err(|e| format!("Disassembly failed: {}", e))?
                     };
-                    
+
                     println!("{}", output);
                     Ok(Value::String("Disassembly complete".to_string()))
                 }
                 "parallel_exploit" => {
                     use crate::parallel_exploit::exploit_parallel;
-                    
+
                     if arg_values.len() < 2 {
                         return Err("parallel_exploit() requires targets list and payload".to_string());
                     }
-                    
+
                     let targets = if let Value::List(t) = &arg_values[0] {
                         t.iter().map(|v| v.to_string()).collect()
                     } else {
                         return Err("parallel_exploit() requires list of target strings".to_string());
                     };
-                    
+
                     let payload_bytes = match &arg_values[1] {
                         Value::Bytes(b) => b.clone(),
                         Value::String(s) => s.as_bytes().to_vec(),
                         _ => return Err("parallel_exploit() requires bytes or string payload".to_string()),
                     };
-                    
+
                     let results: Vec<crate::parallel_exploit::ExploitResult> = exploit_parallel(targets, payload_bytes).await
                         .map_err(|e| format!("Parallel exploitation failed: {}", e))?;
-                    
+
                     let success_count = results.iter().filter(|r| r.success).count();
                     let result_list: Vec<Value> = results.iter()
                         .map(|r| Value::String(format!("{}: {}", r.target, if r.success { "success" } else { "failed" })))
                         .collect();
-                    
+
                     println!("[PARALLEL] Successfully exploited {}/{} targets", success_count, results.len());
                     Ok(Value::List(result_list))
                 }
                 "generate_exploit" => {
                     use crate::ai_exploit_gen::{generate_exploit_ai, AIConfig};
                     use colored::*;
-                    
+
                     if arg_values.is_empty() {
                         return Err("generate_exploit() requires binary path".to_string());
                     }
-                    
+
                     let binary = arg_values[0].to_string();
                     let vuln_type = arg_map.get("vuln_type")
                         .or_else(|| arg_values.get(1))
@@ -2758,9 +3423,9 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.get(2))
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
-                    
-                    println!("{} Generating exploit for {}", "🤖".to_string().cyan(), binary.to_string().yellow());
-                    
+
+                    println!("{} Generating exploit for {}", "".to_string().cyan(), binary.to_string().yellow());
+
                     let config = AIConfig::default();
                     match generate_exploit_ai(&binary, &vuln_type, &arch, Some(config)) {
                         Ok(response) => {
@@ -2779,7 +3444,7 @@ fn eval_expr<'a>(
                     use crate::doc_generator::DocGenerator;
                     use colored::Colorize;
                     let doc_gen = DocGenerator::new();
-                    
+
                     if arg_values.is_empty() {
                         println!("\n{}", "╔═══════════════════════════════════════════════════════════╗".cyan());
                         println!("{}", "║              TALON FUNCTION DOCUMENTATION                 ║".cyan().bold());
@@ -2887,7 +3552,7 @@ fn eval_expr<'a>(
                         Value::List(items) => items,
                         _ => return Err(format!("flat() requires list, got {:?}", arg_values[0])),
                     };
-                    
+
                     use crate::packing_tools::pack64;
                     let mut result = Vec::new();
                     for item in items {
@@ -2915,7 +3580,7 @@ fn eval_expr<'a>(
                         Some(Value::String(s)) if s.len() == 1 => s.as_bytes()[0],
                         _ => b'A',
                     };
-                    
+
                     let mut result = data;
                     if result.len() < size {
                         result.resize(size, filler);
@@ -2936,7 +3601,7 @@ fn eval_expr<'a>(
                         Some(Value::String(s)) => s.as_bytes().to_vec(),
                         _ => return Err("xor() requires key argument".to_string()),
                     };
-                    
+
                     let mut result = Vec::new();
                     for (i, byte) in data.iter().enumerate() {
                         result.push(byte ^ key[i % key.len()]);
@@ -2952,7 +3617,7 @@ fn eval_expr<'a>(
                         Some(Value::String(s)) => s.as_str(),
                         _ => "x64",
                     };
-                    
+
                     use crate::packing_tools;
                     match packing_tools::assemble(code, arch) {
                         Ok(bytes) => Ok(Value::Bytes(bytes)),
@@ -3032,26 +3697,26 @@ fn eval_expr<'a>(
                         return Err("parse_elf() requires binary path argument".to_string());
                     }
                     let path = arg_values[0].to_string();
-                    
+
                     use crate::elf_tools::ElfContext;
                     use colored::Colorize;
-                    
+
                     println!("{} Loading ELF: {}", "[ELF]".cyan(), path.yellow());
                     let elf = ElfContext::load(&path)?;
-                    
-                    println!("{} {} symbols, {} PLT entries, {} GOT entries", 
-                        "[ELF]".cyan(), 
+
+                    println!("{} {} symbols, {} PLT entries, {} GOT entries",
+                        "[ELF]".cyan(),
                         elf.symbols.len().to_string().green(),
                         elf.plt.len().to_string().green(),
                         elf.got.len().to_string().green());
-                    
-                    println!("{} Security: NX={}, PIE={}, Canary={}, RELRO={}", 
+
+                    println!("{} Security: NX={}, PIE={}, Canary={}, RELRO={}",
                         "[ELF]".cyan(),
                         if elf.nx { "[OK]".green() } else { "[ERROR]".red() },
                         if elf.pie { "[OK]".green() } else { "[ERROR]".red() },
                         if elf.canary { "[OK]".green() } else { "[ERROR]".red() },
                         if elf.relro { "[OK]".green() } else { "[ERROR]".red() });
-                    
+
                     let mut elf_map = HashMap::new();
                     elf_map.insert("path".to_string(), Value::String(elf.path.clone()));
                     elf_map.insert("base".to_string(), Value::Number(elf.base_addr as i64));
@@ -3059,7 +3724,7 @@ fn eval_expr<'a>(
                     elf_map.insert("pie".to_string(), Value::Number(if elf.pie { 1 } else { 0 }));
                     elf_map.insert("canary".to_string(), Value::Number(if elf.canary { 1 } else { 0 }));
                     elf_map.insert("relro".to_string(), Value::Number(if elf.relro { 1 } else { 0 }));
-                    
+
                     for (name, addr) in &elf.symbols {
                         elf_map.insert(format!("sym_{}", name), Value::Number(*addr as i64));
                     }
@@ -3069,7 +3734,7 @@ fn eval_expr<'a>(
                     for (name, addr) in &elf.got {
                         elf_map.insert(format!("got_{}", name), Value::Number(*addr as i64));
                     }
-                    
+
                     Ok(Value::Map(elf_map))
                 }
                 "remote" => {
@@ -3077,27 +3742,27 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .ok_or("remote() requires 'host' parameter")?
                         .to_string();
-                    
+
                     let port = if let Some(Value::Number(p)) = arg_map.get("port").or_else(|| arg_values.get(1)) {
                         *p as u16
                     } else {
                         return Err("remote() requires 'port' parameter".to_string());
                     };
-                    
+
                     use colored::Colorize;
-                    
+
                     println!("{} Connecting to {}:{}", "[REMOTE]".cyan(), host.yellow(), port.to_string().yellow());
                     let socket = Socket::connect(format!("{}:{}", host, port))?;
                     println!("{} Connection established", "[REMOTE]".green());
-                    
+
                     let conn_id = CONNECTIONS.lock().await.add_socket(socket);
-                    
+
                     let mut conn_map = HashMap::new();
                     conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
                     conn_map.insert("host".to_string(), Value::String(host));
                     conn_map.insert("port".to_string(), Value::Number(port as i64));
                     conn_map.insert("type".to_string(), Value::String("socket".to_string()));
-                    
+
                     Ok(Value::Map(conn_map))
                 }
                 "connect" => {
@@ -3105,27 +3770,27 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .ok_or("connect() requires 'host' parameter")?
                         .to_string();
-                    
+
                     let port = if let Some(Value::Number(p)) = arg_map.get("port").or_else(|| arg_values.get(1)) {
                         *p as u16
                     } else {
                         return Err("connect() requires 'port' parameter".to_string());
                     };
-                    
+
                     use colored::Colorize;
-                    
+
                     println!("{} Connecting to {}:{}", "[CONNECT]".cyan(), host.yellow(), port.to_string().yellow());
                     let socket = Socket::connect(format!("{}:{}", host, port))?;
                     println!("{} Connection established", "[CONNECT]".green());
-                    
+
                     let conn_id = CONNECTIONS.lock().await.add_socket(socket);
-                    
+
                     let mut conn_map = HashMap::new();
                     conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
                     conn_map.insert("host".to_string(), Value::String(host));
                     conn_map.insert("port".to_string(), Value::Number(port as i64));
                     conn_map.insert("type".to_string(), Value::String("socket".to_string()));
-                    
+
                     Ok(Value::Map(conn_map))
                 }
                 "process" => {
@@ -3133,38 +3798,38 @@ fn eval_expr<'a>(
                         .or_else(|| arg_values.first())
                         .ok_or("process() requires 'binary' parameter")?
                         .to_string();
-                    
+
                     let args = if let Some(Value::List(arg_list)) = arg_map.get("args").or_else(|| arg_values.get(1)) {
                         arg_list.iter().map(|v| v.to_string()).collect::<Vec<_>>()
                     } else {
                         Vec::new()
                     };
-                    
+
                     use colored::Colorize;
-                    
+
                     println!("{} Spawning process: {}", "[PROCESS]".cyan(), binary.yellow());
                     let args_str: Vec<&str> = args.iter().map(|s| s.as_str()).collect();
                     let process = Process::spawn(&binary, &args_str)?;
                     println!("{} Process spawned", "[PROCESS]".green());
-                    
+
                     let conn_id = CONNECTIONS.lock().await.add_process(process);
-                    
+
                     let mut conn_map = HashMap::new();
                     conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
                     conn_map.insert("binary".to_string(), Value::String(binary));
                     conn_map.insert("type".to_string(), Value::String("process".to_string()));
-                    
+
                     Ok(Value::Map(conn_map))
                 }
                 "send" => {
                     let conn = arg_map.get("conn")
                         .or_else(|| arg_values.first())
                         .ok_or("send() requires connection object")?;
-                    
+
                     let data_val = arg_map.get("data")
                         .or_else(|| arg_values.get(1))
                         .ok_or("send() requires 'data' parameter")?;
-                    
+
                     let conn_id = if let Value::Map(m) = conn {
                         if let Some(Value::Number(id)) = m.get("id") {
                             *id as u64
@@ -3174,13 +3839,13 @@ fn eval_expr<'a>(
                     } else {
                         return Err("send() requires connection object".to_string());
                     };
-                    
+
                     let data = match data_val {
                         Value::Bytes(b) => b.clone(),
                         Value::String(s) => s.as_bytes().to_vec(),
                         _ => return Err(format!("send() data must be bytes or string, got {:?}", data_val)),
                     };
-                    
+
                     let mut registry = CONNECTIONS.lock().await;
                     match registry.get_mut(conn_id) {
                         Some(Connection::Socket(socket)) => {
@@ -3193,18 +3858,18 @@ fn eval_expr<'a>(
                         }
                         None => return Err(format!("Connection {} not found", conn_id)),
                     }
-                    
+
                     Ok(Value::Number(data.len() as i64))
                 }
                 "sendline" => {
                     let conn = arg_map.get("conn")
                         .or_else(|| arg_values.first())
                         .ok_or("sendline() requires connection object")?;
-                    
+
                     let data_val = arg_map.get("data")
                         .or_else(|| arg_values.get(1))
                         .ok_or("sendline() requires 'data' parameter")?;
-                    
+
                     let conn_id = if let Value::Map(m) = conn {
                         if let Some(Value::Number(id)) = m.get("id") {
                             *id as u64
@@ -3214,13 +3879,13 @@ fn eval_expr<'a>(
                     } else {
                         return Err("sendline() requires connection object".to_string());
                     };
-                    
+
                     let data = match data_val {
                         Value::Bytes(b) => b.clone(),
                         Value::String(s) => s.as_bytes().to_vec(),
                         _ => return Err(format!("sendline() data must be bytes or string, got {:?}", data_val)),
                     };
-                    
+
                     let mut registry = CONNECTIONS.lock().await;
                     match registry.get_mut(conn_id) {
                         Some(Connection::Socket(socket)) => {
@@ -3233,20 +3898,20 @@ fn eval_expr<'a>(
                         }
                         None => return Err(format!("Connection {} not found", conn_id)),
                     }
-                    
+
                     Ok(Value::Number((data.len() + 1) as i64))
                 }
                 "recv" => {
                     let conn = arg_map.get("conn")
                         .or_else(|| arg_values.first())
                         .ok_or("recv() requires connection object")?;
-                    
+
                     let n = if let Some(Value::Number(num)) = arg_map.get("n").or_else(|| arg_values.get(1)) {
                         *num as usize
                     } else {
                         return Err("recv() requires 'n' parameter (number of bytes)".to_string());
                     };
-                    
+
                     let conn_id = if let Value::Map(m) = conn {
                         if let Some(Value::Number(id)) = m.get("id") {
                             *id as u64
@@ -3256,7 +3921,7 @@ fn eval_expr<'a>(
                     } else {
                         return Err("recv() requires connection object".to_string());
                     };
-                    
+
                     let mut registry = CONNECTIONS.lock().await;
                     let data = match registry.get_mut(conn_id) {
                         Some(Connection::Socket(socket)) => {
@@ -3267,7 +3932,7 @@ fn eval_expr<'a>(
                         }
                         None => return Err(format!("Connection {} not found", conn_id)),
                     };
-                    
+
                     println!("[RECV] Received {} bytes", data.len());
                     Ok(Value::Bytes(data))
                 }
@@ -3275,7 +3940,7 @@ fn eval_expr<'a>(
                     let conn = arg_map.get("conn")
                         .or_else(|| arg_values.first())
                         .ok_or("recvline() requires connection object")?;
-                    
+
                     let conn_id = if let Value::Map(m) = conn {
                         if let Some(Value::Number(id)) = m.get("id") {
                             *id as u64
@@ -3285,7 +3950,7 @@ fn eval_expr<'a>(
                     } else {
                         return Err("recvline() requires connection object".to_string());
                     };
-                    
+
                     let mut registry = CONNECTIONS.lock().await;
                     let data = match registry.get_mut(conn_id) {
                         Some(Connection::Socket(socket)) => {
@@ -3296,7 +3961,7 @@ fn eval_expr<'a>(
                         }
                         None => return Err(format!("Connection {} not found", conn_id)),
                     };
-                    
+
                     println!("[RECVLINE] Received line: {} bytes", data.len());
                     Ok(Value::Bytes(data))
                 }
@@ -3304,11 +3969,11 @@ fn eval_expr<'a>(
                     let conn = arg_map.get("conn")
                         .or_else(|| arg_values.first())
                         .ok_or("recv_until() requires connection object")?;
-                    
+
                     let delim_val = arg_map.get("delim")
                         .or_else(|| arg_values.get(1))
                         .ok_or("recv_until() requires 'delim' parameter")?;
-                    
+
                     let conn_id = if let Value::Map(m) = conn {
                         if let Some(Value::Number(id)) = m.get("id") {
                             *id as u64
@@ -3318,13 +3983,13 @@ fn eval_expr<'a>(
                     } else {
                         return Err("recv_until() requires connection object".to_string());
                     };
-                    
+
                     let delim = match delim_val {
                         Value::String(s) => s.as_bytes().to_vec(),
                         Value::Bytes(b) => b.clone(),
                         _ => return Err("recv_until() delimiter must be string or bytes".to_string()),
                     };
-                    
+
                     let mut registry = CONNECTIONS.lock().await;
                     let data = match registry.get_mut(conn_id) {
                         Some(Connection::Socket(socket)) => {
@@ -3335,7 +4000,7 @@ fn eval_expr<'a>(
                         }
                         None => return Err(format!("Connection {} not found", conn_id)),
                     };
-                    
+
                     println!("[RECV_UNTIL] Received {} bytes", data.len());
                     Ok(Value::Bytes(data))
                 }
@@ -3343,11 +4008,11 @@ fn eval_expr<'a>(
                     let conn = arg_map.get("conn")
                         .or_else(|| arg_values.first())
                         .ok_or("recvuntil() requires connection object")?;
-                    
+
                     let delim_val = arg_map.get("delim")
                         .or_else(|| arg_values.get(1))
                         .ok_or("recvuntil() requires 'delim' parameter")?;
-                    
+
                     let conn_id = if let Value::Map(m) = conn {
                         if let Some(Value::Number(id)) = m.get("id") {
                             *id as u64
@@ -3357,13 +4022,13 @@ fn eval_expr<'a>(
                     } else {
                         return Err("recvuntil() requires connection object".to_string());
                     };
-                    
+
                     let delim = match delim_val {
                         Value::String(s) => s.as_bytes().to_vec(),
                         Value::Bytes(b) => b.clone(),
                         _ => return Err("recvuntil() delimiter must be string or bytes".to_string()),
                     };
-                    
+
                     let mut registry = CONNECTIONS.lock().await;
                     let data = match registry.get_mut(conn_id) {
                         Some(Connection::Socket(socket)) => {
@@ -3374,7 +4039,7 @@ fn eval_expr<'a>(
                         }
                         None => return Err(format!("Connection {} not found", conn_id)),
                     };
-                    
+
                     println!("[RECVUNTIL] Received {} bytes", data.len());
                     Ok(Value::Bytes(data))
                 }
@@ -3382,17 +4047,17 @@ fn eval_expr<'a>(
                     if arg_values.len() < 2 {
                         return Err("leak_address() requires 2 arguments: leak_address(conn, function_name)".into());
                     }
-                    
+
                     let _conn = &arg_values[0];
                     let func_name = match &arg_values[1] {
                         Value::String(s) => s.clone(),
                         _ => return Err("leak_address() function_name must be a string".into()),
                     };
-                    
+
                     println!("[LEAK_ADDRESS] Attempting to leak address of '{}'", func_name);
                     println!("[LEAK_ADDRESS] Note: This is a stub implementation for testing");
                     println!("[LEAK_ADDRESS] In production, this would build a ROP chain and leak the actual address");
-                    
+
                     Ok(Value::Number(0x7ffff7a0d000))
                 }
                 "print" => {
@@ -3566,7 +4231,7 @@ fn eval_expr<'a>(
                             use crate::binary_analyzer::BinaryAnalyzer;
                             let analysis = BinaryAnalyzer::analyze(path)?;
                             let protections = analysis.protections;
-                            
+
                             let mut result = HashMap::new();
                             result.insert("nx".to_string(), Value::Number(if protections.nx { 1 } else { 0 }));
                             result.insert("pie".to_string(), Value::Number(if protections.pie { 1 } else { 0 }));
@@ -3580,7 +4245,7 @@ fn eval_expr<'a>(
                             ));
                             result.insert("aslr".to_string(), Value::Number(if protections.aslr { 1 } else { 0 }));
                             result.insert("fortify".to_string(), Value::Number(if protections.fortify { 1 } else { 0 }));
-                            
+
                             Ok(Value::Map(result))
                         }
                         _ => Err("checksec() requires string path argument".into())
@@ -3594,34 +4259,34 @@ fn eval_expr<'a>(
                         Value::String(path) => {
                             use crate::elf_tools::ElfContext;
                             let elf = ElfContext::load(path)?;
-                            
+
                             let mut result = HashMap::new();
-                            
+
                             let mut plt_map = HashMap::new();
                             for (name, addr) in elf.plt {
                                 plt_map.insert(name, Value::Number(addr as i64));
                             }
                             result.insert("plt".to_string(), Value::Map(plt_map));
-                            
+
                             let mut got_map = HashMap::new();
                             for (name, addr) in elf.got {
                                 got_map.insert(name, Value::Number(addr as i64));
                             }
                             result.insert("got".to_string(), Value::Map(got_map));
-                            
+
                             let mut symbols_map = HashMap::new();
                             for (name, addr) in elf.symbols {
                                 symbols_map.insert(name, Value::Number(addr as i64));
                             }
                             result.insert("symbols".to_string(), Value::Map(symbols_map));
-                            
+
                             result.insert("nx".to_string(), Value::Number(if elf.nx { 1 } else { 0 }));
                             result.insert("pie".to_string(), Value::Number(if elf.pie { 1 } else { 0 }));
                             result.insert("canary".to_string(), Value::Number(if elf.canary { 1 } else { 0 }));
                             result.insert("relro".to_string(), Value::Number(if elf.relro { 1 } else { 0 }));
                             result.insert("fortify".to_string(), Value::Number(if elf.fortify { 1 } else { 0 }));
                             result.insert("base_addr".to_string(), Value::Number(elf.base_addr as i64));
-                            
+
                             Ok(Value::Map(result))
                         }
                         _ => Err("analyze() requires string path argument".into())
@@ -3635,27 +4300,27 @@ fn eval_expr<'a>(
                         Value::String(path) => {
                             use crate::elf_tools::ElfContext;
                             let elf = ElfContext::load(path)?;
-                            
+
                             let mut result = HashMap::new();
-                            
+
                             let mut plt_map = HashMap::new();
                             for (name, addr) in elf.plt {
                                 plt_map.insert(name, Value::Number(addr as i64));
                             }
                             result.insert("plt".to_string(), Value::Map(plt_map));
-                            
+
                             let mut got_map = HashMap::new();
                             for (name, addr) in elf.got {
                                 got_map.insert(name, Value::Number(addr as i64));
                             }
                             result.insert("got".to_string(), Value::Map(got_map));
-                            
+
                             let mut symbols_map = HashMap::new();
                             for (name, addr) in elf.symbols {
                                 symbols_map.insert(name, Value::Number(addr as i64));
                             }
                             result.insert("symbols".to_string(), Value::Map(symbols_map));
-                            
+
                             result.insert("nx".to_string(), Value::Number(if elf.nx { 1 } else { 0 }));
                             result.insert("pie".to_string(), Value::Number(if elf.pie { 1 } else { 0 }));
                             result.insert("canary".to_string(), Value::Number(if elf.canary { 1 } else { 0 }));
@@ -3663,7 +4328,7 @@ fn eval_expr<'a>(
                             result.insert("fortify".to_string(), Value::Number(if elf.fortify { 1 } else { 0 }));
                             result.insert("base_addr".to_string(), Value::Number(elf.base_addr as i64));
                             result.insert("path".to_string(), Value::String(path.clone()));
-                            
+
                             Ok(Value::Map(result))
                         }
                         _ => Err("Elf() requires string path argument".into())
@@ -3677,15 +4342,15 @@ fn eval_expr<'a>(
                         Value::String(version) => {
                             use crate::libc_db::LibcDatabase;
                             let db = LibcDatabase::new();
-                            
+
                             let libc_version = if let Some(libc) = db.get(version) {
                                 libc.clone()
                             } else {
                                 return Err(format!("Libc version '{}' not found. Available: ubuntu18.04, ubuntu20.04, ubuntu22.04, debian10", version));
                             };
-                            
+
                             let mut result = HashMap::new();
-                            
+
                             let mut symbols_map = HashMap::new();
                             symbols_map.insert("system".to_string(), Value::Number(libc_version.system as i64));
                             symbols_map.insert("execve".to_string(), Value::Number(libc_version.execve as i64));
@@ -3700,35 +4365,35 @@ fn eval_expr<'a>(
                             symbols_map.insert("__free_hook".to_string(), Value::Number(libc_version.free_hook as i64));
                             symbols_map.insert("__realloc_hook".to_string(), Value::Number(libc_version.realloc_hook as i64));
                             result.insert("symbols".to_string(), Value::Map(symbols_map));
-                            
+
                             let mut one_gadgets = Vec::new();
                             for &gadget in &libc_version.one_gadgets {
                                 one_gadgets.push(Value::Number(gadget as i64));
                             }
                             result.insert("one_gadgets".to_string(), Value::List(one_gadgets));
-                            
+
                             result.insert("name".to_string(), Value::String(libc_version.name.clone()));
                             result.insert("build_id".to_string(), Value::String(libc_version.build_id.clone()));
                             result.insert("base".to_string(), Value::Number(0));
-                            
+
                             Ok(Value::Map(result))
                         }
                         Value::Map(m) if m.contains_key("base") => {
                             let version = m.get("version")
                                 .and_then(|v| if let Value::String(s) = v { Some(s.as_str()) } else { None })
                                 .ok_or("Libc object requires 'version' field")?;
-                            
+
                             let base = m.get("base")
                                 .and_then(|v| if let Value::Number(n) = v { Some(*n as u64) } else { None })
                                 .ok_or("Libc object requires numeric 'base' field")?;
-                            
+
                             use crate::libc_db::LibcDatabase;
                             let db = LibcDatabase::new();
                             let libc_version = db.get(version)
                                 .ok_or(format!("Libc version '{}' not found", version))?;
-                            
+
                             let mut result = HashMap::new();
-                            
+
                             let mut symbols_map = HashMap::new();
                             symbols_map.insert("system".to_string(), Value::Number((base + libc_version.system) as i64));
                             symbols_map.insert("execve".to_string(), Value::Number((base + libc_version.execve) as i64));
@@ -3743,17 +4408,17 @@ fn eval_expr<'a>(
                             symbols_map.insert("__free_hook".to_string(), Value::Number((base + libc_version.free_hook) as i64));
                             symbols_map.insert("__realloc_hook".to_string(), Value::Number((base + libc_version.realloc_hook) as i64));
                             result.insert("symbols".to_string(), Value::Map(symbols_map));
-                            
+
                             let mut one_gadgets = Vec::new();
                             for &gadget in &libc_version.one_gadgets {
                                 one_gadgets.push(Value::Number((base + gadget) as i64));
                             }
                             result.insert("one_gadgets".to_string(), Value::List(one_gadgets));
-                            
+
                             result.insert("name".to_string(), Value::String(libc_version.name.clone()));
                             result.insert("build_id".to_string(), Value::String(libc_version.build_id.clone()));
                             result.insert("base".to_string(), Value::Number(base as i64));
-                            
+
                             Ok(Value::Map(result))
                         }
                         _ => Err("Libc() requires string version or map with base".into())
@@ -3763,7 +4428,7 @@ fn eval_expr<'a>(
                     if arg_values.is_empty() {
                         return Err("ROP() requires 1 argument: ROP(elf_obj or binary_path)".into());
                     }
-                    
+
                     let binary_path = match &arg_values[0] {
                         Value::String(path) => path.clone(),
                         Value::Map(m) => {
@@ -3773,39 +4438,39 @@ fn eval_expr<'a>(
                         }
                         _ => return Err("ROP() requires ELF object or binary path string".into())
                     };
-                    
+
                     use crate::rop_tools::RopChain;
                     let rop = RopChain::new(&binary_path)?;
-                    
+
                     let mut gadgets_map = HashMap::new();
                     for gadget in rop.gadgets.iter().take(100) {
                         let gadget_str = gadget.instructions.join("; ");
                         gadgets_map.insert(gadget_str, Value::Number(gadget.address as i64));
                     }
-                    
+
                     let mut result = HashMap::new();
                     result.insert("binary".to_string(), Value::String(binary_path));
                     result.insert("gadgets".to_string(), Value::Map(gadgets_map));
                     result.insert("gadget_count".to_string(), Value::Number(rop.gadgets.len() as i64));
-                    
+
                     Ok(Value::Map(result))
                 }
                 "find" => {
                     if arg_values.len() < 2 {
                         return Err("find() requires 2 arguments: find(rop_obj, pattern)".into());
                     }
-                    
+
                     match (&arg_values[0], &arg_values[1]) {
                         (Value::Map(m), Value::String(pattern)) => {
                             if let Some(Value::Map(gadgets_map)) = m.get("gadgets") {
                                 let pattern_lower = pattern.to_lowercase();
-                                
+
                                 for (gadget_str, addr) in gadgets_map {
                                     if gadget_str.to_lowercase().contains(&pattern_lower) {
                                         return Ok(addr.clone());
                                     }
                                 }
-                                
+
                                 Err(format!("Gadget not found: '{}'. Try searching for a simpler pattern.", pattern))
                             } else {
                                 Err("find() requires ROP object (from ROP() or quick_rop())".into())
@@ -6237,6 +6902,47 @@ fn eval_expr<'a>(
                         _ => Err("libc_search() requires (string symbol, number addr)".into())
                     }
                 }
+                "libc_identify" => {
+                    if arg_values.len() < 2 {
+                        return Err("libc_identify() requires 2 arguments: libc_identify(leaked_addr, symbol)".into());
+                    }
+                    match (&arg_values[0], &arg_values[1]) {
+                        (Value::Number(addr), Value::String(symbol)) => {
+                            match crate::libc_db::identify_libc(*addr as u64, symbol) {
+                                Ok(libc_version) => {
+                                    let mut result = HashMap::new();
+                                    result.insert("name".to_string(), Value::String(libc_version.name.clone()));
+                                    result.insert("build_id".to_string(), Value::String(libc_version.build_id.clone()));
+
+                                    let mut symbols_map = HashMap::new();
+                                    symbols_map.insert("system".to_string(), Value::Number(libc_version.system as i64));
+                                    symbols_map.insert("execve".to_string(), Value::Number(libc_version.execve as i64));
+                                    symbols_map.insert("sh".to_string(), Value::Number(libc_version.sh_string as i64));
+                                    symbols_map.insert("bin_sh".to_string(), Value::Number(libc_version.bin_sh_string as i64));
+                                    symbols_map.insert("dup2".to_string(), Value::Number(libc_version.dup2 as i64));
+                                    symbols_map.insert("read".to_string(), Value::Number(libc_version.read as i64));
+                                    symbols_map.insert("write".to_string(), Value::Number(libc_version.write as i64));
+                                    symbols_map.insert("open".to_string(), Value::Number(libc_version.open as i64));
+                                    symbols_map.insert("mprotect".to_string(), Value::Number(libc_version.mprotect as i64));
+                                    symbols_map.insert("__malloc_hook".to_string(), Value::Number(libc_version.malloc_hook as i64));
+                                    symbols_map.insert("__free_hook".to_string(), Value::Number(libc_version.free_hook as i64));
+                                    symbols_map.insert("__realloc_hook".to_string(), Value::Number(libc_version.realloc_hook as i64));
+                                    result.insert("symbols".to_string(), Value::Map(symbols_map));
+
+                                    let mut one_gadgets = Vec::new();
+                                    for &gadget in &libc_version.one_gadgets {
+                                        one_gadgets.push(Value::Number(gadget as i64));
+                                    }
+                                    result.insert("one_gadgets".to_string(), Value::List(one_gadgets));
+
+                                    Ok(Value::Map(result))
+                                }
+                                Err(e) => Err(format!("libc_identify failed: {}", e))
+                            }
+                        }
+                        _ => Err("libc_identify() requires (number leaked_addr, string symbol)".into())
+                    }
+                }
                 "libc_symbols" => {
                     if arg_values.is_empty() {
                         return Err("libc_symbols() requires 1 argument: libc_symbols(libc_path)".into());
@@ -6293,7 +6999,7 @@ fn eval_expr<'a>(
                     match (&arg_values[0], &arg_values[1]) {
                         (Value::String(url), Value::String(flag)) => {
                             match crate::flag_tools::flag_submit(url, flag) {
-                                Ok(response) => Ok(Value::String(format!("{}: {}", 
+                                Ok(response) => Ok(Value::String(format!("{}: {}",
                                     if response.success { "SUCCESS" } else { "FAILED" },
                                     response.message))),
                                 Err(e) => Err(format!("flag_submit failed: {}", e))
@@ -6340,21 +7046,21 @@ fn eval_expr<'a>(
                         Value::String(binary) => {
                             use crate::rop_tools::RopChain;
                             let rop = RopChain::new(binary)?;
-                            
+
                             let mut gadgets_map = HashMap::new();
                             for gadget in &rop.gadgets {
                                 let gadget_str = gadget.instructions.join("; ");
                                 gadgets_map.insert(gadget_str, Value::Number(gadget.address as i64));
                             }
-                            
+
                             let mut result = HashMap::new();
                             result.insert("binary".to_string(), Value::String(binary.clone()));
                             result.insert("gadgets".to_string(), Value::Map(gadgets_map));
                             result.insert("gadget_count".to_string(), Value::Number(rop.gadgets.len() as i64));
                             result.insert("_type".to_string(), Value::String("ROP".to_string()));
-                            
+
                             println!("[ROP] Loaded {} gadgets from {}", rop.gadgets.len(), binary);
-                            
+
                             Ok(Value::Map(result))
                         }
                         _ => Err("quick_rop() requires string binary path".into())
@@ -6388,22 +7094,26 @@ fn eval_expr<'a>(
                     }
                 }
             }
-        }
-        Expr::MacroCall { name, args } => {
-            if let Some(_macro) = macros.read().await.get(name).cloned() {
-                let mut arg_values = Vec::new();
-                for arg_expr in args {
-                    arg_values.push(eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone()).await?);
-                }
-                Ok(Value::String(format!("macro {}({:?})", name, arg_values)))
-            } else {
-                Err(format!("Macro '{}' not found", name))
             }
-        }
-        Expr::Index { base, index } => {
-            let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
-            let index_val = eval_expr(index, vars.clone(), funcs.clone(), macros.clone()).await?;
-            match (base_val, index_val) {
+            Expr::MacroCall { name, args } => {
+                if let Some(_macro) = macros.read().await.get(name).cloned() {
+                    let mut arg_values = Vec::new();
+                    for arg_expr in args {
+                        arg_values.push(
+                            eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone())
+                                .await?,
+                        );
+                    }
+                    Ok(Value::String(format!("macro {}({:?})", name, arg_values)))
+                } else {
+                    Err(format!("Macro '{}' not found", name))
+                }
+            }
+            Expr::Index { base, index } => {
+                let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let index_val =
+                    eval_expr(index, vars.clone(), funcs.clone(), macros.clone()).await?;
+                match (base_val, index_val) {
                 (Value::List(list), Value::Number(idx)) => {
                     let idx_usize = idx as usize;
                     let len = list.len();
@@ -6455,142 +7165,166 @@ fn eval_expr<'a>(
                 }
                 _ => Err("TYPE ERROR\nIndexing requires:\n  - list[number]\n  - string[number]\n  - map[string]\n\nExamples:\n  data[0]\n  str[5]\n  elf.symbols[\"main\"]".into()),
             }
-        }
-        Expr::Slice { base, start, end } => {
-            let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
-            let start_val = eval_expr(start, vars.clone(), funcs.clone(), macros.clone()).await?;
-            let end_val = eval_expr(end, vars.clone(), funcs.clone(), macros.clone()).await?;
-            match (base_val, start_val, end_val) {
-                (Value::List(list), Value::Number(s), Value::Number(e)) => {
-                    let start = s as usize;
-                    let end = e as usize;
-                    Ok(Value::List(list.get(start..end).unwrap_or(&[]).to_vec()))
+            }
+            Expr::Slice { base, start, end } => {
+                let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let start_val =
+                    eval_expr(start, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let end_val = eval_expr(end, vars.clone(), funcs.clone(), macros.clone()).await?;
+                match (base_val, start_val, end_val) {
+                    (Value::List(list), Value::Number(s), Value::Number(e)) => {
+                        let start = s as usize;
+                        let end = e as usize;
+                        Ok(Value::List(list.get(start..end).unwrap_or(&[]).to_vec()))
+                    }
+                    (Value::String(str), Value::Number(s), Value::Number(e)) => {
+                        let start = s as usize;
+                        let end = e as usize;
+                        Ok(Value::String(
+                            str.chars().skip(start).take(end - start).collect(),
+                        ))
+                    }
+                    _ => Err("Slicing requires list or string and numeric range".into()),
                 }
-                (Value::String(str), Value::Number(s), Value::Number(e)) => {
-                    let start = s as usize;
-                    let end = e as usize;
-                    Ok(Value::String(str.chars().skip(start).take(end - start).collect()))
-                }
-                _ => Err("Slicing requires list or string and numeric range".into()),
             }
-        }
-        Expr::Pack { size, value } => {
-            let val = eval_expr(value, vars.clone(), funcs.clone(), macros.clone()).await?;
-            if let Value::Number(n) = val {
-                let bytes = match size {
-                    64 => n.to_le_bytes().to_vec(),
-                    32 => (n as u32).to_le_bytes().to_vec(),
-                    16 => (n as u16).to_le_bytes().to_vec(),
-                    8 => vec![n as u8],
-                    _ => return Err(format!("Unsupported pack size: {}", size)),
-                };
-                Ok(Value::Bytes(bytes))
-            } else {
-                Err(format!("Pack requires number, got {:?}", val))
-            }
-        }
-        Expr::Unpack { size, data } => {
-            let val = eval_expr(data, vars.clone(), funcs.clone(), macros.clone()).await?;
-            if let Value::Bytes(bytes) = val {
-                let num = match size {
-                    64 => {
-                        if bytes.len() >= 8 {
-                            i64::from_le_bytes(bytes[0..8].try_into().unwrap())
-                        } else {
-                            return Err("Not enough bytes for u64".into());
-                        }
-                    }
-                    32 => {
-                        if bytes.len() >= 4 {
-                            u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as i64
-                        } else {
-                            return Err("Not enough bytes for u32".into());
-                        }
-                    }
-                    16 => {
-                        if bytes.len() >= 2 {
-                            u16::from_le_bytes(bytes[0..2].try_into().unwrap()) as i64
-                        } else {
-                            return Err("Not enough bytes for u16".into());
-                        }
-                    }
-                    8 => {
-                        if !bytes.is_empty() {
-                            bytes[0] as i64
-                        } else {
-                            return Err("Not enough bytes for u8".into());
-                        }
-                    }
-                    _ => return Err(format!("Unsupported unpack size: {}", size)),
-                };
-                Ok(Value::Number(num))
-            } else {
-                Err(format!("Unpack requires bytes, got {:?}", val))
-            }
-        }
-        Expr::Spread(_) => {
-            Err("Spread operator can only be used inside list literals".into())
-        }
-        Expr::Pipe { stages } => {
-            let mut current_value = None;
-            for (i, stage) in stages.iter().enumerate() {
-                if i == 0 {
-                    current_value = Some(eval_expr(stage, vars.clone(), funcs.clone(), macros.clone()).await?);
+            Expr::Pack { size, value } => {
+                let val = eval_expr(value, vars.clone(), funcs.clone(), macros.clone()).await?;
+                if let Value::Number(n) = val {
+                    let bytes = match size {
+                        64 => n.to_le_bytes().to_vec(),
+                        32 => (n as u32).to_le_bytes().to_vec(),
+                        16 => (n as u16).to_le_bytes().to_vec(),
+                        8 => vec![n as u8],
+                        _ => return Err(format!("Unsupported pack size: {}", size)),
+                    };
+                    Ok(Value::Bytes(bytes))
                 } else {
-                    match stage {
-                        Expr::Ident(func_name) => {
-                            let input = current_value.take().unwrap();
-                            match func_name.as_str() {
-                                "p64" => {
-                                    if let Value::Number(n) = input {
-                                        current_value = Some(Value::Bytes(n.to_le_bytes().to_vec()));
-                                    } else {
-                                        return Err("p64 requires a number".into());
-                                    }
-                                }
-                                "p32" => {
-                                    if let Value::Number(n) = input {
-                                        current_value = Some(Value::Bytes((n as u32).to_le_bytes().to_vec()));
-                                    } else {
-                                        return Err("p32 requires a number".into());
-                                    }
-                                }
-                                "p16" => {
-                                    if let Value::Number(n) = input {
-                                        current_value = Some(Value::Bytes((n as u16).to_le_bytes().to_vec()));
-                                    } else {
-                                        return Err("p16 requires a number".into());
-                                    }
-                                }
-                                "p8" => {
-                                    if let Value::Number(n) = input {
-                                        current_value = Some(Value::Bytes(vec![n as u8]));
-                                    } else {
-                                        return Err("p8 requires a number".into());
-                                    }
-                                }
-                                _ => {
-                                    return Err(format!("Unknown function in pipe: {}", func_name));
-                                }
+                    Err(format!("Pack requires number, got {:?}", val))
+                }
+            }
+            Expr::Unpack { size, data } => {
+                let val = eval_expr(data, vars.clone(), funcs.clone(), macros.clone()).await?;
+                if let Value::Bytes(bytes) = val {
+                    let num = match size {
+                        64 => {
+                            if bytes.len() >= 8 {
+                                i64::from_le_bytes(bytes[0..8].try_into().unwrap())
+                            } else {
+                                return Err("Not enough bytes for u64".into());
                             }
                         }
-                        Expr::Call { name, args } => {
-                            let input = current_value.take().unwrap();
-                            vars.write().await.insert("_".to_string(), input);
-                            let mut all_args = vec![(None, Expr::Ident("_".to_string()))];
-                            all_args.extend(args.clone());
-                            current_value = Some(eval_expr(&Expr::Call { name: name.clone(), args: all_args }, vars.clone(), funcs.clone(), macros.clone()).await?);
+                        32 => {
+                            if bytes.len() >= 4 {
+                                u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as i64
+                            } else {
+                                return Err("Not enough bytes for u32".into());
+                            }
                         }
-                        _ => {
-                            return Err("Pipe stages must be function names or function calls".into());
+                        16 => {
+                            if bytes.len() >= 2 {
+                                u16::from_le_bytes(bytes[0..2].try_into().unwrap()) as i64
+                            } else {
+                                return Err("Not enough bytes for u16".into());
+                            }
+                        }
+                        8 => {
+                            if !bytes.is_empty() {
+                                bytes[0] as i64
+                            } else {
+                                return Err("Not enough bytes for u8".into());
+                            }
+                        }
+                        _ => return Err(format!("Unsupported unpack size: {}", size)),
+                    };
+                    Ok(Value::Number(num))
+                } else {
+                    Err(format!("Unpack requires bytes, got {:?}", val))
+                }
+            }
+            Expr::Spread(_) => Err("Spread operator can only be used inside list literals".into()),
+            Expr::Pipe { stages } => {
+                let mut current_value = None;
+                for (i, stage) in stages.iter().enumerate() {
+                    if i == 0 {
+                        current_value = Some(
+                            eval_expr(stage, vars.clone(), funcs.clone(), macros.clone()).await?,
+                        );
+                    } else {
+                        match stage {
+                            Expr::Ident(func_name) => {
+                                let input = current_value.take().unwrap();
+                                match func_name.as_str() {
+                                    "p64" => {
+                                        if let Value::Number(n) = input {
+                                            current_value =
+                                                Some(Value::Bytes(n.to_le_bytes().to_vec()));
+                                        } else {
+                                            return Err("p64 requires a number".into());
+                                        }
+                                    }
+                                    "p32" => {
+                                        if let Value::Number(n) = input {
+                                            current_value = Some(Value::Bytes(
+                                                (n as u32).to_le_bytes().to_vec(),
+                                            ));
+                                        } else {
+                                            return Err("p32 requires a number".into());
+                                        }
+                                    }
+                                    "p16" => {
+                                        if let Value::Number(n) = input {
+                                            current_value = Some(Value::Bytes(
+                                                (n as u16).to_le_bytes().to_vec(),
+                                            ));
+                                        } else {
+                                            return Err("p16 requires a number".into());
+                                        }
+                                    }
+                                    "p8" => {
+                                        if let Value::Number(n) = input {
+                                            current_value = Some(Value::Bytes(vec![n as u8]));
+                                        } else {
+                                            return Err("p8 requires a number".into());
+                                        }
+                                    }
+                                    _ => {
+                                        return Err(format!(
+                                            "Unknown function in pipe: {}",
+                                            func_name
+                                        ));
+                                    }
+                                }
+                            }
+                            Expr::Call { name, args } => {
+                                let input = current_value.take().unwrap();
+                                vars.write().await.insert("_".to_string(), input);
+                                let mut all_args = vec![(None, Expr::Ident("_".to_string()))];
+                                all_args.extend(args.clone());
+                                current_value = Some(
+                                    eval_expr(
+                                        &Expr::Call {
+                                            name: name.clone(),
+                                            args: all_args,
+                                        },
+                                        vars.clone(),
+                                        funcs.clone(),
+                                        macros.clone(),
+                                    )
+                                    .await?,
+                                );
+                            }
+                            _ => {
+                                return Err(
+                                    "Pipe stages must be function names or function calls".into()
+                                );
+                            }
                         }
                     }
                 }
+                current_value.ok_or("Empty pipe".into())
             }
-            current_value.ok_or("Empty pipe".into())
+            Expr::Return(_) => Err("Return outside function".into()),
         }
-        Expr::Return(_) => Err("Return outside function".into()),
-    }
     })
 }
 
@@ -6598,26 +7332,23 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let len1 = s1.len();
     let len2 = s2.len();
     let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
-    
+
     for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
         row[0] = i;
     }
     for (j, cell) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
         *cell = j;
     }
-    
+
     for (i, c1) in s1.chars().enumerate() {
         for (j, c2) in s2.chars().enumerate() {
             let cost = if c1 == c2 { 0 } else { 1 };
             matrix[i + 1][j + 1] = std::cmp::min(
-                std::cmp::min(
-                    matrix[i][j + 1] + 1,
-                    matrix[i + 1][j] + 1
-                ),
-                matrix[i][j] + cost
+                std::cmp::min(matrix[i][j + 1] + 1, matrix[i + 1][j] + 1),
+                matrix[i][j] + cost,
             );
         }
     }
-    
+
     matrix[len1][len2]
 }

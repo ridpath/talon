@@ -19,17 +19,17 @@ impl TutorialSystem {
         println!("{}", "=".repeat(70));
         println!("\nThis interactive tutorial will guide you through your first exploit.");
         println!("You'll learn to exploit a buffer overflow and spawn a shell.\n");
-        
+
         self.step1_introduction()?;
         self.step2_binary_analysis()?;
         self.step3_offset_finding()?;
         self.step4_rop_chain()?;
         self.step5_exploitation()?;
-        
+
         println!("\n{}", "=".repeat(70));
         println!("Congratulations! You've completed your first exploit!");
         println!("{}", "=".repeat(70));
-        
+
         Ok(())
     }
 

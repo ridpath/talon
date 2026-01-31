@@ -1,4 +1,4 @@
-# 📡 Connect to a challenge server and send a crafted payload
+#  Connect to a challenge server and send a crafted payload
 
 # Connect to the target
 connect to "127.0.0.1" on port 1337

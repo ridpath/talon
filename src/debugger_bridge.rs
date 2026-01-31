@@ -1,8 +1,10 @@
 // LIVE DEBUGGING BRIDGE
 // GDB/LLDB/WinDbg integration for unified debugging
 
+#![allow(clippy::upper_case_acronyms)]
+
 use std::collections::HashMap;
-use std::process::{Command, Stdio, Child};
+use std::process::{Child, Command, Stdio};
 
 #[derive(Debug, Clone)]
 pub enum Debugger {
@@ -57,7 +59,7 @@ impl DebuggerBridge {
         };
 
         log::info!("Initializing debugger bridge for: {}", binary);
-        
+
         DebuggerBridge {
             debugger,
             target_binary: binary,
@@ -69,7 +71,7 @@ impl DebuggerBridge {
 
     pub fn attach(&mut self) -> Result<(), String> {
         log::info!("Attaching debugger to {}", self.target_binary);
-        
+
         match self.debugger {
             Debugger::GDB => self.attach_gdb(),
             Debugger::LLDB => self.attach_lldb(),
@@ -79,7 +81,7 @@ impl DebuggerBridge {
 
     fn attach_gdb(&mut self) -> Result<(), String> {
         log::info!("Starting GDB session with MI interface");
-        
+
         let child = Command::new("gdb")
             .arg("--interpreter=mi")
             .arg("--quiet")
@@ -89,14 +91,14 @@ impl DebuggerBridge {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("Failed to start GDB: {}", e))?;
-        
+
         self.process = Some(child);
         Ok(())
     }
 
     fn attach_lldb(&mut self) -> Result<(), String> {
         log::info!("Starting LLDB session");
-        
+
         let child = Command::new("lldb")
             .arg(&self.target_binary)
             .stdin(Stdio::piped())
@@ -104,7 +106,7 @@ impl DebuggerBridge {
             .stderr(Stdio::piped())
             .spawn()
             .map_err(|e| format!("Failed to start LLDB: {}", e))?;
-        
+
         self.process = Some(child);
         Ok(())
     }
@@ -114,7 +116,11 @@ impl DebuggerBridge {
         Ok(())
     }
 
-    pub fn add_breakpoint(&mut self, location: BreakpointLocation, condition: Option<String>) -> usize {
+    pub fn add_breakpoint(
+        &mut self,
+        location: BreakpointLocation,
+        condition: Option<String>,
+    ) -> usize {
         let id = self.breakpoints.len();
         let bp = Breakpoint {
             id,
@@ -122,21 +128,26 @@ impl DebuggerBridge {
             condition,
             enabled: true,
         };
-        
+
         log::info!("Adding breakpoint {}: {:?}", id, location);
         self.breakpoints.push(bp);
         id
     }
 
-    pub fn add_watchpoint(&mut self, address: u64, size: usize, access_type: WatchType) -> Result<(), String> {
+    pub fn add_watchpoint(
+        &mut self,
+        address: u64,
+        size: usize,
+        access_type: WatchType,
+    ) -> Result<(), String> {
         log::info!("Adding watchpoint at 0x{:x} ({} bytes)", address, size);
-        
+
         let wp = Watchpoint {
             address,
             size,
             access_type,
         };
-        
+
         self.watchpoints.push(wp);
         Ok(())
     }
@@ -173,14 +184,12 @@ impl DebuggerBridge {
 
     pub fn backtrace(&self) -> Result<Vec<StackFrame>, String> {
         log::info!("Getting backtrace");
-        Ok(vec![
-            StackFrame {
-                address: 0x401234,
-                function: "main".to_string(),
-                file: Some("main.c".to_string()),
-                line: Some(42),
-            }
-        ])
+        Ok(vec![StackFrame {
+            address: 0x401234,
+            function: "main".to_string(),
+            file: Some("main.c".to_string()),
+            line: Some(42),
+        }])
     }
 }
 
@@ -216,8 +225,11 @@ pub struct TimeTravelDebugger {
 
 impl TimeTravelDebugger {
     pub fn new(binary: String) -> Self {
-        println!("[TIME-TRAVEL] Initializing time-travel debugger for: {}", binary);
-        
+        println!(
+            "[TIME-TRAVEL] Initializing time-travel debugger for: {}",
+            binary
+        );
+
         TimeTravelDebugger {
             target_binary: binary,
             checkpoints: Vec::new(),
@@ -226,27 +238,27 @@ impl TimeTravelDebugger {
             rr_trace_dir: None,
         }
     }
-    
+
     pub fn start_recording(&mut self) -> Result<(), String> {
         println!("[TIME-TRAVEL] Starting execution recording...");
-        
+
         // In real implementation, would spawn:
         // rr record ./target_binary
-        
+
         self.recording = true;
         self.rr_trace_dir = Some("/tmp/rr-traces/latest".to_string());
-        
+
         println!("[TIME-TRAVEL] [OK] Recording started");
         Ok(())
     }
-    
+
     pub fn create_checkpoint(&mut self) -> Result<usize, String> {
         if !self.recording {
             return Err("Not recording - start recording first".to_string());
         }
-        
+
         let checkpoint_id = self.checkpoints.len();
-        
+
         // Capture current state
         let state = DebugState {
             instruction_count: checkpoint_id as u64 * 100, // Simulated
@@ -258,16 +270,19 @@ impl TimeTravelDebugger {
                 .unwrap()
                 .as_secs(),
         };
-        
+
         self.checkpoints.push(state);
         self.current_position = checkpoint_id;
-        
-        println!("[TIME-TRAVEL] Checkpoint {} created at instruction {}", 
-                 checkpoint_id, checkpoint_id * 100);
-        
+
+        println!(
+            "[TIME-TRAVEL] Checkpoint {} created at instruction {}",
+            checkpoint_id,
+            checkpoint_id * 100
+        );
+
         Ok(checkpoint_id)
     }
-    
+
     fn capture_registers(&self) -> HashMap<String, u64> {
         let mut regs = HashMap::new();
         regs.insert("rip".to_string(), 0x401234);
@@ -279,108 +294,139 @@ impl TimeTravelDebugger {
         regs.insert("rdx".to_string(), 0);
         regs
     }
-    
+
     pub fn rewind(&mut self, instructions: u64) -> Result<(), String> {
-        println!("[TIME-TRAVEL] ⏪ Rewinding {} instructions...", instructions);
-        
+        println!(
+            "[TIME-TRAVEL] ⏪ Rewinding {} instructions...",
+            instructions
+        );
+
         if self.checkpoints.is_empty() {
             return Err("No checkpoints available".to_string());
         }
-        
+
         // Find nearest checkpoint before target
-        let target_instr = if instructions > self.checkpoints[self.current_position].instruction_count {
-            0
-        } else {
-            self.checkpoints[self.current_position].instruction_count - instructions
-        };
-        
+        let target_instr =
+            self.checkpoints[self.current_position].instruction_count.saturating_sub(instructions);
+
         for (idx, checkpoint) in self.checkpoints.iter().enumerate().rev() {
             if checkpoint.instruction_count <= target_instr {
                 self.current_position = idx;
-                println!("[TIME-TRAVEL] [OK] Rewound to checkpoint {} (instruction {})", 
-                         idx, checkpoint.instruction_count);
+                println!(
+                    "[TIME-TRAVEL] [OK] Rewound to checkpoint {} (instruction {})",
+                    idx, checkpoint.instruction_count
+                );
                 return Ok(());
             }
         }
-        
+
         self.current_position = 0;
         println!("[TIME-TRAVEL] [OK] Rewound to beginning");
         Ok(())
     }
-    
+
     pub fn fast_forward(&mut self, instructions: u64) -> Result<(), String> {
-        println!("[TIME-TRAVEL] ⏩ Fast-forwarding {} instructions...", instructions);
-        
+        println!(
+            "[TIME-TRAVEL] ⏩ Fast-forwarding {} instructions...",
+            instructions
+        );
+
         if self.current_position >= self.checkpoints.len() - 1 {
             return Err("Already at latest checkpoint".to_string());
         }
-        
+
         let target_instr = self.checkpoints[self.current_position].instruction_count + instructions;
-        
-        for (idx, checkpoint) in self.checkpoints.iter().enumerate().skip(self.current_position) {
+
+        for (idx, checkpoint) in self
+            .checkpoints
+            .iter()
+            .enumerate()
+            .skip(self.current_position)
+        {
             if checkpoint.instruction_count >= target_instr {
                 self.current_position = idx;
-                println!("[TIME-TRAVEL] [OK] Advanced to checkpoint {} (instruction {})", 
-                         idx, checkpoint.instruction_count);
+                println!(
+                    "[TIME-TRAVEL] [OK] Advanced to checkpoint {} (instruction {})",
+                    idx, checkpoint.instruction_count
+                );
                 return Ok(());
             }
         }
-        
+
         self.current_position = self.checkpoints.len() - 1;
         println!("[TIME-TRAVEL] [OK] Advanced to latest checkpoint");
         Ok(())
     }
-    
+
     pub fn find_register_change(&self, register: &str) -> Result<Vec<(usize, u64, u64)>, String> {
         println!("[TIME-TRAVEL] Finding changes to register: {}", register);
-        
+
         let mut changes = Vec::new();
         let mut prev_value: Option<u64> = None;
-        
+
         for (idx, checkpoint) in self.checkpoints.iter().enumerate() {
             if let Some(&current_value) = checkpoint.registers.get(register) {
                 if let Some(prev) = prev_value {
                     if prev != current_value {
                         changes.push((idx, prev, current_value));
-                        println!("[TIME-TRAVEL]   Checkpoint {}: 0x{:x} → 0x{:x}", 
-                                 idx, prev, current_value);
+                        println!(
+                            "[TIME-TRAVEL]   Checkpoint {}: 0x{:x} → 0x{:x}",
+                            idx, prev, current_value
+                        );
                     }
                 }
                 prev_value = Some(current_value);
             }
         }
-        
-        println!("[TIME-TRAVEL] Found {} changes to {}", changes.len(), register);
+
+        println!(
+            "[TIME-TRAVEL] Found {} changes to {}",
+            changes.len(),
+            register
+        );
         Ok(changes)
     }
-    
+
     pub fn find_memory_corruption(&self, address: u64) -> Result<Option<usize>, String> {
-        println!("[TIME-TRAVEL] Finding first write to address: 0x{:x}", address);
-        
+        println!(
+            "[TIME-TRAVEL] Finding first write to address: 0x{:x}",
+            address
+        );
+
         // In real implementation, would analyze heap snapshots
         // For now, return simulated result
-        
+
         if !self.checkpoints.is_empty() {
             let checkpoint_id = self.checkpoints.len() / 2;
-            println!("[TIME-TRAVEL] [OK] First write detected at checkpoint {}", checkpoint_id);
+            println!(
+                "[TIME-TRAVEL] [OK] First write detected at checkpoint {}",
+                checkpoint_id
+            );
             Ok(Some(checkpoint_id))
         } else {
             Ok(None)
         }
     }
-    
-    pub fn diff_states(&self, checkpoint_a: usize, checkpoint_b: usize) -> Result<StateDiff, String> {
+
+    pub fn diff_states(
+        &self,
+        checkpoint_a: usize,
+        checkpoint_b: usize,
+    ) -> Result<StateDiff, String> {
         if checkpoint_a >= self.checkpoints.len() || checkpoint_b >= self.checkpoints.len() {
             return Err("Invalid checkpoint IDs".to_string());
         }
-        
-        println!("[TIME-TRAVEL] 🔀 Comparing checkpoints {} and {}", checkpoint_a, checkpoint_b);
-        
+
+        println!(
+            "[TIME-TRAVEL]  Comparing checkpoints {} and {}",
+            checkpoint_a, checkpoint_b
+        );
+
         let state_a = &self.checkpoints[checkpoint_a];
         let state_b = &self.checkpoints[checkpoint_b];
-        
+
         let mut register_diffs = Vec::new();
-        
+
         for (reg, &val_b) in &state_b.registers {
             if let Some(&val_a) = state_a.registers.get(reg) {
                 if val_a != val_b {
@@ -392,9 +438,12 @@ impl TimeTravelDebugger {
                 }
             }
         }
-        
-        println!("[TIME-TRAVEL] Found {} register changes", register_diffs.len());
-        
+
+        println!(
+            "[TIME-TRAVEL] Found {} register changes",
+            register_diffs.len()
+        );
+
         Ok(StateDiff {
             checkpoint_a,
             checkpoint_b,
@@ -402,54 +451,64 @@ impl TimeTravelDebugger {
             memory_changes: Vec::new(),
         })
     }
-    
+
     pub fn goto_checkpoint(&mut self, checkpoint_id: usize) -> Result<(), String> {
         if checkpoint_id >= self.checkpoints.len() {
             return Err(format!("Checkpoint {} does not exist", checkpoint_id));
         }
-        
+
         self.current_position = checkpoint_id;
         let state = &self.checkpoints[checkpoint_id];
-        
-        println!("[TIME-TRAVEL] Jumped to checkpoint {} (instruction {})", 
-                 checkpoint_id, state.instruction_count);
-        
+
+        println!(
+            "[TIME-TRAVEL] Jumped to checkpoint {} (instruction {})",
+            checkpoint_id, state.instruction_count
+        );
+
         Ok(())
     }
-    
+
     pub fn replay_from_crash(&mut self) -> Result<(), String> {
         println!("[TIME-TRAVEL] Replaying execution from crash point...");
-        
+
         if self.checkpoints.is_empty() {
             return Err("No recording available".to_string());
         }
-        
+
         // Go to last checkpoint (crash)
         self.current_position = self.checkpoints.len() - 1;
-        
-        println!("[TIME-TRAVEL] Crash occurred at instruction {}", 
-                 self.checkpoints[self.current_position].instruction_count);
-        
+
+        println!(
+            "[TIME-TRAVEL] Crash occurred at instruction {}",
+            self.checkpoints[self.current_position].instruction_count
+        );
+
         // Automatically rewind 1000 instructions
         self.rewind(1000)?;
-        
+
         println!("[TIME-TRAVEL] [OK] Ready for analysis");
         Ok(())
     }
-    
+
     pub fn list_checkpoints(&self) {
         println!("\n[TIME-TRAVEL] Available Checkpoints:");
         println!("─────────────────────────────────────────────────────────────");
-        
+
         for (idx, checkpoint) in self.checkpoints.iter().enumerate() {
-            let marker = if idx == self.current_position { "→" } else { " " };
-            println!("{} Checkpoint {} - Instruction: {} ({}s since start)",
-                     marker,
-                     idx,
-                     checkpoint.instruction_count,
-                     checkpoint.timestamp - self.checkpoints[0].timestamp);
+            let marker = if idx == self.current_position {
+                "→"
+            } else {
+                " "
+            };
+            println!(
+                "{} Checkpoint {} - Instruction: {} ({}s since start)",
+                marker,
+                idx,
+                checkpoint.instruction_count,
+                checkpoint.timestamp - self.checkpoints[0].timestamp
+            );
         }
-        
+
         println!("─────────────────────────────────────────────────────────────\n");
     }
 }

@@ -6,7 +6,7 @@
 
 ```bash
 # Clone and build
-git clone https://github.com/your-org/talon
+git clone https://github.com/ridpath/talon.git
 cd talon
 cargo build --release
 

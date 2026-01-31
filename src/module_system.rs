@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use std::path::PathBuf;
-use std::fs;
 use crate::ast::Command;
+use std::collections::HashMap;
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone)]
 pub struct Module {
@@ -67,8 +67,8 @@ impl ModuleLoader {
     fn resolve_module_path(&self, module_path: &str) -> Result<PathBuf, String> {
         for search_path in &self.search_paths {
             let mut full_path = search_path.join(module_path);
-            
-            if !full_path.extension().is_some() {
+
+            if full_path.extension().is_none() {
                 full_path.set_extension("talon");
             }
 
@@ -82,7 +82,10 @@ impl ModuleLoader {
 
     fn extract_exports(&self, _statements: &[Command]) -> HashMap<String, ModuleExport> {
         let mut exports = HashMap::new();
-        exports.insert("default".to_string(), ModuleExport::Function("default".to_string()));
+        exports.insert(
+            "default".to_string(),
+            ModuleExport::Function("default".to_string()),
+        );
         exports
     }
 
@@ -93,7 +96,7 @@ impl ModuleLoader {
 
 pub fn parse_import_statement(stmt: &str) -> Option<(String, Option<Vec<String>>)> {
     let parts: Vec<&str> = stmt.split_whitespace().collect();
-    
+
     if parts.len() < 2 {
         return None;
     }
@@ -116,7 +119,7 @@ pub fn parse_import_statement(stmt: &str) -> Option<(String, Option<Vec<String>>
                 break;
             }
         }
-        
+
         if brace_end > 0 && brace_end + 2 < parts.len() && parts[brace_end + 1] == "from" {
             // Collect all symbol parts between { and }
             let symbol_parts: Vec<&str> = parts[2..brace_end].to_vec();

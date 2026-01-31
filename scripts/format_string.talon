@@ -1,4 +1,4 @@
-# 🎯 Format string write attack (to overwrite memory or leak)
+#  Format string write attack (to overwrite memory or leak)
 # Assumes binary has vulnerable printf(user_input)
 
 include "exploit/format_string.my"

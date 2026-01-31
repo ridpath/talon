@@ -93,7 +93,10 @@ fn test_hex_encode() {
 #[test]
 fn test_hex_decode() {
     assert_eq!(BaseEncoder::hex_decode("68656c6c6f").unwrap(), b"hello");
-    assert_eq!(BaseEncoder::hex_decode("deadbeef").unwrap(), b"\xde\xad\xbe\xef");
+    assert_eq!(
+        BaseEncoder::hex_decode("deadbeef").unwrap(),
+        b"\xde\xad\xbe\xef"
+    );
     assert_eq!(BaseEncoder::hex_decode("").unwrap(), b"");
     assert_eq!(BaseEncoder::hex_decode("00").unwrap(), b"\x00");
 }
@@ -124,7 +127,10 @@ fn test_url_encode() {
 #[test]
 fn test_url_decode() {
     assert_eq!(URLEncoder::decode("hello%20world").unwrap(), "hello world");
-    assert_eq!(URLEncoder::decode("test%40example.com").unwrap(), "test@example.com");
+    assert_eq!(
+        URLEncoder::decode("test%40example.com").unwrap(),
+        "test@example.com"
+    );
     assert_eq!(URLEncoder::decode("a%2Bb%3Dc").unwrap(), "a+b=c");
     assert_eq!(URLEncoder::decode("plain").unwrap(), "plain");
 }
@@ -147,7 +153,7 @@ fn test_url_double_encode() {
 fn test_url_encode_all() {
     let result = URLEncoder::encode_all("ABC");
     assert_eq!(result, "%41%42%43");
-    
+
     let result = URLEncoder::encode_all("a");
     assert_eq!(result, "%61");
 }
@@ -194,19 +200,31 @@ fn test_html_encode_hex() {
 fn test_unicode_to_escape() {
     assert_eq!(UnicodeEncoder::to_unicode_escape("hello"), "hello");
     assert_eq!(UnicodeEncoder::to_unicode_escape("café"), "caf\\u{00e9}");
-    assert_eq!(UnicodeEncoder::to_unicode_escape("日本"), "\\u{65e5}\\u{672c}");
+    assert_eq!(
+        UnicodeEncoder::to_unicode_escape("日本"),
+        "\\u{65e5}\\u{672c}"
+    );
 }
 
 #[test]
 fn test_unicode_from_escape() {
-    assert_eq!(UnicodeEncoder::from_unicode_escape("hello").unwrap(), "hello");
-    assert_eq!(UnicodeEncoder::from_unicode_escape("caf\\u{00e9}").unwrap(), "café");
-    assert_eq!(UnicodeEncoder::from_unicode_escape("\\u{65e5}\\u{672c}").unwrap(), "日本");
+    assert_eq!(
+        UnicodeEncoder::from_unicode_escape("hello").unwrap(),
+        "hello"
+    );
+    assert_eq!(
+        UnicodeEncoder::from_unicode_escape("caf\\u{00e9}").unwrap(),
+        "café"
+    );
+    assert_eq!(
+        UnicodeEncoder::from_unicode_escape("\\u{65e5}\\u{672c}").unwrap(),
+        "日本"
+    );
 }
 
 #[test]
 fn test_unicode_roundtrip() {
-    let original = "Hello 世界 🌍";
+    let original = "Hello 世界 ";
     let escaped = UnicodeEncoder::to_unicode_escape(original);
     let decoded = UnicodeEncoder::from_unicode_escape(&escaped).unwrap();
     assert_eq!(decoded, original);
@@ -216,7 +234,7 @@ fn test_unicode_roundtrip() {
 fn test_unicode_to_utf16_hex() {
     let result = UnicodeEncoder::to_utf16_hex("A");
     assert_eq!(result, "0041");
-    
+
     let result = UnicodeEncoder::to_utf16_hex("AB");
     assert_eq!(result, "0041 0042");
 }
@@ -293,7 +311,7 @@ fn test_jwt_decode() {
     let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.signature";
     let result = JWTHelper::decode_token(token);
     assert!(result.is_ok());
-    
+
     let (header, payload, sig) = result.unwrap();
     assert!(header.contains("alg"));
     assert!(payload.contains("sub"));
@@ -310,7 +328,7 @@ fn test_jwt_decode_invalid_format() {
 fn test_jwt_create_unsigned() {
     let token = JWTHelper::create_unsigned(r#"{"alg":"none"}"#, r#"{"sub":"test"}"#);
     assert!(token.ends_with('.'));
-    
+
     let parts: Vec<&str> = token.split('.').collect();
     assert_eq!(parts.len(), 3);
     assert_eq!(parts[2], "");
@@ -326,7 +344,10 @@ fn test_binary_to_binary() {
 #[test]
 fn test_binary_from_binary() {
     assert_eq!(BinaryConverter::from_binary("01000001").unwrap(), "A");
-    assert_eq!(BinaryConverter::from_binary("01000001 01000010").unwrap(), "AB");
+    assert_eq!(
+        BinaryConverter::from_binary("01000001 01000010").unwrap(),
+        "AB"
+    );
 }
 
 #[test]
@@ -402,7 +423,7 @@ fn test_substitution_cipher_roundtrip() {
 fn test_universal_decoder() {
     let results = UniversalDecoder::try_all("aGVsbG8=");
     assert!(!results.is_empty());
-    
+
     let base64_result = results.iter().find(|(method, _)| method == "Base64");
     assert!(base64_result.is_some());
     assert_eq!(base64_result.unwrap().1, "hello");

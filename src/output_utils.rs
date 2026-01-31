@@ -14,23 +14,23 @@ impl OutputUtils {
             progress_enabled: progress,
         }
     }
-    
+
     pub fn success(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[OK]".green().bold(), message);
+            println!("{} {}", "[+]".green().bold(), message);
         } else {
-            println!("[OK] {}", message);
+            println!("[+] {}", message);
         }
     }
-    
+
     pub fn error(&self, message: &str) {
         if self.colors_enabled {
-            eprintln!("{} {}", "[ERROR]".red().bold(), message);
+            eprintln!("{} {}", "[-]".red().bold(), message);
         } else {
-            eprintln!("[ERROR] {}", message);
+            eprintln!("[-] {}", message);
         }
     }
-    
+
     pub fn warning(&self, message: &str) {
         if self.colors_enabled {
             println!("{} {}", "[!]".yellow().bold(), message);
@@ -38,31 +38,31 @@ impl OutputUtils {
             println!("[!] {}", message);
         }
     }
-    
+
     pub fn info(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[i]".blue().bold(), message);
+            println!("{} {}", "[*]".blue().bold(), message);
         } else {
-            println!("[i] {}", message);
+            println!("[*] {}", message);
         }
     }
-    
+
     pub fn exploit(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[X]".red().bold(), message);
+            println!("{} {}", "[*]".red().bold(), message);
         } else {
-            println!("[X] {}", message);
+            println!("[*] {}", message);
         }
     }
-    
+
     pub fn shell(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[$]".cyan().bold(), message);
+            println!("{} {}", "[*]".cyan().bold(), message);
         } else {
-            println!("[$] {}", message);
+            println!("[*] {}", message);
         }
     }
-    
+
     pub fn section(&self, title: &str) {
         if self.colors_enabled {
             println!("\n{}", format!("══════ {} ══════", title).bold().purple());
@@ -70,39 +70,41 @@ impl OutputUtils {
             println!("\n══════ {} ══════", title);
         }
     }
-    
+
     pub fn create_progress_bar(&self, total: u64, message: &str) -> Option<ProgressBar> {
         if !self.progress_enabled {
             return None;
         }
-        
+
         let pb = ProgressBar::new(total);
         pb.set_style(
             ProgressStyle::default_bar()
-                .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}")
+                .template(
+                    "{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} {msg}",
+                )
                 .expect("Invalid progress bar template")
-                .progress_chars("#>-")
+                .progress_chars("#>-"),
         );
         pb.set_message(message.to_string());
         Some(pb)
     }
-    
+
     pub fn create_spinner(&self, message: &str) -> Option<ProgressBar> {
         if !self.progress_enabled {
             return None;
         }
-        
+
         let pb = ProgressBar::new_spinner();
         pb.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.green} {msg}")
-                .expect("Invalid spinner template")
+                .expect("Invalid spinner template"),
         );
         pb.set_message(message.to_string());
         pb.enable_steady_tick(Duration::from_millis(100));
         Some(pb)
     }
-    
+
     pub fn format_bytes(&self, bytes: u64) -> String {
         if bytes < 1024 {
             format!("{} B", bytes)
@@ -114,30 +116,33 @@ impl OutputUtils {
             format!("{:.2} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
         }
     }
-    
+
     pub fn highlight_code(&self, code: &str, language: &str) -> String {
         if !self.colors_enabled {
             return code.to_string();
         }
-        
+
         match language {
             "talon" => self.highlight_talon(code),
             "asm" => self.highlight_asm(code),
             _ => code.to_string(),
         }
     }
-    
+
     fn highlight_talon(&self, code: &str) -> String {
-        let keywords = ["let", "const", "if", "else", "for", "in", "end", "function", "return", "connect", "send", "recv"];
+        let keywords = [
+            "let", "const", "if", "else", "for", "in", "end", "function", "return", "connect",
+            "send", "recv",
+        ];
         let mut result = code.to_string();
-        
+
         for keyword in &keywords {
             result = result.replace(keyword, &format!("{}", keyword.blue().bold()));
         }
-        
+
         result
     }
-    
+
     fn highlight_asm(&self, code: &str) -> String {
         let mut result = String::new();
         for line in code.lines() {

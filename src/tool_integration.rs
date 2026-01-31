@@ -1,6 +1,6 @@
-use std::process::Command;
-use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct GhidraProject {
@@ -46,7 +46,7 @@ impl GhidraIntegration {
             .output();
 
         let mut symbols = HashMap::new();
-        
+
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
@@ -77,7 +77,7 @@ impl GhidraIntegration {
             .output();
 
         let mut gadgets = Vec::new();
-        
+
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
             for line in stdout.lines() {
@@ -147,7 +147,7 @@ impl Radare2Integration {
         let output = Command::new("r2")
             .arg("-q")
             .arg("-c")
-            .arg(&format!("s {}; pdf", function_addr))
+            .arg(format!("s {}; pdf", function_addr))
             .arg(binary_path)
             .output();
 

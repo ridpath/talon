@@ -159,9 +159,9 @@ The HTML report (`tarpaulin-report.html`) provides:
 - **Overall coverage percentage**
 - **File-by-file breakdown**
 - **Line-by-line coverage visualization**
-  - 🟢 Green: Executed lines
-  - 🔴 Red: Uncovered lines
-  - ⚪ Gray: Non-executable lines
+  -  Green: Executed lines
+  -  Red: Uncovered lines
+  -  Gray: Non-executable lines
 
 ### XML Report (Cobertura)
 
@@ -258,7 +258,7 @@ LCOV format (`lcov.info`) for integration with:
 ```rust
 // Uncovered error path
 fn parse_number(s: &str) -> Result<i64, ParseError> {
-    s.parse().map_err(|_| ParseError::InvalidNumber) // ❌ Error path not tested
+    s.parse().map_err(|_| ParseError::InvalidNumber) //  Error path not tested
 }
 ```
 
@@ -276,7 +276,7 @@ fn test_parse_number_invalid() {
 // Uncovered edge case
 fn divide(a: i64, b: i64) -> Option<i64> {
     if b == 0 {
-        None // ❌ Not tested
+        None //  Not tested
     } else {
         Some(a / b)
     }
@@ -298,7 +298,7 @@ fn test_divide_by_zero() {
 match token {
     Token::If => { /* tested */ },
     Token::While => { /* tested */ },
-    Token::For => { /* ❌ not tested */ },
+    Token::For => { /*  not tested */ },
     _ => { /* tested */ }
 }
 ```
@@ -507,14 +507,14 @@ Prioritize coverage for:
 
 Don't write meaningless tests just to increase numbers:
 ```rust
-// ❌ Bad: Meaningless test
+//  Bad: Meaningless test
 #[test]
 fn test_getter() {
     let x = Foo::new();
     let _ = x.get_value(); // Just calling to increase coverage
 }
 
-// ✅ Good: Tests behavior
+//  Good: Tests behavior
 #[test]
 fn test_value_persists_after_creation() {
     let x = Foo::new_with_value(42);

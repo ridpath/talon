@@ -119,7 +119,7 @@ The `fixtures` directory contains:
 - **exploits/**: Reference exploit payloads
 - **data/**: Test data files (ELF headers, PE files, etc.)
 
-⚠️ **Security Warning**: Files in `fixtures/` are intentionally vulnerable. Never execute them outside of sandboxed test environments.
+️ **Security Warning**: Files in `fixtures/` are intentionally vulnerable. Never execute them outside of sandboxed test environments.
 
 ## Writing New Tests
 

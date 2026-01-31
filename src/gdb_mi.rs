@@ -1,9 +1,9 @@
 // GDB-MI PROTOCOL INTEGRATION
 // Machine Interface protocol for programmatic GDB control
 
-use std::process::{Command, Stdio, Child, ChildStdin, ChildStdout};
-use std::io::{BufRead, BufReader, Write};
 use std::collections::HashMap;
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStdin, ChildStdout, Command, Stdio};
 
 pub struct GDBSession {
     pub process: Child,
@@ -33,7 +33,7 @@ pub enum MIResponseType {
 impl GDBSession {
     pub fn new(binary: &str) -> Result<Self, String> {
         log::info!("Starting GDB-MI session for: {}", binary);
-        
+
         let mut process = Command::new("gdb")
             .args(["--interpreter=mi", binary])
             .stdin(Stdio::piped())
@@ -56,14 +56,14 @@ impl GDBSession {
     fn send_command(&mut self, command: &str) -> Result<u32, String> {
         self.token_counter += 1;
         let token = self.token_counter;
-        
+
         let mi_command = format!("{}-{}\n", token, command);
         log::debug!("Sending GDB command: {}", mi_command.trim());
-        
+
         self.stdin
             .write_all(mi_command.as_bytes())
             .map_err(|e| format!("Failed to send command: {}", e))?;
-        
+
         self.stdin
             .flush()
             .map_err(|e| format!("Failed to flush stdin: {}", e))?;
@@ -78,13 +78,13 @@ impl GDBSession {
             .map_err(|e| format!("Failed to read response: {}", e))?;
 
         log::debug!("GDB response: {}", line.trim());
-        
+
         self.parse_mi_response(&line)
     }
 
     fn parse_mi_response(&self, line: &str) -> Result<MIResponse, String> {
         let line = line.trim();
-        
+
         let response_type = if line.contains("^done") {
             MIResponseType::Done
         } else if line.contains("^running") {
@@ -110,8 +110,16 @@ impl GDBSession {
         self.send_command(&command)
     }
 
-    pub fn set_breakpoint_conditional(&mut self, location: &str, condition: &str) -> Result<u32, String> {
-        log::info!("Setting conditional breakpoint at {} with condition: {}", location, condition);
+    pub fn set_breakpoint_conditional(
+        &mut self,
+        location: &str,
+        condition: &str,
+    ) -> Result<u32, String> {
+        log::info!(
+            "Setting conditional breakpoint at {} with condition: {}",
+            location,
+            condition
+        );
         let command = format!("break-insert -c \"{}\" {}", condition, location);
         self.send_command(&command)
     }
@@ -149,8 +157,12 @@ impl GDBSession {
         let command = format!("data-evaluate-expression ${}", register);
         self.send_command(&command)?;
         let response = self.read_response()?;
-        
-        Ok(response.data.get("value").cloned().unwrap_or_else(|| "0".to_string()))
+
+        Ok(response
+            .data
+            .get("value")
+            .cloned()
+            .unwrap_or_else(|| "0".to_string()))
     }
 
     pub fn write_register(&mut self, register: &str, value: u64) -> Result<(), String> {
@@ -166,7 +178,7 @@ impl GDBSession {
         let command = format!("data-read-memory-bytes 0x{:x} {}", address, count);
         self.send_command(&command)?;
         let _response = self.read_response()?;
-        
+
         Ok(vec![0x41; count])
     }
 
@@ -183,23 +195,21 @@ impl GDBSession {
         log::info!("Getting backtrace");
         self.send_command("stack-list-frames")?;
         let _response = self.read_response()?;
-        
-        Ok(vec![
-            StackFrame {
-                level: 0,
-                address: 0x401234,
-                function: "main".to_string(),
-                file: Some("main.c".to_string()),
-                line: Some(42),
-            }
-        ])
+
+        Ok(vec![StackFrame {
+            level: 0,
+            address: 0x401234,
+            function: "main".to_string(),
+            file: Some("main.c".to_string()),
+            line: Some(42),
+        }])
     }
 
     pub fn list_breakpoints(&mut self) -> Result<Vec<Breakpoint>, String> {
         log::info!("Listing breakpoints");
         self.send_command("break-list")?;
         let _response = self.read_response()?;
-        
+
         Ok(vec![])
     }
 

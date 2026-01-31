@@ -159,3 +159,7 @@ harness = false
 # [[bench]]
 # name = "binary_analysis_bench"
 # harness = false
+
+[[bench]]
+name = "vs_pwntools_bench"
+harness = false

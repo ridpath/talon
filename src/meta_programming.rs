@@ -1,7 +1,7 @@
-use std::collections::HashMap;
-use serde::{Deserialize, Serialize};
 use crate::ast::Command;
 use crate::parser::parse_script;
+use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ASTNode {
@@ -34,9 +34,10 @@ impl MetaProgramming {
     }
 
     fn commands_to_ast_node(&self, commands: &[Command]) -> ASTNode {
-        let children: Vec<ASTNode> = commands.iter().map(|cmd| {
-            self.command_to_ast_node(cmd)
-        }).collect();
+        let children: Vec<ASTNode> = commands
+            .iter()
+            .map(|cmd| self.command_to_ast_node(cmd))
+            .collect();
 
         ASTNode {
             node_type: "Program".to_string(),
@@ -47,8 +48,12 @@ impl MetaProgramming {
 
     fn command_to_ast_node(&self, cmd: &Command) -> ASTNode {
         let mut attributes = HashMap::new();
-        let node_type = format!("{:?}", cmd).split('(').next().unwrap_or("Unknown").to_string();
-        
+        let node_type = format!("{:?}", cmd)
+            .split('(')
+            .next()
+            .unwrap_or("Unknown")
+            .to_string();
+
         match cmd {
             Command::VarDecl { name, .. } => {
                 attributes.insert("name".to_string(), name.clone());
@@ -73,7 +78,11 @@ impl MetaProgramming {
 
     pub fn find_nodes(&self, node_type: &str) -> Vec<ASTNode> {
         let mut results = Vec::new();
-        self.find_nodes_recursive(&self.commands_to_ast_node(&self.current_ast), node_type, &mut results);
+        self.find_nodes_recursive(
+            &self.commands_to_ast_node(&self.current_ast),
+            node_type,
+            &mut results,
+        );
         results
     }
 
@@ -86,16 +95,21 @@ impl MetaProgramming {
         }
     }
 
-    pub fn patch_function(&mut self, target_name: &str, replacement_code: &str) -> Result<(), String> {
+    pub fn patch_function(
+        &mut self,
+        target_name: &str,
+        replacement_code: &str,
+    ) -> Result<(), String> {
         let replacement_commands = parse_script(replacement_code)?;
-        
+
         if let Some(replacement_func) = replacement_commands.first() {
             match replacement_func {
                 Command::DefineFunction(_func) => {
-                    self.function_registry.insert(target_name.to_string(), vec![replacement_func.clone()]);
+                    self.function_registry
+                        .insert(target_name.to_string(), vec![replacement_func.clone()]);
                     Ok(())
                 }
-                _ => Err("Replacement must be a function definition".to_string())
+                _ => Err("Replacement must be a function definition".to_string()),
             }
         } else {
             Err("Empty replacement code".to_string())
@@ -120,10 +134,8 @@ impl MetaProgramming {
                     self.generate_shellcode_injection_strategy()
                 }
             }
-            "information_leak" => {
-                self.generate_leak_strategy()
-            }
-            _ => return Err(format!("Unknown goal: {}", goal))
+            "information_leak" => self.generate_leak_strategy(),
+            _ => return Err(format!("Unknown goal: {}", goal)),
         };
 
         Ok(strategy)
@@ -135,7 +147,8 @@ impl MetaProgramming {
     let encoded_val = encode_null_free(value)
     let payload = build_format_string_write(encoded_addr, encoded_val)
     send(target, payload)
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn generate_jop_strategy(&self) -> String {
@@ -144,7 +157,8 @@ impl MetaProgramming {
     let chain = build_jop_chain(gadgets, goal: "system")
     let payload = craft_payload(chain)
     send(target, payload)
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn generate_generic_write_strategy(&self) -> String {
@@ -152,7 +166,8 @@ impl MetaProgramming {
     let offset = find_buffer_offset(target)
     let payload = cyclic(offset) + pack64(address) + pack64(value)
     send(target, payload)
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn generate_rop_strategy(&self) -> String {
@@ -165,7 +180,8 @@ impl MetaProgramming {
     let rop = [pop_rdi, binsh, system]
     let payload = cyclic(offset) + pack_addresses(rop)
     send(target, payload)
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn generate_shellcode_injection_strategy(&self) -> String {
@@ -174,7 +190,8 @@ impl MetaProgramming {
     let nop_sled = "\x90" * 100
     let payload = nop_sled + shellcode
     send(target, payload)
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     fn generate_leak_strategy(&self) -> String {
@@ -184,7 +201,8 @@ impl MetaProgramming {
     let response = recv(target, 1024)
     let addresses = parse_leaked_addresses(response)
     return addresses
-}"#.to_string()
+}"#
+        .to_string()
     }
 
     pub fn modify_ast(&mut self, transformations: &[String]) -> Result<(), String> {
@@ -193,7 +211,7 @@ impl MetaProgramming {
                 "optimize_loops" => self.optimize_loops()?,
                 "inline_small_functions" => self.inline_small_functions()?,
                 "remove_dead_code" => self.remove_dead_code()?,
-                _ => return Err(format!("Unknown transformation: {}", transformation))
+                _ => return Err(format!("Unknown transformation: {}", transformation)),
             }
         }
         Ok(())
@@ -213,8 +231,14 @@ impl MetaProgramming {
 
     pub fn get_metadata(&self) -> HashMap<String, String> {
         let mut metadata = HashMap::new();
-        metadata.insert("total_commands".to_string(), self.current_ast.len().to_string());
-        metadata.insert("function_count".to_string(), self.function_registry.len().to_string());
+        metadata.insert(
+            "total_commands".to_string(),
+            self.current_ast.len().to_string(),
+        );
+        metadata.insert(
+            "function_count".to_string(),
+            self.function_registry.len().to_string(),
+        );
         metadata.insert("ast_depth".to_string(), self.calculate_depth().to_string());
         metadata
     }

@@ -216,12 +216,12 @@ let result = defense_simulator(
 )
 
 print("Stress Test Results (100 iterations):")
-print("  Success rate:", result["success_rate"] * 100, "%")
-print("  Detection rate:", result["detection_rate"] * 100, "%")
-print("  Blocked attempts:", result["blocked_attempts"])
+print("  Success rate:", result.success_rate * 100, "%")
+print("  Detection rate:", result.detection_rate * 100, "%")
+print("  Blocked attempts:", result.blocked_attempts)
 
 print("\nRecommendations:")
-for rec in result["recommendations"] {
+for rec in result.recommendations {
     print("  -", rec)
 }
 
@@ -233,8 +233,8 @@ let linux_result = defense_simulator(
 )
 
 print("\nSELinux Results:")
-print("  Success rate:", linux_result["success_rate"] * 100, "%")
-print("  Detection rate:", linux_result["detection_rate"] * 100, "%")
+print("  Success rate:", linux_result.success_rate * 100, "%")
+print("  Detection rate:", linux_result.detection_rate * 100, "%")
 
 # ============================================================================
 # 8. COMBINING ALL FEATURES: THE LIVING EXPLOIT
@@ -271,7 +271,7 @@ let test_result = speculate {
     execute_strategy(final_exploit)
 }
 
-if test_result["outcome"] == "success" {
+if test_result.outcome == "success" {
     print("Speculative test passed! Executing for real...")
     
     # Test against defenses

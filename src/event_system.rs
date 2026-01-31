@@ -1,8 +1,8 @@
+use crate::ast::{Command, Expr};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
-use crate::ast::{Command, Expr};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum EventType {
@@ -53,7 +53,12 @@ impl EventSystem {
         }
     }
 
-    pub async fn register_handler(&self, event_type: EventType, condition: Option<Expr>, callback: Vec<Command>) -> Result<(), String> {
+    pub async fn register_handler(
+        &self,
+        event_type: EventType,
+        condition: Option<Expr>,
+        callback: Vec<Command>,
+    ) -> Result<(), String> {
         let handler = EventHandler {
             event_type,
             condition,
@@ -65,7 +70,12 @@ impl EventSystem {
         Ok(())
     }
 
-    pub async fn register_watch(&self, register: String, range: Option<(u64, u64)>, callback: Vec<Command>) -> Result<(), String> {
+    pub async fn register_watch(
+        &self,
+        register: String,
+        range: Option<(u64, u64)>,
+        callback: Vec<Command>,
+    ) -> Result<(), String> {
         let (min_value, max_value) = if let Some((min, max)) = range {
             (Some(min), Some(max))
         } else {
@@ -99,13 +109,17 @@ impl EventSystem {
     fn matches_event_type(&self, handler_type: &EventType, event_type: &EventType) -> bool {
         match (handler_type, event_type) {
             (EventType::Custom(h), EventType::Custom(e)) => h == e,
-            _ => std::mem::discriminant(handler_type) == std::mem::discriminant(event_type)
+            _ => std::mem::discriminant(handler_type) == std::mem::discriminant(event_type),
         }
     }
 
-    pub async fn check_register(&self, register: &str, value: u64) -> Result<Option<Vec<Command>>, String> {
+    pub async fn check_register(
+        &self,
+        register: &str,
+        value: u64,
+    ) -> Result<Option<Vec<Command>>, String> {
         let watches = self.register_watches.read().await;
-        
+
         if let Some(watch) = watches.get(register) {
             let in_range = match (watch.min_value, watch.max_value) {
                 (Some(min), Some(max)) => value >= min && value <= max,
@@ -122,7 +136,12 @@ impl EventSystem {
         Ok(None)
     }
 
-    pub async fn on_memory_change(&self, address: u64, old_value: &[u8], new_value: &[u8]) -> Result<Vec<Vec<Command>>, String> {
+    pub async fn on_memory_change(
+        &self,
+        address: u64,
+        old_value: &[u8],
+        new_value: &[u8],
+    ) -> Result<Vec<Vec<Command>>, String> {
         let mut data = HashMap::new();
         data.insert("address".to_string(), format!("0x{:x}", address));
         data.insert("old_value".to_string(), hex::encode(old_value));

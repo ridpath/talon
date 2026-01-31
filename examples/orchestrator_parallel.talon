@@ -28,7 +28,7 @@ let results = parallel for target in targets {
 }
 
 # Analyze results
-let successful = filter(results, |r| contains(r["status"], "flag"))
+let successful = filter(results, |r| contains(r.status, "flag"))
 print("Successful attacks:", len(successful), "/", len(targets))
 
 # Example 2: Race Multiple Strategies Against Single Target
@@ -43,16 +43,16 @@ let strategies = [
 # Try all strategies concurrently, first one to succeed wins
 let winner = race strategies against "192.168.1.100:1337" {
     let conn = connect("192.168.1.100:1337")
-    send(conn, strategy["payload"])
+    send(conn, strategy.payload)
     
     let shell = recv(conn, 1024)
     if contains(shell, "$ ") or contains(shell, "# ") {
-        return { "strategy": strategy["name"], "success": true, "shell": conn }
+        return { "strategy": strategy.name, "success": true, "shell": conn }
     }
 }
 
-print("Winner:", winner["strategy"])
-interactive(winner["shell"])
+print("Winner:", winner.strategy)
+interactive(winner.shell)
 
 # Example 3: Parallel Fuzzing
 print("\nParallel fuzzing with 50 threads...")
@@ -68,7 +68,7 @@ let crashes = parallel for payload in fuzz_inputs {
     send(proc, payload)
     
     let status = wait(proc, 1000)
-    if status["crashed"] {
+    if status.crashed {
         return { "payload": payload, "crash_info": status }
     }
 }

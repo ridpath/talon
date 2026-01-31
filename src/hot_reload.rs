@@ -1,6 +1,8 @@
+#![allow(clippy::type_complexity)]
+
 use std::collections::HashMap;
-use std::path::{Path, PathBuf};
 use std::fs;
+use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, UNIX_EPOCH};
@@ -24,7 +26,7 @@ impl FileWatcher {
         F: FnMut() + Send + 'static,
     {
         let modified = Self::get_modified_time(&path).unwrap_or(0);
-        
+
         {
             let mut files = self.files.lock().unwrap();
             files.insert(path.clone(), modified);
@@ -40,51 +42,50 @@ impl FileWatcher {
         let files = Arc::clone(&self.files);
         let callbacks = Arc::clone(&self.callbacks);
 
-        thread::spawn(move || {
-            loop {
-                thread::sleep(Duration::from_millis(500));
+        thread::spawn(move || loop {
+            thread::sleep(Duration::from_millis(500));
 
-                let changed_files: Vec<PathBuf> = {
-                    let mut files_guard = files.lock().unwrap();
-                    let mut changed = Vec::new();
-                    
-                    for (path, old_time) in files_guard.iter() {
-                        if let Ok(new_time) = Self::get_modified_time(path) {
-                            if new_time > *old_time {
-                                changed.push(path.clone());
-                            }
+            let changed_files: Vec<PathBuf> = {
+                let mut files_guard = files.lock().unwrap();
+                let mut changed = Vec::new();
+
+                for (path, old_time) in files_guard.iter() {
+                    if let Ok(new_time) = Self::get_modified_time(path) {
+                        if new_time > *old_time {
+                            changed.push(path.clone());
                         }
                     }
-                    
-                    for path in &changed {
-                        if let Ok(new_time) = Self::get_modified_time(path) {
-                            files_guard.insert(path.clone(), new_time);
-                        }
-                    }
-                    
-                    changed
-                };
+                }
 
-                for changed_file in changed_files {
-                    let mut callbacks_guard = callbacks.lock().unwrap();
-                    if let Some(callback) = callbacks_guard.get_mut(&changed_file) {
-                        callback();
+                for path in &changed {
+                    if let Ok(new_time) = Self::get_modified_time(path) {
+                        files_guard.insert(path.clone(), new_time);
                     }
+                }
+
+                changed
+            };
+
+            for changed_file in changed_files {
+                let mut callbacks_guard = callbacks.lock().unwrap();
+                if let Some(callback) = callbacks_guard.get_mut(&changed_file) {
+                    callback();
                 }
             }
         });
     }
 
     fn get_modified_time(path: &Path) -> Result<u64, String> {
-        let metadata = fs::metadata(path)
-            .map_err(|e| format!("Failed to get metadata: {}", e))?;
-        
-        let modified = metadata.modified()
+        let metadata = fs::metadata(path).map_err(|e| format!("Failed to get metadata: {}", e))?;
+
+        let modified = metadata
+            .modified()
             .map_err(|e| format!("Failed to get modified time: {}", e))?;
-        
-        let duration = modified.duration_since(UNIX_EPOCH)
+
+        let duration = modified
+            .duration_since(UNIX_EPOCH)
             .map_err(|e| format!("Failed to convert time: {}", e))?;
-        
+
         Ok(duration.as_secs())
     }
 }
@@ -144,12 +145,12 @@ impl CodeReloader {
     }
 
     pub fn enable_hot_reload(&mut self, path: PathBuf) -> Result<(), String> {
-        let source = fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read file: {}", e))?;
-        
+        let source =
+            fs::read_to_string(&path).map_err(|e| format!("Failed to read file: {}", e))?;
+
         self.source_cache.insert(path.clone(), source);
         self.hot_reloader.watch_script(path);
-        
+
         Ok(())
     }
 
@@ -209,16 +210,13 @@ impl ReloadContext {
 
 pub fn enable_hot_reload_for_directory(dir: &Path) -> Result<CodeReloader, String> {
     let mut reloader = CodeReloader::new();
-    
-    let entries = fs::read_dir(dir)
-        .map_err(|e| format!("Failed to read directory: {}", e))?;
 
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("talon") {
-                reloader.enable_hot_reload(path)?;
-            }
+    let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) == Some("talon") {
+            reloader.enable_hot_reload(path)?;
         }
     }
 
@@ -237,7 +235,7 @@ mod tests {
     fn test_file_watcher() {
         let dir = tempdir().unwrap();
         let file_path = dir.path().join("test.talon");
-        
+
         let mut file = File::create(&file_path).unwrap();
         writeln!(file, "let x = 1").unwrap();
 

@@ -1,5 +1,5 @@
-use talon::parser::parse_script;
 use talon::interpreter::interpret;
+use talon::parser::parse_script;
 
 async fn run_script(code: &str) -> Result<(), String> {
     let commands = parse_script(code)?;
@@ -28,7 +28,10 @@ async fn test_multiple_var_decls() {
         let z = 30
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Multiple variable declarations should succeed");
+    assert!(
+        result.is_ok(),
+        "Multiple variable declarations should succeed"
+    );
 }
 
 #[tokio::test]
@@ -84,7 +87,10 @@ async fn test_typed_null_decl() {
 async fn test_typed_null_error() {
     let code = "let x: null = 42";
     let result = run_script(code).await;
-    assert!(result.is_err(), "Typed null with non-null value should fail");
+    assert!(
+        result.is_err(),
+        "Typed null with non-null value should fail"
+    );
     assert!(result.unwrap_err().contains("Type Error"));
 }
 
@@ -274,7 +280,10 @@ async fn test_numeric_operations_in_decl() {
         let x = 42
     "#;
     let result = run_script(code).await;
-    assert!(result.is_ok(), "Numeric operations in declaration should work");
+    assert!(
+        result.is_ok(),
+        "Numeric operations in declaration should work"
+    );
 }
 
 #[tokio::test]

@@ -30,7 +30,8 @@ for gadget in {gadgets}
     chain = chain + p64(gadget)
 end
 chain
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
@@ -43,7 +44,8 @@ let leak = u64(recv(conn, 8))
 let libc_base = leak - PUTS_OFFSET
 print("Libc base:", hex(libc_base))
 libc_base
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
@@ -51,12 +53,17 @@ libc_base
             parameters: vec!["arch".to_string()],
             template: r#"
 shellcode({arch}, "execve", "/bin/sh")
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
             name: "format_string_exploit".to_string(),
-            parameters: vec!["offset".to_string(), "target".to_string(), "value".to_string()],
+            parameters: vec![
+                "offset".to_string(),
+                "target".to_string(),
+                "value".to_string(),
+            ],
             template: r#"
 let writes = [
     ({target}, {value} & 0xFF),
@@ -69,7 +76,8 @@ for write in writes
     payload = payload + "%{}x%{}$hhn".format(write[1], {offset})
 end
 payload
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
@@ -82,34 +90,46 @@ if len(players) > 0
     let player = players[0]
     let health = unity_get_component(player["address"], "Health")
     mem_write(pid, health["address"] + 0x10, p32(99999))
-    
+
     let ammo = unity_get_component(player["address"], "Ammo")
     mem_write(pid, ammo["address"] + 0x14, p32(99999))
-    
+
     print("God mode activated!")
 end
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
             name: "buffer_overflow_exploit".to_string(),
-            parameters: vec!["offset".to_string(), "target".to_string(), "payload".to_string()],
+            parameters: vec![
+                "offset".to_string(),
+                "target".to_string(),
+                "payload".to_string(),
+            ],
             template: r#"
 let exploit = cyclic({offset}) + p64({target}) + {payload}
 exploit
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
             name: "ret2libc".to_string(),
-            parameters: vec!["offset".to_string(), "system_addr".to_string(), "binsh_addr".to_string(), "pop_rdi".to_string()],
+            parameters: vec![
+                "offset".to_string(),
+                "system_addr".to_string(),
+                "binsh_addr".to_string(),
+                "pop_rdi".to_string(),
+            ],
             template: r#"
 let chain = cyclic({offset})
 chain = chain + p64({pop_rdi})
 chain = chain + p64({binsh_addr})
 chain = chain + p64({system_addr})
 chain
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
@@ -117,7 +137,8 @@ chain
             parameters: vec!["length".to_string()],
             template: r#"
 cyclic({length})
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
@@ -125,7 +146,8 @@ cyclic({length})
             parameters: vec!["pattern".to_string()],
             template: r#"
 cyclic_find({pattern})
-"#.to_string(),
+"#
+            .to_string(),
         });
 
         self.register_macro(Macro {
@@ -141,7 +163,8 @@ for entity in entities
         esp_draw_box(screen["x"], screen["y"], 50, 100)
     end
 end
-"#.to_string(),
+"#
+            .to_string(),
         });
     }
 
@@ -150,7 +173,9 @@ end
     }
 
     pub fn expand(&self, macro_name: &str, args: &[String]) -> Result<String, String> {
-        let macro_def = self.macros.get(macro_name)
+        let macro_def = self
+            .macros
+            .get(macro_name)
             .ok_or_else(|| format!("Macro '{}' not found", macro_name))?;
 
         if args.len() != macro_def.parameters.len() {
@@ -163,7 +188,7 @@ end
         }
 
         let mut expanded = macro_def.template.clone();
-        
+
         for (param, arg) in macro_def.parameters.iter().zip(args.iter()) {
             let placeholder = format!("{{{}}}", param);
             expanded = expanded.replace(&placeholder, arg);
@@ -174,13 +199,13 @@ end
 
     pub fn expand_code(&self, source: &str) -> Result<String, String> {
         let mut result = source.to_string();
-        let macro_pattern = regex::Regex::new(r"(\w+)!\s*\((.*?)\)")
-            .map_err(|e| format!("Regex error: {}", e))?;
+        let macro_pattern =
+            regex::Regex::new(r"(\w+)!\s*\((.*?)\)").map_err(|e| format!("Regex error: {}", e))?;
 
         for cap in macro_pattern.captures_iter(source) {
             let macro_name = &cap[1];
             let args_str = &cap[2];
-            
+
             let args: Vec<String> = if args_str.trim().is_empty() {
                 Vec::new()
             } else {
@@ -206,10 +231,10 @@ end
 
 pub fn parse_macro_definition(source: &str) -> Option<Macro> {
     let lines: Vec<&str> = source.lines().collect();
-    
+
     for (i, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
-        
+
         if trimmed.starts_with("macro ") {
             let parts: Vec<&str> = trimmed.split_whitespace().collect();
             if parts.len() < 2 {
@@ -233,11 +258,11 @@ pub fn parse_macro_definition(source: &str) -> Option<Macro> {
             }
 
             let mut template = String::new();
-            for j in (i + 1)..lines.len() {
-                if lines[j].trim() == "end" || lines[j].trim().starts_with("end ") {
+            for line in lines.iter().skip(i + 1) {
+                if line.trim() == "end" || line.trim().starts_with("end ") {
                     break;
                 }
-                template.push_str(lines[j]);
+                template.push_str(line);
                 template.push('\n');
             }
 
@@ -259,7 +284,7 @@ mod tests {
     #[test]
     fn test_macro_expansion() {
         let expander = MacroExpander::new();
-        
+
         let result = expander.expand("pattern_create", &["100".to_string()]);
         assert!(result.is_ok());
         assert!(result.unwrap().contains("cyclic(100)"));
@@ -268,11 +293,8 @@ mod tests {
     #[test]
     fn test_rop_chain_macro() {
         let expander = MacroExpander::new();
-        
-        let result = expander.expand(
-            "rop_chain",
-            &["[0x401234, 0x401567, 0x401890]".to_string()]
-        );
+
+        let result = expander.expand("rop_chain", &["[0x401234, 0x401567, 0x401890]".to_string()]);
         assert!(result.is_ok());
     }
 

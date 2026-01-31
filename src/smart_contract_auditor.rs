@@ -3,9 +3,10 @@
 // Comprehensive vulnerability detection and exploit generation for Solidity contracts
 // ═══════════════════════════════════════════════════════════════════════════
 
-use std::fs;
-use serde::{Deserialize, Serialize};
+#![allow(clippy::needless_range_loop)]
 
+use serde::{Deserialize, Serialize};
+use std::fs;
 
 // ═══════════════════════════════════════════════════════════════════════════
 // VULNERABILITY DETECTION ENGINE
@@ -19,7 +20,7 @@ pub enum VulnerabilityType {
     IntegerUnderflow,
     UnprotectedSelfDestruct,
     UnprotectedEther,
-    
+
     // DeFi-Specific
     FlashLoanAttack,
     FrontRunning,
@@ -27,26 +28,26 @@ pub enum VulnerabilityType {
     Sandwiching,
     OracleManipulation,
     PriceManipulation,
-    
+
     // Access Control
     UnprotectedFunction,
     MissingAccessControl,
     WeakRandomness,
     TxOriginAuthentication,
     DelegateCallInjection,
-    
+
     // Gas & Performance
     UnboundedLoop,
     GasGriefing,
     StorageCollision,
-    
+
     // Advanced
     TimestampDependence,
     BlockhashWeakness,
     SignatureReplay,
     ERC20IssuesApproveRace,
     UncheckedCall,
-    
+
     // MEV
     MEVVulnerable,
     SlippageTooHigh,
@@ -67,11 +68,11 @@ pub struct Vulnerability {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Severity {
-    Critical,  // Immediate funds at risk
-    High,      // Significant risk, exploitable
-    Medium,    // Potential risk, complex exploit
-    Low,       // Minor issue
-    Info,      // Informational
+    Critical, // Immediate funds at risk
+    High,     // Significant risk, exploitable
+    Medium,   // Potential risk, complex exploit
+    Low,      // Minor issue
+    Info,     // Informational
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -95,11 +96,11 @@ impl SmartContractAuditor {
     pub fn new(contract_path: String) -> Result<Self, String> {
         let source_code = fs::read_to_string(&contract_path)
             .map_err(|e| format!("Failed to read contract: {}", e))?;
-        
+
         println!("[AUDIT] Initializing Smart Contract Security Auditor");
         println!("[AUDIT] Contract: {}", contract_path);
         println!("[AUDIT] Source: {} lines", source_code.lines().count());
-        
+
         Ok(SmartContractAuditor {
             contract_path,
             source_code,
@@ -108,14 +109,14 @@ impl SmartContractAuditor {
             contract_abi: None,
         })
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // COMPREHENSIVE VULNERABILITY SCANNING
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     pub fn scan_all_vulnerabilities(&mut self) -> Result<AuditReport, String> {
         println!("[AUDIT] Starting comprehensive vulnerability scan...");
-        
+
         self.detect_reentrancy()?;
         self.detect_integer_issues()?;
         self.detect_access_control()?;
@@ -134,33 +135,38 @@ impl SmartContractAuditor {
         self.detect_flashloan_attacks()?;
         self.detect_oracle_manipulation()?;
         self.detect_front_running()?;
-        
-        println!("[AUDIT] [OK] Scan complete: {} vulnerabilities found", self.vulnerabilities.len());
-        
+
+        println!(
+            "[AUDIT] [OK] Scan complete: {} vulnerabilities found",
+            self.vulnerabilities.len()
+        );
+
         Ok(self.generate_report())
     }
-    
+
     fn detect_reentrancy(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for reentrancy vulnerabilities...");
-        
+
         let lines: Vec<&str> = self.source_code.lines().collect();
         let mut state_changes_after_call = Vec::new();
-        
+
         for (idx, line) in lines.iter().enumerate() {
             // Detect external calls
-            if line.contains(".call{") || line.contains(".call(") || 
-               line.contains(".transfer(") || line.contains(".send(") {
-                
+            if line.contains(".call{")
+                || line.contains(".call(")
+                || line.contains(".transfer(")
+                || line.contains(".send(")
+            {
                 // Check if state changes occur after the call
                 for future_idx in (idx + 1)..lines.len().min(idx + 20) {
                     let future_line = lines[future_idx];
-                    
+
                     if future_line.contains("=") && !future_line.trim().starts_with("//") {
                         // State change after external call - reentrancy risk!
-                        
+
                         if !future_line.contains("require") && !future_line.contains("assert") {
                             state_changes_after_call.push((idx, future_idx));
-                            
+
                             self.vulnerabilities.push(Vulnerability {
                                 vuln_type: VulnerabilityType::Reentrancy,
                                 severity: Severity::Critical,
@@ -188,29 +194,35 @@ impl SmartContractAuditor {
                 }
             }
         }
-        
-        println!("[AUDIT]   → Found {} reentrancy issues", state_changes_after_call.len());
+
+        println!(
+            "[AUDIT]   → Found {} reentrancy issues",
+            state_changes_after_call.len()
+        );
         Ok(())
     }
-    
+
     fn detect_integer_issues(&mut self) -> Result<(), String> {
-        println!("[AUDIT] 🔢 Scanning for integer overflow/underflow...");
-        
+        println!("[AUDIT]  Scanning for integer overflow/underflow...");
+
         let lines: Vec<&str> = self.source_code.lines().collect();
         let mut unchecked_math = 0;
-        
+
         // Check Solidity version
-        let has_solidity_08 = self.source_code.contains("pragma solidity ^0.8") || 
-                              self.source_code.contains("pragma solidity >=0.8");
-        
+        let has_solidity_08 = self.source_code.contains("pragma solidity ^0.8")
+            || self.source_code.contains("pragma solidity >=0.8");
+
         if !has_solidity_08 {
             for (idx, line) in lines.iter().enumerate() {
-                if (line.contains(" + ") || line.contains(" - ") || 
-                    line.contains(" * ") || line.contains(" / ")) && 
-                   !line.contains("SafeMath") && !line.trim().starts_with("//") {
-                    
+                if (line.contains(" + ")
+                    || line.contains(" - ")
+                    || line.contains(" * ")
+                    || line.contains(" / "))
+                    && !line.contains("SafeMath")
+                    && !line.trim().starts_with("//")
+                {
                     unchecked_math += 1;
-                    
+
                     self.vulnerabilities.push(Vulnerability {
                         vuln_type: VulnerabilityType::IntegerOverflow,
                         severity: Severity::High,
@@ -233,27 +245,30 @@ impl SmartContractAuditor {
                 }
             }
         }
-        
-        println!("[AUDIT]   → Found {} unchecked arithmetic operations", unchecked_math);
+
+        println!(
+            "[AUDIT]   → Found {} unchecked arithmetic operations",
+            unchecked_math
+        );
         Ok(())
     }
-    
+
     fn detect_access_control(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for access control issues...");
-        
+
         let lines: Vec<&str> = self.source_code.lines().collect();
         let mut unprotected_functions = 0;
-        
+
         for (idx, line) in lines.iter().enumerate() {
             // Check for public/external functions
             if line.contains("function") && (line.contains("public") || line.contains("external")) {
                 let is_protected = self.function_has_modifier(&lines, idx);
                 let is_view_pure = line.contains("view") || line.contains("pure");
                 let is_constructor = line.contains("constructor");
-                
+
                 if !is_protected && !is_view_pure && !is_constructor {
                     unprotected_functions += 1;
-                    
+
                     self.vulnerabilities.push(Vulnerability {
                         vuln_type: VulnerabilityType::MissingAccessControl,
                         severity: Severity::High,
@@ -276,28 +291,33 @@ impl SmartContractAuditor {
                 }
             }
         }
-        
-        println!("[AUDIT]   → Found {} unprotected functions", unprotected_functions);
+
+        println!(
+            "[AUDIT]   → Found {} unprotected functions",
+            unprotected_functions
+        );
         Ok(())
     }
-    
+
     fn detect_unchecked_calls(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for unchecked external calls...");
-        
+
         let lines: Vec<&str> = self.source_code.lines().collect();
         let mut unchecked_calls = 0;
-        
+
         for (idx, line) in lines.iter().enumerate() {
-            if (line.contains(".call(") || line.contains(".send(") || line.contains(".transfer(")) 
-               && !line.trim().starts_with("//") {
-                
+            if (line.contains(".call(") || line.contains(".send(") || line.contains(".transfer("))
+                && !line.trim().starts_with("//")
+            {
                 // Check if return value is checked
-                let is_checked = line.contains("require(") || line.contains("if (") || 
-                                 line.contains("assert(") || line.contains("success");
-                
+                let is_checked = line.contains("require(")
+                    || line.contains("if (")
+                    || line.contains("assert(")
+                    || line.contains("success");
+
                 if !is_checked && line.contains(".call(") {
                     unchecked_calls += 1;
-                    
+
                     self.vulnerabilities.push(Vulnerability {
                         vuln_type: VulnerabilityType::UncheckedCall,
                         severity: Severity::Medium,
@@ -320,22 +340,25 @@ impl SmartContractAuditor {
                 }
             }
         }
-        
-        println!("[AUDIT]   → Found {} unchecked external calls", unchecked_calls);
+
+        println!(
+            "[AUDIT]   → Found {} unchecked external calls",
+            unchecked_calls
+        );
         Ok(())
     }
-    
+
     fn detect_timestamp_dependence(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for timestamp dependence...");
-        
+
         if self.source_code.contains("block.timestamp") || self.source_code.contains("now") {
             let lines: Vec<&str> = self.source_code.lines().collect();
-            
+
             for (idx, line) in lines.iter().enumerate() {
-                if (line.contains("block.timestamp") || line.contains("now")) && 
-                   (line.contains("==") || line.contains("<") || line.contains(">")) &&
-                   !line.trim().starts_with("//") {
-                    
+                if (line.contains("block.timestamp") || line.contains("now"))
+                    && (line.contains("==") || line.contains("<") || line.contains(">"))
+                    && !line.trim().starts_with("//")
+                {
                     self.vulnerabilities.push(Vulnerability {
                         vuln_type: VulnerabilityType::TimestampDependence,
                         severity: Severity::Low,
@@ -355,16 +378,16 @@ impl SmartContractAuditor {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_tx_origin(&mut self) -> Result<(), String> {
-        println!("[AUDIT] 🎭 Scanning for tx.origin usage...");
-        
+        println!("[AUDIT]  Scanning for tx.origin usage...");
+
         if self.source_code.contains("tx.origin") {
             let lines: Vec<&str> = self.source_code.lines().collect();
-            
+
             for (idx, line) in lines.iter().enumerate() {
                 if line.contains("tx.origin") && !line.trim().starts_with("//") {
                     self.vulnerabilities.push(Vulnerability {
@@ -386,20 +409,22 @@ impl SmartContractAuditor {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_delegatecall_issues(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for delegatecall vulnerabilities...");
-        
+
         if self.source_code.contains("delegatecall") {
             let lines: Vec<&str> = self.source_code.lines().collect();
-            
+
             for (idx, line) in lines.iter().enumerate() {
                 if line.contains("delegatecall") && !line.trim().starts_with("//") {
-                    let is_controlled = line.contains("msg.sender") || line.contains("input") || line.contains("_target");
-                    
+                    let is_controlled = line.contains("msg.sender")
+                        || line.contains("input")
+                        || line.contains("_target");
+
                     self.vulnerabilities.push(Vulnerability {
                         vuln_type: VulnerabilityType::DelegateCallInjection,
                         severity: if is_controlled { Severity::Critical } else { Severity::High },
@@ -419,13 +444,13 @@ impl SmartContractAuditor {
                 }
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_selfdestruct_issues(&mut self) -> Result<(), String> {
-        println!("[AUDIT] 💣 Scanning for selfdestruct issues...");
-        
+        println!("[AUDIT]  Scanning for selfdestruct issues...");
+
         if self.source_code.contains("selfdestruct") || self.source_code.contains("suicide") {
             self.vulnerabilities.push(Vulnerability {
                 vuln_type: VulnerabilityType::UnprotectedSelfDestruct,
@@ -444,15 +469,20 @@ impl SmartContractAuditor {
                 references: vec!["https://swcregistry.io/docs/SWC-106".to_string()],
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_weak_randomness(&mut self) -> Result<(), String> {
-        println!("[AUDIT] 🎲 Scanning for weak randomness...");
-        
-        let weak_sources = ["block.timestamp", "block.number", "blockhash", "block.difficulty"];
-        
+        println!("[AUDIT]  Scanning for weak randomness...");
+
+        let weak_sources = [
+            "block.timestamp",
+            "block.number",
+            "blockhash",
+            "block.difficulty",
+        ];
+
         for source in &weak_sources {
             if self.source_code.contains(source) && self.source_code.contains("random") {
                 self.vulnerabilities.push(Vulnerability {
@@ -473,15 +503,15 @@ impl SmartContractAuditor {
                 });
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_unbounded_loops(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for unbounded loops...");
-        
+
         let lines: Vec<&str> = self.source_code.lines().collect();
-        
+
         for (idx, line) in lines.iter().enumerate() {
             if line.contains("for") && (line.contains(".length") || line.contains("array")) {
                 self.vulnerabilities.push(Vulnerability {
@@ -502,15 +532,16 @@ impl SmartContractAuditor {
                 });
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_storage_collision(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for storage collision risks...");
-        
-        if self.source_code.contains("delegatecall") && 
-           (self.source_code.contains("contract") && self.source_code.contains("is")) {
+
+        if self.source_code.contains("delegatecall")
+            && (self.source_code.contains("contract") && self.source_code.contains("is"))
+        {
             self.vulnerabilities.push(Vulnerability {
                 vuln_type: VulnerabilityType::StorageCollision,
                 severity: Severity::Medium,
@@ -528,17 +559,18 @@ impl SmartContractAuditor {
                 references: vec!["https://eips.ethereum.org/EIPS/eip-1967".to_string()],
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_signature_replay(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for signature replay vulnerabilities...");
-        
+
         if self.source_code.contains("ecrecover") || self.source_code.contains("signature") {
             let has_nonce = self.source_code.contains("nonce");
-            let has_chainid = self.source_code.contains("chainid") || self.source_code.contains("block.chainid");
-            
+            let has_chainid =
+                self.source_code.contains("chainid") || self.source_code.contains("block.chainid");
+
             if !has_nonce || !has_chainid {
                 self.vulnerabilities.push(Vulnerability {
                     vuln_type: VulnerabilityType::SignatureReplay,
@@ -558,16 +590,16 @@ impl SmartContractAuditor {
                 });
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_erc20_issues(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for ERC20-specific issues...");
-        
+
         // Check for approve race condition
-        if self.source_code.contains("function approve") {
-            if !self.source_code.contains("increaseAllowance") {
+        if self.source_code.contains("function approve")
+            && !self.source_code.contains("increaseAllowance") {
                 self.vulnerabilities.push(Vulnerability {
                     vuln_type: VulnerabilityType::ERC20IssuesApproveRace,
                     severity: Severity::Medium,
@@ -585,17 +617,17 @@ impl SmartContractAuditor {
                     references: vec!["https://docs.google.com/document/d/1YLPtQxZu1UAvO9cZ1O2RPXBbT0mooh4DYKjA_jp-RLM".to_string()],
                 });
             }
-        }
-        
+
         Ok(())
     }
-    
+
     fn detect_defi_specific(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for DeFi-specific vulnerabilities...");
-        
+
         // Check for price manipulation via direct balance checks
-        if self.source_code.contains("balanceOf(address(this))") && 
-           (self.source_code.contains("swap") || self.source_code.contains("price")) {
+        if self.source_code.contains("balanceOf(address(this))")
+            && (self.source_code.contains("swap") || self.source_code.contains("price"))
+        {
             self.vulnerabilities.push(Vulnerability {
                 vuln_type: VulnerabilityType::PriceManipulation,
                 severity: Severity::Critical,
@@ -613,16 +645,17 @@ impl SmartContractAuditor {
                 references: vec!["https://docs.uniswap.org/concepts/protocol/oracle".to_string()],
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_mev_vulnerabilities(&mut self) -> Result<(), String> {
-        println!("[AUDIT] 🏃 Scanning for MEV vulnerabilities...");
-        
+        println!("[AUDIT]  Scanning for MEV vulnerabilities...");
+
         // Check for missing deadline protection
-        if (self.source_code.contains("swap") || self.source_code.contains("trade")) && 
-           !self.source_code.contains("deadline") {
+        if (self.source_code.contains("swap") || self.source_code.contains("trade"))
+            && !self.source_code.contains("deadline")
+        {
             self.vulnerabilities.push(Vulnerability {
                 vuln_type: VulnerabilityType::NoDeadline,
                 severity: Severity::High,
@@ -640,7 +673,7 @@ impl SmartContractAuditor {
                 references: vec!["https://www.mev.wiki/".to_string()],
             });
         }
-        
+
         // Check for high slippage tolerance
         if self.source_code.contains("slippage") {
             // Simplified check - in real implementation would parse actual values
@@ -661,13 +694,13 @@ impl SmartContractAuditor {
                 references: vec!["https://medium.com/coinmonks/defi-sandwich-attack-explain-776f6f43b2fd".to_string()],
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_flashloan_attacks(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for flashloan attack vectors...");
-        
+
         if self.source_code.contains("borrow") || self.source_code.contains("flashLoan") {
             self.vulnerabilities.push(Vulnerability {
                 vuln_type: VulnerabilityType::FlashLoanAttack,
@@ -686,18 +719,18 @@ impl SmartContractAuditor {
                 references: vec!["https://aave.com/flash-loans".to_string()],
             });
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_oracle_manipulation(&mut self) -> Result<(), String> {
-        println!("[AUDIT] 🔮 Scanning for oracle manipulation risks...");
-        
+        println!("[AUDIT]  Scanning for oracle manipulation risks...");
+
         if self.source_code.contains("oracle") || self.source_code.contains("getPrice") {
-            let uses_single_source = !self.source_code.contains("median") && 
-                                      !self.source_code.contains("average") &&
-                                      !self.source_code.contains("multiple");
-            
+            let uses_single_source = !self.source_code.contains("median")
+                && !self.source_code.contains("average")
+                && !self.source_code.contains("multiple");
+
             if uses_single_source {
                 self.vulnerabilities.push(Vulnerability {
                     vuln_type: VulnerabilityType::OracleManipulation,
@@ -717,13 +750,13 @@ impl SmartContractAuditor {
                 });
             }
         }
-        
+
         Ok(())
     }
-    
+
     fn detect_front_running(&mut self) -> Result<(), String> {
         println!("[AUDIT] Scanning for front-running vulnerabilities...");
-        
+
         // Check for commit-reveal pattern
         if self.source_code.contains("reveal") && !self.source_code.contains("commit") {
             self.vulnerabilities.push(Vulnerability {
@@ -743,37 +776,37 @@ impl SmartContractAuditor {
                 references: vec!["https://ethereum.stackexchange.com/questions/191/how-can-i-securely-generate-a-random-number-in-my-smart-contract".to_string()],
             });
         }
-        
+
         Ok(())
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // EXPLOIT GENERATION
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     fn generate_reentrancy_exploit(&self, _line: usize) -> String {
-        format!(r#"
+        r#"
 // Reentrancy Exploit POC
-contract ReentrancyAttack {{
+contract ReentrancyAttack {
     TargetContract target;
-    
-    constructor(address _target) {{
+
+    constructor(address _target) {
         target = TargetContract(_target);
-    }}
-    
-    function attack() external payable {{
-        target.vulnerableFunction{{value: msg.value}}();
-    }}
-    
-    receive() external payable {{
-        if (address(target).balance >= 1 ether) {{
-            target.vulnerableFunction(); // Recursive call
-        }}
-    }}
-}}
-        "#)
     }
-    
+
+    function attack() external payable {
+        target.vulnerableFunction{value: msg.value}();
+    }
+
+    receive() external payable {
+        if (address(target).balance >= 1 ether) {
+            target.vulnerableFunction(); // Recursive call
+        }
+    }
+}
+        "#.to_string()
+    }
+
     fn generate_overflow_exploit(&self) -> String {
         r#"
 // Integer Overflow Exploit POC
@@ -783,34 +816,36 @@ function exploit() public {
     uint256 result = maxInt + 1;
     // Attacker can manipulate balances, timestamps, etc.
 }
-        "#.to_string()
+        "#
+        .to_string()
     }
-    
+
     fn generate_txorigin_exploit(&self) -> String {
         r#"
 // tx.origin Phishing Attack
 contract PhishingAttack {
     VulnerableContract target;
-    
+
     constructor(address _target) {
         target = VulnerableContract(_target);
     }
-    
+
     function phish() external {
         // Victim calls this, their tx.origin is checked by vulnerable contract
         target.withdrawAll();
         // Funds go to attacker's contract
     }
 }
-        "#.to_string()
+        "#
+        .to_string()
     }
-    
+
     fn generate_delegatecall_exploit(&self) -> String {
         r#"
 // Delegatecall Takeover Exploit
 contract DelegatecallAttack {
     address public owner; // Storage slot 0
-    
+
     function pwn() public {
         owner = msg.sender; // Overwrites victim's storage slot 0
     }
@@ -818,9 +853,10 @@ contract DelegatecallAttack {
 
 // Attacker calls: victim.delegatecall(address(attackContract), "pwn()")
 // This overwrites victim's owner variable
-        "#.to_string()
+        "#
+        .to_string()
     }
-    
+
     fn generate_flashloan_exploit_template(&self) -> String {
         r#"
 // Flash Loan Price Manipulation Attack
@@ -830,24 +866,25 @@ contract FlashLoanAttack {
         uint256 loanAmount = 1000000 * 1e18;
         flashLoanProvider.flashLoan(loanAmount, address(this));
     }
-    
+
     function onFlashLoan(uint256 amount) external {
         // 2. Manipulate price by dumping tokens
         uniswapPair.swap(amount, 0, address(this), "");
-        
+
         // 3. Exploit vulnerable contract at manipulated price
         vulnerableContract.buyAtOraclePrice();
-        
+
         // 4. Restore price
         uniswapPair.swap(0, amount, address(this), "");
-        
+
         // 5. Repay flash loan + profit
         token.transfer(msg.sender, amount);
     }
 }
-        "#.to_string()
+        "#
+        .to_string()
     }
-    
+
     fn generate_sandwich_attack_template(&self) -> String {
         r#"
 // MEV Sandwich Attack
@@ -857,20 +894,21 @@ contract SandwichAttack {
         // 2. Submit transaction with higher gas to execute first
         dex.swap(token0, token1, amount);
     }
-    
+
     function backrun(address victim) external {
         // 3. After victim's transaction, reverse the trade
         dex.swap(token1, token0, balance);
         // Profit from price impact
     }
 }
-        "#.to_string()
+        "#
+        .to_string()
     }
-    
+
     // ═══════════════════════════════════════════════════════════════════════
     // HELPER FUNCTIONS
     // ═══════════════════════════════════════════════════════════════════════
-    
+
     fn extract_function_name(&self, lines: &[&str], line_idx: usize) -> Option<String> {
         // Look backwards from line_idx to find function declaration
         for i in (0..=line_idx).rev() {
@@ -886,13 +924,16 @@ contract SandwichAttack {
         }
         None
     }
-    
+
     fn function_has_modifier(&self, lines: &[&str], line_idx: usize) -> bool {
         // Check if function has modifiers like onlyOwner, onlyAdmin, etc.
         for i in line_idx..(line_idx + 5).min(lines.len()) {
             let line = lines[i];
-            if line.contains("only") || line.contains("require(msg.sender") || 
-               line.contains("AccessControl") || line.contains("Ownable") {
+            if line.contains("only")
+                || line.contains("require(msg.sender")
+                || line.contains("AccessControl")
+                || line.contains("Ownable")
+            {
                 return true;
             }
             // Stop at opening brace
@@ -902,17 +943,37 @@ contract SandwichAttack {
         }
         false
     }
-    
+
     fn generate_report(&self) -> AuditReport {
-        let critical = self.vulnerabilities.iter().filter(|v| matches!(v.severity, Severity::Critical)).count();
-        let high = self.vulnerabilities.iter().filter(|v| matches!(v.severity, Severity::High)).count();
-        let medium = self.vulnerabilities.iter().filter(|v| matches!(v.severity, Severity::Medium)).count();
-        let low = self.vulnerabilities.iter().filter(|v| matches!(v.severity, Severity::Low)).count();
-        let info = self.vulnerabilities.iter().filter(|v| matches!(v.severity, Severity::Info)).count();
-        
-        let risk_score = (critical * 100 + high * 50 + medium * 25 + low * 10) as f64 / 
-                         (self.vulnerabilities.len().max(1) as f64);
-        
+        let critical = self
+            .vulnerabilities
+            .iter()
+            .filter(|v| matches!(v.severity, Severity::Critical))
+            .count();
+        let high = self
+            .vulnerabilities
+            .iter()
+            .filter(|v| matches!(v.severity, Severity::High))
+            .count();
+        let medium = self
+            .vulnerabilities
+            .iter()
+            .filter(|v| matches!(v.severity, Severity::Medium))
+            .count();
+        let low = self
+            .vulnerabilities
+            .iter()
+            .filter(|v| matches!(v.severity, Severity::Low))
+            .count();
+        let info = self
+            .vulnerabilities
+            .iter()
+            .filter(|v| matches!(v.severity, Severity::Info))
+            .count();
+
+        let risk_score = (critical * 100 + high * 50 + medium * 25 + low * 10) as f64
+            / (self.vulnerabilities.len().max(1) as f64);
+
         AuditReport {
             contract_name: self.contract_path.clone(),
             total_vulnerabilities: self.vulnerabilities.len(),
@@ -926,7 +987,7 @@ contract SandwichAttack {
             recommendations: self.generate_recommendations(),
         }
     }
-    
+
     fn generate_recommendations(&self) -> Vec<String> {
         vec![
             "Implement comprehensive test coverage including edge cases".to_string(),
@@ -970,13 +1031,16 @@ impl AuditReport {
         println!("║   Low: {:<54} ║", self.low_count);
         println!("║   INFO: {:<52} ║", self.info_count);
         println!("║                                                               ║");
-        println!("║ Risk Score: {:<6.2} / 100                                      ║", self.risk_score);
+        println!(
+            "║ Risk Score: {:<6.2} / 100                                      ║",
+            self.risk_score
+        );
         println!("╚═══════════════════════════════════════════════════════════════╝\n");
-        
+
         if self.critical_count > 0 || self.high_count > 0 {
             println!("WARNING: CRITICAL ISSUES FOUND - DO NOT DEPLOY TO MAINNET\n");
         }
-        
+
         for (idx, vuln) in self.vulnerabilities.iter().enumerate() {
             let prefix = match vuln.severity {
                 Severity::Critical => "[CRITICAL]",
@@ -985,10 +1049,16 @@ impl AuditReport {
                 Severity::Low => "[LOW]",
                 Severity::Info => "[INFO]",
             };
-            
-            println!("\n{}═══════════════════════════════════════════════════════════════", prefix);
+
+            println!(
+                "\n{}═══════════════════════════════════════════════════════════════",
+                prefix
+            );
             println!("{} Issue #{}: {:?}", prefix, idx + 1, vuln.vuln_type);
-            println!("{}═══════════════════════════════════════════════════════════════", prefix);
+            println!(
+                "{}═══════════════════════════════════════════════════════════════",
+                prefix
+            );
             println!("Location: {}:{}", vuln.location.file, vuln.location.line);
             if let Some(func) = &vuln.location.function {
                 println!("Function: {}", func);
@@ -996,17 +1066,17 @@ impl AuditReport {
             println!("Description: {}", vuln.description);
             println!("Recommendation: {}", vuln.recommendation);
             println!("Exploitability: {}/100", vuln.exploitability_score);
-            
+
             if let Some(poc) = &vuln.poc_code {
                 println!("\nProof of Concept:\n{}", poc);
             }
-            
+
             println!("References:");
             for ref_url in &vuln.references {
                 println!("   {}", ref_url);
             }
         }
-        
+
         println!("\n\nRECOMMENDATIONS:");
         for (idx, rec) in self.recommendations.iter().enumerate() {
             println!("  {}. {}", idx + 1, rec);

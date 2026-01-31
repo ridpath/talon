@@ -199,13 +199,13 @@ parallel for target in targets {
     
     let result = execute GraphBufferOverflow against target
     
-    if result["success"] {
+    if result.success {
         print("SUCCESS on", target)
-        print("  Steps completed:", result["steps_completed"])
-        print("  Execution time:", result["execution_time"], "ms")
+        print("  Steps completed:", result.steps_completed)
+        print("  Execution time:", result.execution_time, "ms")
     } else {
         print("FAILED on", target)
-        print("  Failed at step:", result["steps_failed"][0])
+        print("  Failed at step:", result.steps_failed[0])
     }
 }
 
@@ -219,20 +219,20 @@ print(graph.visualize())
 
 # Analyze dependencies
 print("\nDependency Analysis:")
-for step_name in graph["execution_order"] {
-    let step = graph["steps"][step_name]
+for step_name in graph.execution_order {
+    let step = graph.steps[step_name]
     print("Step:", step_name)
     
-    if len(step["dependencies"]) > 0 {
-        print("  Depends on:", step["dependencies"])
+    if len(step.dependencies) > 0 {
+        print("  Depends on:", step.dependencies)
     }
     
-    if len(step["inputs"]) > 0 {
-        print("  Requires:", step["inputs"])
+    if len(step.inputs) > 0 {
+        print("  Requires:", step.inputs)
     }
     
-    if len(step["outputs"]) > 0 {
-        print("  Produces:", step["outputs"])
+    if len(step.outputs) > 0 {
+        print("  Produces:", step.outputs)
     }
 }
 
@@ -248,15 +248,15 @@ fn build_exploit_graph_for_binary(binary_path) {
     # Add steps based on protections
     graph = graph.step_find_offset()
     
-    if analysis["protections"]["canary"] {
+    if analysis.protections.canary {
         graph = graph.step_leak_canary()
     }
     
-    if analysis["protections"]["pie"] {
+    if analysis.protections.pie {
         graph = graph.step_leak_binary_base()
     }
     
-    if analysis["protections"]["nx"] {
+    if analysis.protections.nx {
         graph = graph.step_leak_libc()
         graph = graph.step_build_rop()
     } else {

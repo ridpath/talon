@@ -4,13 +4,13 @@
 # This file shows how to think about exploits in plain English
 # and translate them to TALON code
 
-print("🗣️  Natural Language to TALON Translation Guide")
+print("️  Natural Language to TALON Translation Guide")
 print("═══════════════════════════════════════════════════")
 
 # ─────────────────────────────────────────────────────────────────────────────
 # EXAMPLE 1: "Send a buffer overflow to crash the program"
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n📝 EXAMPLE 1: Buffer Overflow")
+print("\n EXAMPLE 1: Buffer Overflow")
 print("English: Send 500 bytes to overflow the buffer")
 print("TALON:")
 print("  let overflow = cyclic(500)")
@@ -19,7 +19,7 @@ print("  send overflow")
 # ─────────────────────────────────────────────────────────────────────────────
 # EXAMPLE 2: "Find gadgets to build a ROP chain"
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n📝 EXAMPLE 2: ROP Chain")
+print("\n EXAMPLE 2: ROP Chain")
 print("English: Find 'pop rdi; ret' and call system()")
 print("TALON:")
 print("  let pop_rdi = 0x401234")
@@ -29,7 +29,7 @@ print("  let chain = [pop_rdi, bin_sh, system_addr]")
 # ─────────────────────────────────────────────────────────────────────────────
 # EXAMPLE 3: "Leak a memory address from the output"
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n📝 EXAMPLE 3: Memory Leak")
+print("\n EXAMPLE 3: Memory Leak")
 print("English: Extract address from position 10 in response")
 print("TALON:")
 print("  let response = receive()")
@@ -39,7 +39,7 @@ print("  let leaked_addr = parts[10]")
 # ─────────────────────────────────────────────────────────────────────────────
 # EXAMPLE 4: "Try the exploit multiple times"
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n📝 EXAMPLE 4: Brute Force / Retry")
+print("\n EXAMPLE 4: Brute Force / Retry")
 print("English: Try exploit 100 times with different values")
 print("TALON:")
 print("  for attempt in 0..100")
@@ -58,7 +58,7 @@ print("  end")
 # ─────────────────────────────────────────────────────────────────────────────
 # EXAMPLE 5: "Parse the binary to find useful addresses"
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n📝 EXAMPLE 5: Binary Analysis")
+print("\n EXAMPLE 5: Binary Analysis")
 print("English: Find all references to '/bin/sh' in libc")
 print("TALON:")
 print("  # Use built-in tools (when integrated)")
@@ -68,7 +68,7 @@ print("  # find_string '/bin/sh'")
 # ─────────────────────────────────────────────────────────────────────────────
 # COMMON PATTERNS
 # ─────────────────────────────────────────────────────────────────────────────
-print("\n\n📚 COMMON PATTERNS:")
+print("\n\n COMMON PATTERNS:")
 print("────────────────────────────────────────")
 
 print("\n1️⃣  CONNECT AND SEND:")
@@ -93,7 +93,7 @@ print("       try_byte_value(i)")
 print("   end")
 
 print("\n═══════════════════════════════════════════════════")
-print("💡 TIP: Start with small scripts and build up!")
+print(" TIP: Start with small scripts and build up!")
 print("   - Test each step separately")
 print("   - Use print() to debug values")
 print("   - Add try/catch for errors")

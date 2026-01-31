@@ -1,7 +1,7 @@
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryBinding {
@@ -54,7 +54,12 @@ impl ReactiveMemoryManager {
         }
     }
 
-    pub async fn bind_memory(&self, name: &str, address: u64, mem_type: &str) -> Result<(), String> {
+    pub async fn bind_memory(
+        &self,
+        name: &str,
+        address: u64,
+        mem_type: &str,
+    ) -> Result<(), String> {
         let parsed_type = match mem_type {
             "uint8" => MemoryType::UInt8,
             "uint16" => MemoryType::UInt16,
@@ -68,10 +73,14 @@ impl ReactiveMemoryManager {
             "float64" => MemoryType::Float64,
             "string" => MemoryType::String,
             "bytes" => MemoryType::Bytes,
-            _ => return Err(format!("Unknown memory type: {}", mem_type))
+            _ => return Err(format!("Unknown memory type: {}", mem_type)),
         };
 
-        let size = if parsed_type.size() == 0 { 256 } else { parsed_type.size() };
+        let size = if parsed_type.size() == 0 {
+            256
+        } else {
+            parsed_type.size()
+        };
         let current_value = self.read_memory(address, size).await?;
 
         let binding = MemoryBinding {
@@ -83,21 +92,28 @@ impl ReactiveMemoryManager {
             is_reactive: true,
         };
 
-        self.bindings.write().await.insert(name.to_string(), binding);
+        self.bindings
+            .write()
+            .await
+            .insert(name.to_string(), binding);
         Ok(())
     }
 
     pub async fn unbind_memory(&self, name: &str) -> Result<(), String> {
-        self.bindings.write().await.remove(name)
+        self.bindings
+            .write()
+            .await
+            .remove(name)
             .ok_or_else(|| format!("No binding found for: {}", name))?;
         Ok(())
     }
 
     pub async fn read_binding(&self, name: &str) -> Result<Vec<u8>, String> {
         let bindings = self.bindings.read().await;
-        let binding = bindings.get(name)
+        let binding = bindings
+            .get(name)
             .ok_or_else(|| format!("No binding found for: {}", name))?;
-        
+
         if binding.is_reactive {
             self.read_memory(binding.address, binding.size).await
         } else {
@@ -107,13 +123,19 @@ impl ReactiveMemoryManager {
 
     pub async fn write_binding(&self, name: &str, value: &[u8]) -> Result<(), String> {
         let bindings = self.bindings.read().await;
-        let binding = bindings.get(name)
+        let binding = bindings
+            .get(name)
             .ok_or_else(|| format!("No binding found for: {}", name))?;
-        
+
         self.write_memory(binding.address, value).await?;
         drop(bindings);
-        
-        self.bindings.write().await.get_mut(name).unwrap().current_value = value.to_vec();
+
+        self.bindings
+            .write()
+            .await
+            .get_mut(name)
+            .unwrap()
+            .current_value = value.to_vec();
         Ok(())
     }
 
@@ -122,19 +144,19 @@ impl ReactiveMemoryManager {
         {
             use std::fs::File;
             use std::io::{Read, Seek, SeekFrom};
-            
+
             let mut file = File::open("/proc/self/mem")
                 .map_err(|e| format!("Failed to open memory: {}", e))?;
             file.seek(SeekFrom::Start(address))
                 .map_err(|e| format!("Failed to seek memory: {}", e))?;
-            
+
             let mut buffer = vec![0u8; size];
             file.read_exact(&mut buffer)
                 .map_err(|e| format!("Failed to read memory: {}", e))?;
-            
+
             Ok(buffer)
         }
-        
+
         #[cfg(not(target_os = "linux"))]
         {
             Ok(vec![0u8; size])
@@ -145,38 +167,46 @@ impl ReactiveMemoryManager {
         #[cfg(target_os = "linux")]
         {
             use std::fs::OpenOptions;
-            use std::io::{Write, Seek, SeekFrom};
-            
+            use std::io::{Seek, SeekFrom, Write};
+
             let mut file = OpenOptions::new()
                 .write(true)
                 .open("/proc/self/mem")
                 .map_err(|e| format!("Failed to open memory for writing: {}", e))?;
-            
+
             file.seek(SeekFrom::Start(address))
                 .map_err(|e| format!("Failed to seek memory: {}", e))?;
-            
+
             file.write_all(value)
                 .map_err(|e| format!("Failed to write memory: {}", e))?;
-            
+
             Ok(())
         }
-        
+
         #[cfg(not(target_os = "linux"))]
         {
             Ok(())
         }
     }
 
-    pub async fn watch_memory(&self, address: u64, _size: usize, callback: String) -> Result<(), String> {
+    pub async fn watch_memory(
+        &self,
+        address: u64,
+        _size: usize,
+        callback: String,
+    ) -> Result<(), String> {
         let mut watches = self.watches.write().await;
-        watches.entry(address).or_insert_with(Vec::new).push(callback);
+        watches
+            .entry(address)
+            .or_insert_with(Vec::new)
+            .push(callback);
         Ok(())
     }
 
     pub async fn poll_changes(&self) -> Result<Vec<(String, Vec<u8>)>, String> {
         let mut changes = Vec::new();
         let bindings = self.bindings.read().await;
-        
+
         for (name, binding) in bindings.iter() {
             if binding.is_reactive {
                 let new_value = self.read_memory(binding.address, binding.size).await?;
@@ -185,7 +215,7 @@ impl ReactiveMemoryManager {
                 }
             }
         }
-        
+
         Ok(changes)
     }
 }

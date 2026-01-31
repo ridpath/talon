@@ -11,9 +11,9 @@ This guide provides step-by-step instructions for manually testing the binary an
 - Optional: checksec, readelf, nm (for verification)
 
 ### Platform Support
-- ✅ Linux (recommended)
-- ✅ macOS
-- ⚠️  Windows (requires MSVC or MinGW-w64 with proper setup)
+-  Linux (recommended)
+-  macOS
+- ️  Windows (requires MSVC or MinGW-w64 with proper setup)
 
 ## Setup
 
@@ -268,10 +268,10 @@ grep -c "test.*ok" test_results.log || true
 
 # Test 5: Manual verification
 echo "[5/5] Manual verification checklist:"
-echo "  ✓ All tests passed?"
-echo "  ✓ No panics or crashes?"
-echo "  ✓ Protection detection accurate?"
-echo "  ✓ Binary patching correct?"
+echo "   All tests passed?"
+echo "   No panics or crashes?"
+echo "   Protection detection accurate?"
+echo "   Binary patching correct?"
 
 echo ""
 echo "=== Test Complete ==="

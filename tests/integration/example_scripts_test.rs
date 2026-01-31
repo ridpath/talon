@@ -26,7 +26,7 @@ impl ExampleTest {
             .and_then(|s| s.to_str())
             .unwrap_or("unknown")
             .to_string();
-        
+
         Self {
             name,
             path,
@@ -37,14 +37,14 @@ impl ExampleTest {
 
 fn find_all_examples() -> Vec<ExampleTest> {
     let examples_dir = Path::new("examples");
-    
+
     if !examples_dir.exists() {
         eprintln!("Warning: examples/ directory not found");
         return Vec::new();
     }
 
     let mut examples = Vec::new();
-    
+
     if let Ok(entries) = fs::read_dir(examples_dir) {
         for entry in entries.flatten() {
             let path = entry.path();
@@ -53,14 +53,14 @@ fn find_all_examples() -> Vec<ExampleTest> {
             }
         }
     }
-    
+
     examples.sort_by(|a, b| a.name.cmp(&b.name));
     examples
 }
 
 fn run_example_with_timeout(example: &ExampleTest) -> Result<(), String> {
     let cargo_bin = env!("CARGO_BIN_EXE_talon");
-    
+
     let child = Command::new(cargo_bin)
         .arg("run")
         .arg(&example.path)
@@ -71,10 +71,10 @@ fn run_example_with_timeout(example: &ExampleTest) -> Result<(), String> {
         .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
     let timeout = Duration::from_secs(TIMEOUT_SECS);
-    
+
     let output = wait_timeout::ChildExt::wait_timeout(child, timeout)
         .map_err(|e| format!("Failed to wait for process: {}", e))?;
-    
+
     match output {
         None => {
             Err(format!("Script timed out after {} seconds", TIMEOUT_SECS))
@@ -93,25 +93,25 @@ fn run_example_with_timeout(example: &ExampleTest) -> Result<(), String> {
 #[test]
 fn test_all_examples_execute() {
     let _lock = TEST_LOCK.lock().unwrap();
-    
+
     let examples = find_all_examples();
-    
+
     if examples.is_empty() {
         panic!("No example .talon files found in examples/ directory");
     }
-    
+
     println!("\nFound {} example scripts to test", examples.len());
     println!("Timeout per script: {}s", TIMEOUT_SECS);
     println!("─────────────────────────────────────");
-    
+
     let mut results = Vec::new();
     let mut passed = 0;
     let mut failed = 0;
     let mut skipped = 0;
-    
+
     for example in &examples {
         print!("Testing: {:40} ... ", example.name);
-        
+
         match run_example_with_timeout(example) {
             Ok(()) => {
                 println!("PASS");
@@ -130,10 +130,10 @@ fn test_all_examples_execute() {
             }
         }
     }
-    
+
     println!("─────────────────────────────────────");
     println!("Summary: {} passed, {} failed, {} skipped", passed, failed, skipped);
-    
+
     if failed > 0 {
         println!("\nFailed examples:");
         for (name, success, error) in results {
@@ -197,14 +197,14 @@ fn test_beginner_ctf_template() {
 #[cfg(test)]
 mod resource_limits {
     use super::*;
-    
+
     #[test]
     fn test_script_respects_timeout() {
         let _lock = TEST_LOCK.lock().unwrap();
-        
+
         let temp_dir = tempfile::tempdir().unwrap();
         let infinite_loop_script = temp_dir.path().join("infinite_loop.talon");
-        
+
         fs::write(&infinite_loop_script, r#"
 # Infinite loop test
 let i = 0
@@ -212,46 +212,46 @@ while true
     let i = i + 1
 end
 "#).unwrap();
-        
+
         let example = ExampleTest::new(infinite_loop_script);
         let result = run_example_with_timeout(&example);
-        
+
         assert!(result.is_err(), "Infinite loop should timeout");
         assert!(result.unwrap_err().contains("timed out"), "Error should mention timeout");
     }
-    
+
     #[test]
     fn test_syntax_error_fails_gracefully() {
         let _lock = TEST_LOCK.lock().unwrap();
-        
+
         let temp_dir = tempfile::tempdir().unwrap();
         let syntax_error_script = temp_dir.path().join("syntax_error.talon");
-        
+
         fs::write(&syntax_error_script, r#"
 # Invalid syntax
-let x = 
+let x =
 let y = "unclosed string
 this is not valid Talon syntax !!!
 "#).unwrap();
-        
+
         let example = ExampleTest::new(syntax_error_script);
         let result = run_example_with_timeout(&example);
-        
+
         assert!(result.is_err(), "Syntax error should fail");
     }
-    
+
     #[test]
     fn test_empty_script_handling() {
         let _lock = TEST_LOCK.lock().unwrap();
-        
+
         let temp_dir = tempfile::tempdir().unwrap();
         let empty_script = temp_dir.path().join("empty.talon");
-        
+
         fs::write(&empty_script, "").unwrap();
-        
+
         let example = ExampleTest::new(empty_script);
         let result = run_example_with_timeout(&example);
-        
+
         assert!(result.is_err(), "Empty script should fail");
     }
 }
@@ -259,37 +259,37 @@ this is not valid Talon syntax !!!
 #[cfg(test)]
 mod example_content_validation {
     use super::*;
-    
+
     #[test]
     fn test_all_examples_have_content() {
         let examples = find_all_examples();
-        
+
         for example in examples {
             let content = fs::read_to_string(&example.path)
                 .expect(&format!("Should be able to read {}", example.name));
-            
-            assert!(!content.trim().is_empty(), 
+
+            assert!(!content.trim().is_empty(),
                 "Example {} should not be empty", example.name);
-            
-            assert!(content.len() > 10, 
+
+            assert!(content.len() > 10,
                 "Example {} seems too short ({}bytes)", example.name, content.len());
         }
     }
-    
+
     #[test]
     fn test_examples_have_comments() {
         let examples = find_all_examples();
-        
+
         let mut uncommented = Vec::new();
-        
+
         for example in examples {
             let content = fs::read_to_string(&example.path).unwrap();
-            
+
             if !content.contains('#') {
                 uncommented.push(example.name);
             }
         }
-        
+
         if !uncommented.is_empty() {
             println!("Warning: The following examples have no comments:");
             for name in &uncommented {

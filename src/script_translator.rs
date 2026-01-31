@@ -3,9 +3,9 @@ pub struct ScriptTranslator;
 impl ScriptTranslator {
     pub fn from_pwntools(python_script: &str) -> Result<String, String> {
         let mut talon_script = String::new();
-        
+
         talon_script.push_str("# Translated from pwntools\n\n");
-        
+
         for line in python_script.lines() {
             if line.contains("remote(") {
                 talon_script.push_str("let s = connect(\"target\", 1337)\n");
@@ -19,15 +19,15 @@ impl ScriptTranslator {
                 talon_script.push_str("interactive(s)\n");
             }
         }
-        
+
         Ok(talon_script)
     }
 
     pub fn from_metasploit(ruby_module: &str) -> Result<String, String> {
         let mut talon_script = String::new();
-        
+
         talon_script.push_str("# Translated from Metasploit\n\n");
-        
+
         for line in ruby_module.lines() {
             if line.contains("connect(") {
                 talon_script.push_str("let s = connect(target, port)\n");
@@ -37,14 +37,14 @@ impl ScriptTranslator {
                 talon_script.push_str("send(s, request)\n");
             }
         }
-        
+
         Ok(talon_script)
     }
 
     pub fn to_pwntools(talon_script: &str) -> Result<String, String> {
         let mut python_script = String::from("#!/usr/bin/env python3\n");
         python_script.push_str("from pwn import *\n\n");
-        
+
         for line in talon_script.lines() {
             if line.contains("connect(") {
                 python_script.push_str("r = remote('target', 1337)\n");
@@ -56,7 +56,7 @@ impl ScriptTranslator {
                 python_script.push_str("r.interactive()\n");
             }
         }
-        
+
         Ok(python_script)
     }
 }

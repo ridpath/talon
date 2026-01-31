@@ -1,6 +1,6 @@
-use std::process::Command;
-use std::path::Path;
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+use std::process::Command;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct BinaryAnalysis {
@@ -82,13 +82,11 @@ impl BinaryAnalyzer {
     }
 
     fn detect_architecture(binary_path: &str) -> Result<String, String> {
-        let output = Command::new("file")
-            .arg(binary_path)
-            .output();
+        let output = Command::new("file").arg(binary_path).output();
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             if stdout.contains("x86-64") || stdout.contains("x86_64") {
                 return Ok("x86_64".to_string());
             } else if stdout.contains("80386") || stdout.contains("i386") {
@@ -106,13 +104,11 @@ impl BinaryAnalyzer {
     }
 
     fn detect_os(binary_path: &str) -> Result<String, String> {
-        let output = Command::new("file")
-            .arg(binary_path)
-            .output();
+        let output = Command::new("file").arg(binary_path).output();
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             if stdout.contains("ELF") {
                 return Ok("Linux".to_string());
             } else if stdout.contains("PE32") || stdout.contains("MS Windows") {
@@ -126,13 +122,11 @@ impl BinaryAnalyzer {
     }
 
     fn detect_bitness(binary_path: &str) -> Result<usize, String> {
-        let output = Command::new("file")
-            .arg(binary_path)
-            .output();
+        let output = Command::new("file").arg(binary_path).output();
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             if stdout.contains("64-bit") {
                 return Ok(64);
             } else if stdout.contains("32-bit") {
@@ -144,13 +138,11 @@ impl BinaryAnalyzer {
     }
 
     fn detect_endianness(binary_path: &str) -> Result<String, String> {
-        let output = Command::new("file")
-            .arg(binary_path)
-            .output();
+        let output = Command::new("file").arg(binary_path).output();
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             if stdout.contains("LSB") {
                 return Ok("little".to_string());
             } else if stdout.contains("MSB") {
@@ -178,12 +170,12 @@ impl BinaryAnalyzer {
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             protections.nx = stdout.contains("NX enabled") || !stdout.contains("NX disabled");
             protections.pie = stdout.contains("PIE enabled");
             protections.canary = stdout.contains("Canary found") || stdout.contains("Stack");
             protections.fortify = stdout.contains("FORTIFY");
-            
+
             if stdout.contains("Full RELRO") {
                 protections.relro = RelroLevel::Full;
             } else if stdout.contains("Partial RELRO") {
@@ -197,10 +189,7 @@ impl BinaryAnalyzer {
     }
 
     fn analyze_protections_fallback(binary_path: &str) -> Result<BinaryProtections, String> {
-        let readelf_output = Command::new("readelf")
-            .arg("-l")
-            .arg(binary_path)
-            .output();
+        let readelf_output = Command::new("readelf").arg("-l").arg(binary_path).output();
 
         let mut protections = BinaryProtections {
             nx: false,
@@ -217,10 +206,7 @@ impl BinaryAnalyzer {
             protections.pie = stdout.contains("DYN");
         }
 
-        let readelf_relro = Command::new("readelf")
-            .arg("-d")
-            .arg(binary_path)
-            .output();
+        let readelf_relro = Command::new("readelf").arg("-d").arg(binary_path).output();
 
         if let Ok(output) = readelf_relro {
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -231,9 +217,7 @@ impl BinaryAnalyzer {
             }
         }
 
-        let symbols_output = Command::new("nm")
-            .arg(binary_path)
-            .output();
+        let symbols_output = Command::new("nm").arg(binary_path).output();
 
         if let Ok(output) = symbols_output {
             let stdout = String::from_utf8_lossy(&output.stdout);
@@ -245,31 +229,32 @@ impl BinaryAnalyzer {
     }
 
     fn analyze_sections(binary_path: &str) -> Result<Vec<Section>, String> {
-        let output = Command::new("readelf")
-            .arg("-S")
-            .arg(binary_path)
-            .output();
+        let output = Command::new("readelf").arg("-S").arg(binary_path).output();
 
         let mut sections = Vec::new();
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             for line in stdout.lines() {
-                if line.contains('[') && (line.contains(".text") || line.contains(".data") 
-                    || line.contains(".bss") || line.contains(".rodata") 
-                    || line.contains(".got") || line.contains(".plt")) {
-                    
+                if line.contains('[')
+                    && (line.contains(".text")
+                        || line.contains(".data")
+                        || line.contains(".bss")
+                        || line.contains(".rodata")
+                        || line.contains(".got")
+                        || line.contains(".plt"))
+                {
                     let parts: Vec<&str> = line.split_whitespace().collect();
                     if parts.len() >= 7 {
                         let name = parts[1].trim_start_matches('[').to_string();
                         let address = u64::from_str_radix(parts[3], 16).unwrap_or(0);
                         let size = u64::from_str_radix(parts[5], 16).unwrap_or(0);
                         let flags = if parts.len() > 7 { parts[7] } else { "" };
-                        
+
                         let is_writable = flags.contains('W');
                         let is_executable = flags.contains('X');
-                        
+
                         sections.push(Section {
                             name,
                             address,
@@ -306,23 +291,20 @@ impl BinaryAnalyzer {
     }
 
     fn extract_symbols(binary_path: &str) -> Result<Vec<Symbol>, String> {
-        let output = Command::new("nm")
-            .arg("-D")
-            .arg(binary_path)
-            .output();
+        let output = Command::new("nm").arg("-D").arg(binary_path).output();
 
         let mut symbols = Vec::new();
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             for line in stdout.lines() {
                 let parts: Vec<&str> = line.split_whitespace().collect();
                 if parts.len() >= 3 {
                     let address = u64::from_str_radix(parts[0], 16).unwrap_or(0);
                     let symbol_type = parts[1].to_string();
                     let name = parts[2].to_string();
-                    
+
                     symbols.push(Symbol {
                         name,
                         address,
@@ -346,19 +328,17 @@ impl BinaryAnalyzer {
     }
 
     fn get_entry_point(binary_path: &str) -> Result<u64, String> {
-        let output = Command::new("readelf")
-            .arg("-h")
-            .arg(binary_path)
-            .output();
+        let output = Command::new("readelf").arg("-h").arg(binary_path).output();
 
         if let Ok(output) = output {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            
+
             for line in stdout.lines() {
                 if line.contains("Entry point address:") {
                     let parts: Vec<&str> = line.split_whitespace().collect();
                     if let Some(addr_str) = parts.last() {
-                        if let Ok(addr) = u64::from_str_radix(addr_str.trim_start_matches("0x"), 16) {
+                        if let Ok(addr) = u64::from_str_radix(addr_str.trim_start_matches("0x"), 16)
+                        {
                             return Ok(addr);
                         }
                     }
@@ -375,12 +355,12 @@ impl BinaryAnalyzer {
 
     pub fn find_dangerous_functions(symbols: &[Symbol]) -> Vec<String> {
         let dangerous = vec![
-            "strcpy", "strcat", "gets", "sprintf", "scanf",
-            "system", "exec", "popen", "strcpy", "strncpy",
-            "memcpy", "memmove", "read", "fread", "getenv"
+            "strcpy", "strcat", "gets", "sprintf", "scanf", "system", "exec", "popen", "strcpy",
+            "strncpy", "memcpy", "memmove", "read", "fread", "getenv",
         ];
 
-        symbols.iter()
+        symbols
+            .iter()
             .filter(|s| dangerous.iter().any(|&d| s.name.contains(d)))
             .map(|s| s.name.clone())
             .collect()
@@ -388,19 +368,20 @@ impl BinaryAnalyzer {
 
     pub fn find_interesting_functions(symbols: &[Symbol]) -> Vec<String> {
         let interesting = vec![
-            "main", "system", "execve", "mprotect", "mmap",
-            "strcpy", "gets", "read", "printf", "scanf",
-            "malloc", "free", "calloc", "realloc"
+            "main", "system", "execve", "mprotect", "mmap", "strcpy", "gets", "read", "printf",
+            "scanf", "malloc", "free", "calloc", "realloc",
         ];
 
-        symbols.iter()
+        symbols
+            .iter()
             .filter(|s| interesting.iter().any(|&i| s.name.contains(i)))
             .map(|s| s.name.clone())
             .collect()
     }
 
     pub fn find_writable_sections(sections: &[Section]) -> Vec<String> {
-        sections.iter()
+        sections
+            .iter()
             .filter(|s| s.is_writable)
             .map(|s| s.name.clone())
             .collect()
@@ -414,15 +395,44 @@ impl BinaryAnalyzer {
         println!("Bitness: {}-bit", analysis.bitness);
         println!("Endianness: {}", analysis.endianness);
         println!("\nProtections:");
-        println!("  NX: {}", if analysis.protections.nx { "Enabled" } else { "Disabled" });
-        println!("  PIE: {}", if analysis.protections.pie { "Enabled" } else { "Disabled" });
+        println!(
+            "  NX: {}",
+            if analysis.protections.nx {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+        );
+        println!(
+            "  PIE: {}",
+            if analysis.protections.pie {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+        );
         println!("  RELRO: {:?}", analysis.protections.relro);
-        println!("  Canary: {}", if analysis.protections.canary { "Found" } else { "Not found" });
-        println!("  FORTIFY: {}", if analysis.protections.fortify { "Enabled" } else { "Disabled" });
-        
+        println!(
+            "  Canary: {}",
+            if analysis.protections.canary {
+                "Found"
+            } else {
+                "Not found"
+            }
+        );
+        println!(
+            "  FORTIFY: {}",
+            if analysis.protections.fortify {
+                "Enabled"
+            } else {
+                "Disabled"
+            }
+        );
+
         println!("\nSections:");
         for section in &analysis.sections {
-            println!("  {} @ 0x{:x} (size: 0x{:x}) [{}{}]",
+            println!(
+                "  {} @ 0x{:x} (size: 0x{:x}) [{}{}]",
                 section.name,
                 section.address,
                 section.size,

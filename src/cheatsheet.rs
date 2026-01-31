@@ -27,9 +27,10 @@ impl CheatSheet {
             }
         }
     }
-    
+
     fn show_quick_reference() {
-        println!(r#"
+        println!(
+            r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                    TALON DSL QUICK REFERENCE                             ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -85,11 +86,13 @@ talon cheat <topic>              Show cheatsheet
 talon quick-ref                  This reference guide
 
 Use 'talon cheat <topic>' for specific exploitation techniques
-"#);
+"#
+        );
     }
 
     fn show_builtins() {
-        println!(r#"
+        println!(
+            r#"
 ╔══════════════════════════════════════════════════════════════════════════╗
 ║                    TALON BUILT-IN FUNCTIONS                              ║
 ╚══════════════════════════════════════════════════════════════════════════╝
@@ -458,11 +461,13 @@ Stealth & Persistence:
   persist_remove(method)              Remove persistence
 
 Use 'talon man <function>' for detailed documentation
-"#);
+"#
+        );
     }
 
     fn show_rop() {
-        println!(r#"
+        println!(
+            r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                     ROP (RETURN-ORIENTED PROGRAMMING)                     ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -519,11 +524,13 @@ NX/DEP      → ROP chains (no code execution on stack)
 ASLR        → Information leak to find base addresses
 Stack canary → Leak canary or bypass via other overflow
 PIE         → Partial overwrite or leak PIE base
-"#);
+"#
+        );
     }
-    
+
     fn show_heap() {
-        println!(r#"
+        println!(
+            r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                        HEAP EXPLOITATION TECHNIQUES                       ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -532,7 +539,7 @@ HEAP STRUCTURE (glibc ptmalloc2)
 ───────────────────────────────────────────────────────────────────────────
 Chunk Header:
   [size | prev_size] [user data] [size | prev_size]
-  
+
 Bins:
   - tcache (per-thread, fast, 7 bins)
   - fastbins (LIFO, 10 bins, 0x20-0xb0)
@@ -587,11 +594,13 @@ USEFUL ONE-LINERS
 one_gadget libc.so.6
 patchelf --set-interpreter ./ld.so ./binary
 LD_PRELOAD=./libc.so.6 ./binary
-"#);
+"#
+        );
     }
-    
+
     fn show_format_string() {
-        println!(r#"
+        println!(
+            r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                       FORMAT STRING EXPLOITATION                          ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -653,11 +662,13 @@ payload = payload + "%31428c%9$hn" // Write high 2 bytes
 
 send payload
 send "/bin/sh"  // Next printf call becomes system("/bin/sh")
-"#);
+"#
+        );
     }
-    
+
     fn show_shellcode() {
-        println!(r#"
+        println!(
+            r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                        SHELLCODE DEVELOPMENT                              ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -735,11 +746,13 @@ char shellcode[] = "\x48\x31\xf6...";
 # Test in Python
 from pwn import *
 asm(shellcraft.amd64.linux.sh())
-"#);
+"#
+        );
     }
-    
+
     fn show_kernel() {
-        println!(r#"
+        println!(
+            r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                    KERNEL EXPLOITATION TECHNIQUES                         ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -818,11 +831,13 @@ gdb vmlinux
 (gdb) target remote :1234
 (gdb) b *0xffffffff81000000
 (gdb) c
-"#);
+"#
+        );
     }
-    
+
     fn show_web() {
-        println!(r#"
+        println!(
+            r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                        WEB EXPLOITATION CHEATSHEET                        ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -875,11 +890,13 @@ http://localhost:80
 http://127.0.0.1:22
 http://[::]:80
 http://0.0.0.0:80
-"#);
+"#
+        );
     }
-    
+
     fn show_crypto() {
-        println!(r#"
+        println!(
+            r#"
 ╔═══════════════════════════════════════════════════════════════════════════╗
 ║                    CRYPTOGRAPHY ATTACK CHEATSHEET                         ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
@@ -888,7 +905,7 @@ RSA ATTACKS
 ───────────────────────────────────────────────────────────────────────────
 1. Small exponent (e=3)
    - Cube root attack if m^3 < N
-   
+
 2. Common modulus
    - Same N, different e values
    - Extended Euclidean algorithm
@@ -940,6 +957,7 @@ hashcat - Password cracking
 john - Password cracking
 yafu - Integer factorization
 sage - Mathematical computations
-"#);
+"#
+        );
     }
 }

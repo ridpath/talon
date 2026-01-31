@@ -1,4 +1,4 @@
-# 🧪 Simple test for AES-decrypted shellcode execution
+#  Simple test for AES-decrypted shellcode execution
 # Uses `drop_and_decrypt` from the malware/dropper.my stdlib
 
 include "malware/dropper.my"

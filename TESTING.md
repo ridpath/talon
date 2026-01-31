@@ -643,10 +643,10 @@ fn test_parser_nested_function_calls() {
 
 TALON's testing infrastructure ensures:
 
-✅ **Correctness**: Comprehensive unit and integration tests  
-✅ **Security**: Fuzzing and security audits  
-✅ **Performance**: Benchmarks and profiling  
-✅ **Reliability**: CI/CD automation  
-✅ **Coverage**: >80% code coverage target  
+ **Correctness**: Comprehensive unit and integration tests  
+ **Security**: Fuzzing and security audits  
+ **Performance**: Benchmarks and profiling  
+ **Reliability**: CI/CD automation  
+ **Coverage**: >80% code coverage target  
 
 For questions or issues, consult the troubleshooting section or open a GitHub issue.

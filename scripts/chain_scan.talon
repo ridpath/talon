@@ -1,4 +1,4 @@
-# ⛓️ Web3 + Ethereum scan example
+# ️ Web3 + Ethereum scan example
 # - Decodes transaction input
 # - Sends eth_call to check EVM behavior
 # Useful for contract auditing, MEV detection, or tx tracing
@@ -15,5 +15,5 @@ define function scan()
     eth_call("https://mainnet.infura.io/v3/YOURKEY", "0xa9059cbb...")
 end
 
-# 🚀 Run Web3 scan + decode
+#  Run Web3 scan + decode
 scan()

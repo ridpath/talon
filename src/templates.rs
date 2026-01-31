@@ -13,47 +13,76 @@ impl TemplateGenerator {
         gen.load_builtin_templates();
         gen
     }
-    
+
     fn load_builtin_templates(&mut self) {
-        self.templates.insert("buffer-overflow".to_string(), BUFFER_OVERFLOW_TEMPLATE.to_string());
-        self.templates.insert("rop".to_string(), ROP_TEMPLATE.to_string());
-        self.templates.insert("format-string".to_string(), FORMAT_STRING_TEMPLATE.to_string());
-        self.templates.insert("heap".to_string(), HEAP_TEMPLATE.to_string());
-        self.templates.insert("kernel".to_string(), KERNEL_TEMPLATE.to_string());
-        self.templates.insert("ret2libc".to_string(), RET2LIBC_TEMPLATE.to_string());
-        self.templates.insert("use-after-free".to_string(), UAF_TEMPLATE.to_string());
-        self.templates.insert("race-condition".to_string(), RACE_CONDITION_TEMPLATE.to_string());
-        self.templates.insert("shellcode".to_string(), SHELLCODE_TEMPLATE.to_string());
-        self.templates.insert("web-sqli".to_string(), SQLI_TEMPLATE.to_string());
-        self.templates.insert("smart-contract".to_string(), SMART_CONTRACT_TEMPLATE.to_string());
-        self.templates.insert("basic".to_string(), BASIC_TEMPLATE.to_string());
-        self.templates.insert("ret2csu".to_string(), RET2CSU_TEMPLATE.to_string());
-        self.templates.insert("ret2plt".to_string(), RET2PLT_TEMPLATE.to_string());
-        self.templates.insert("fsop".to_string(), FSOP_TEMPLATE.to_string());
-        self.templates.insert("srop".to_string(), SROP_TEMPLATE.to_string());
-        self.templates.insert("house-of-force".to_string(), HOUSE_OF_FORCE_TEMPLATE.to_string());
-        self.templates.insert("off-by-one".to_string(), OFF_BY_ONE_TEMPLATE.to_string());
+        self.templates.insert(
+            "buffer-overflow".to_string(),
+            BUFFER_OVERFLOW_TEMPLATE.to_string(),
+        );
+        self.templates
+            .insert("rop".to_string(), ROP_TEMPLATE.to_string());
+        self.templates.insert(
+            "format-string".to_string(),
+            FORMAT_STRING_TEMPLATE.to_string(),
+        );
+        self.templates
+            .insert("heap".to_string(), HEAP_TEMPLATE.to_string());
+        self.templates
+            .insert("kernel".to_string(), KERNEL_TEMPLATE.to_string());
+        self.templates
+            .insert("ret2libc".to_string(), RET2LIBC_TEMPLATE.to_string());
+        self.templates
+            .insert("use-after-free".to_string(), UAF_TEMPLATE.to_string());
+        self.templates.insert(
+            "race-condition".to_string(),
+            RACE_CONDITION_TEMPLATE.to_string(),
+        );
+        self.templates
+            .insert("shellcode".to_string(), SHELLCODE_TEMPLATE.to_string());
+        self.templates
+            .insert("web-sqli".to_string(), SQLI_TEMPLATE.to_string());
+        self.templates.insert(
+            "smart-contract".to_string(),
+            SMART_CONTRACT_TEMPLATE.to_string(),
+        );
+        self.templates
+            .insert("basic".to_string(), BASIC_TEMPLATE.to_string());
+        self.templates
+            .insert("ret2csu".to_string(), RET2CSU_TEMPLATE.to_string());
+        self.templates
+            .insert("ret2plt".to_string(), RET2PLT_TEMPLATE.to_string());
+        self.templates
+            .insert("fsop".to_string(), FSOP_TEMPLATE.to_string());
+        self.templates
+            .insert("srop".to_string(), SROP_TEMPLATE.to_string());
+        self.templates.insert(
+            "house-of-force".to_string(),
+            HOUSE_OF_FORCE_TEMPLATE.to_string(),
+        );
+        self.templates
+            .insert("off-by-one".to_string(), OFF_BY_ONE_TEMPLATE.to_string());
     }
-    
+
     pub fn list_templates(&self) -> Vec<String> {
         let mut templates: Vec<String> = self.templates.keys().cloned().collect();
         templates.sort();
         templates
     }
-    
+
     pub fn generate(&self, template_type: &str, name: &str) -> Result<String, String> {
-        let template = self.templates.get(template_type)
+        let template = self
+            .templates
+            .get(template_type)
             .ok_or_else(|| format!("Template '{}' not found", template_type))?;
-        
+
         let content = template.replace("{{NAME}}", name);
         let filename = format!("{}.tal", name);
-        
-        fs::write(&filename, &content)
-            .map_err(|e| format!("Failed to write file: {}", e))?;
-        
+
+        fs::write(&filename, &content).map_err(|e| format!("Failed to write file: {}", e))?;
+
         Ok(filename)
     }
-    
+
     pub fn get_template_description(&self, template_type: &str) -> Option<&'static str> {
         match template_type {
             "buffer-overflow" => Some("Classic stack buffer overflow exploitation"),
@@ -436,7 +465,7 @@ let base = leak_pie_base()
 
 // Locate PLT entries (no randomization in PIE-disabled binaries)
 let plt_puts = base + 0x1040       // puts@PLT
-let plt_gets = base + 0x1050       // gets@PLT  
+let plt_gets = base + 0x1050       // gets@PLT
 let plt_system = base + 0x1060     // system@PLT (if available)
 let plt_printf = base + 0x1070     // printf@PLT
 
@@ -558,7 +587,7 @@ let sigframe = [
     0x0,                    // r15
     bin_sh_addr,            // rdi (arg1 for execve)
     0x0,                    // rsi (arg2)
-    0x0,                    // rdx (arg3)  
+    0x0,                    // rdx (arg3)
     0x0,                    // rcx
     0x0,                    // rbx
     0x0,                    // rbp
@@ -644,7 +673,7 @@ end
 // Step 1: Setup heap layout
 // Allocate chunks in specific order for overlap
 malloc 0x100  // chunk A
-malloc 0x100  // chunk B  
+malloc 0x100  // chunk B
 malloc 0x100  // chunk C (prevent consolidation)
 
 // Step 2: Free chunk A to create a fake chunk

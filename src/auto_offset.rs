@@ -1,6 +1,6 @@
-use std::process::{Command, Stdio};
-use std::io::Write;
 use crate::cyclic_tools::{cyclic, cyclic_find};
+use std::io::Write;
+use std::process::{Command, Stdio};
 
 pub struct OffsetFinder {
     binary_path: String,
@@ -22,7 +22,7 @@ impl OffsetFinder {
 
     pub fn find_offset(&self, input_method: InputMethod) -> Result<usize, String> {
         let pattern = cyclic(self.pattern_size);
-        
+
         let crash_value = match input_method {
             InputMethod::Stdin => self.run_with_stdin(&pattern)?,
             InputMethod::Args => self.run_with_args(&pattern)?,
@@ -42,11 +42,13 @@ impl OffsetFinder {
             .map_err(|e| format!("Failed to spawn process: {}", e))?;
 
         if let Some(mut stdin) = child.stdin.take() {
-            stdin.write_all(pattern)
+            stdin
+                .write_all(pattern)
                 .map_err(|e| format!("Failed to write to stdin: {}", e))?;
         }
 
-        let output = child.wait_with_output()
+        let output = child
+            .wait_with_output()
             .map_err(|e| format!("Failed to wait for process: {}", e))?;
 
         self.extract_crash_value_from_core(&output)
@@ -54,7 +56,7 @@ impl OffsetFinder {
 
     fn run_with_args(&self, pattern: &[u8]) -> Result<u64, String> {
         let pattern_str = String::from_utf8_lossy(pattern);
-        
+
         let output = Command::new(&self.binary_path)
             .arg(&*pattern_str)
             .stdout(Stdio::null())
@@ -83,7 +85,7 @@ impl OffsetFinder {
         #[cfg(target_os = "linux")]
         {
             use std::fs;
-            
+
             if let Ok(core_data) = fs::read("core") {
                 if let Some(rip) = self.parse_core_file(&core_data) {
                     return Ok(rip);
@@ -112,7 +114,7 @@ impl OffsetFinder {
     #[cfg(target_os = "linux")]
     fn parse_core_file(&self, core_data: &[u8]) -> Option<u64> {
         use goblin::elf::Elf;
-        
+
         if let Ok(elf) = Elf::parse(core_data) {
             for note in &elf.iter_note_headers(core_data) {
                 if note.n_type == 1 {
@@ -129,7 +131,8 @@ impl OffsetFinder {
             if line.contains("segfault") && line.contains("ip ") {
                 if let Some(ip_str) = line.split("ip ").nth(1) {
                     if let Some(addr_str) = ip_str.split_whitespace().next() {
-                        if let Ok(addr) = u64::from_str_radix(addr_str.trim_start_matches("0x"), 16) {
+                        if let Ok(addr) = u64::from_str_radix(addr_str.trim_start_matches("0x"), 16)
+                        {
                             return Some(addr);
                         }
                     }
@@ -163,15 +166,21 @@ pub fn auto_offset_file(binary: &str, filepath: &str) -> Result<usize, String> {
 }
 
 #[allow(dead_code)]
-pub fn auto_offset_custom(binary: &str, pattern_size: usize, input_method: &str) -> Result<usize, String> {
+pub fn auto_offset_custom(
+    binary: &str,
+    pattern_size: usize,
+    input_method: &str,
+) -> Result<usize, String> {
     let finder = OffsetFinder::new(binary.to_string()).with_pattern_size(pattern_size);
-    
+
     let method = match input_method {
         "stdin" => InputMethod::Stdin,
         "args" => InputMethod::Args,
-        path if path.starts_with("file:") => InputMethod::File(path.trim_start_matches("file:").to_string()),
+        path if path.starts_with("file:") => {
+            InputMethod::File(path.trim_start_matches("file:").to_string())
+        }
         _ => return Err("Invalid input method. Use: stdin, args, or file:<path>".to_string()),
     };
-    
+
     finder.find_offset(method)
 }

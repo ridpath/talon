@@ -1,10 +1,10 @@
 use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::Write;
+use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::TempDir;
 
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub enum Vuln {
     BufferOverflow { offset: usize },
     FormatString { vuln_arg: usize },
@@ -42,22 +42,23 @@ impl TalonTestHarness {
 
     pub fn mock_binary(&mut self, name: &str, vulns: &[Vuln]) -> PathBuf {
         let bin_path = self.temp_dir.path().join(name);
-        
+
         let elf_header = self.generate_mock_elf(vulns);
         fs::write(&bin_path, elf_header).expect("Failed to write mock binary");
-        
-        self.mock_binaries.insert(name.to_string(), bin_path.clone());
+
+        self.mock_binaries
+            .insert(name.to_string(), bin_path.clone());
         bin_path
     }
 
     fn generate_mock_elf(&self, vulns: &[Vuln]) -> Vec<u8> {
         let mut elf = Vec::new();
-        
+
         elf.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]);
         elf.extend_from_slice(&[0x00; 8]);
         elf.extend_from_slice(&[0x02, 0x00, 0x3e, 0x00]);
         elf.extend_from_slice(&[0x01, 0x00, 0x00, 0x00]);
-        
+
         for vuln in vulns {
             match vuln {
                 Vuln::BufferOverflow { offset } => {
@@ -77,11 +78,11 @@ impl TalonTestHarness {
                 }
             }
         }
-        
+
         while elf.len() < 256 {
             elf.push(0x90);
         }
-        
+
         elf
     }
 
@@ -105,7 +106,10 @@ impl TalonTestHarness {
         if !haystack.contains(needle) {
             Ok(())
         } else {
-            Err(format!("Expected '{}' to not contain '{}'", haystack, needle))
+            Err(format!(
+                "Expected '{}' to not contain '{}'",
+                haystack, needle
+            ))
         }
     }
 
@@ -176,8 +180,7 @@ int main(int argc, char *argv[]) {{
                     width
                 )
             }
-            Vuln::StackPivot { .. } => {
-                r#"#include <stdio.h>
+            Vuln::StackPivot { .. } => r#"#include <stdio.h>
 #include <string.h>
 
 int main(int argc, char *argv[]) {
@@ -188,10 +191,9 @@ int main(int argc, char *argv[]) {
     return 0;
 }
 "#
-                .to_string()
-            }
+            .to_string(),
         };
-        
+
         fs::write(&source_path, code).expect("Failed to write C source");
         source_path
     }
@@ -221,41 +223,31 @@ pub fn assert_u64(value: u64, expected: u64) {
     assert_eq!(value, expected, "Expected {:x}, got {:x}", expected, value);
 }
 
-pub fn assert_hex_str(value: &str, expected: &str) {
-    assert_eq!(value, expected, "Expected {}, got {}", expected, value);
-}
-
 pub fn create_rop_gadget_binary() -> Vec<u8> {
     let mut binary = Vec::new();
-    
+
     binary.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]);
     binary.extend_from_slice(&[0x00; 8]);
-    
+
     binary.extend_from_slice(&[0x5f, 0xc3]);
     binary.extend_from_slice(&[0x5e, 0xc3]);
     binary.extend_from_slice(&[0x5a, 0xc3]);
-    
+
     binary.extend_from_slice(&[0x48, 0x89, 0xe5, 0xc3]);
-    
+
     binary.extend_from_slice(&[0x48, 0x83, 0xc4, 0x08, 0xc3]);
-    
+
     while binary.len() < 1024 {
         binary.push(0x90);
     }
-    
+
     binary
 }
 
 pub fn create_shellcode_test_env() -> Vec<u8> {
     vec![
-        0x48, 0x31, 0xc0,
-        0x48, 0xbb, 0x2f, 0x62, 0x69, 0x6e, 0x2f, 0x73, 0x68, 0x00,
-        0x53,
-        0x48, 0x89, 0xe7,
-        0x48, 0x31, 0xf6,
-        0x48, 0x31, 0xd2,
-        0xb0, 0x3b,
-        0x0f, 0x05,
+        0x48, 0x31, 0xc0, 0x48, 0xbb, 0x2f, 0x62, 0x69, 0x6e, 0x2f, 0x73, 0x68, 0x00, 0x53, 0x48,
+        0x89, 0xe7, 0x48, 0x31, 0xf6, 0x48, 0x31, 0xd2, 0xb0, 0x3b, 0x0f, 0x05,
     ]
 }
 
@@ -274,7 +266,7 @@ mod tests {
         let mut harness = TalonTestHarness::new();
         let vulns = vec![Vuln::BufferOverflow { offset: 64 }];
         let bin_path = harness.mock_binary("test_binary", &vulns);
-        
+
         assert!(bin_path.exists());
         let content = fs::read(&bin_path).unwrap();
         assert!(content.len() >= 256);
@@ -286,7 +278,7 @@ mod tests {
         let harness = TalonTestHarness::new();
         let vuln = Vuln::BufferOverflow { offset: 128 };
         let source_path = harness.create_vulnerable_c_source("vuln_test", &vuln);
-        
+
         assert!(source_path.exists());
         let content = fs::read_to_string(&source_path).unwrap();
         assert!(content.contains("strcpy"));
@@ -296,10 +288,10 @@ mod tests {
     #[test]
     fn test_assert_helpers() {
         let harness = TalonTestHarness::new();
-        
+
         assert!(harness.assert_contains("hello world", "world").is_ok());
         assert!(harness.assert_contains("hello", "world").is_err());
-        
+
         assert!(harness.assert_not_contains("hello", "world").is_ok());
         assert!(harness.assert_not_contains("hello world", "world").is_err());
     }
@@ -308,7 +300,7 @@ mod tests {
     fn test_create_test_file() {
         let harness = TalonTestHarness::new();
         let file_path = harness.create_test_file("test.txt", "test content");
-        
+
         assert!(file_path.exists());
         let content = fs::read_to_string(&file_path).unwrap();
         assert_eq!(content, "test content");

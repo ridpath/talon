@@ -71,24 +71,33 @@ impl SymbolicExecutor {
         }
     }
 
-    pub fn solve_to_reach(&mut self, target_address: u64) -> Result<HashMap<String, Vec<u8>>, String> {
+    pub fn solve_to_reach(
+        &mut self,
+        target_address: u64,
+    ) -> Result<HashMap<String, Vec<u8>>, String> {
         self.target_address = Some(target_address);
-        log::info!("Solving constraints to reach address: 0x{:x}", target_address);
-        
+        log::info!(
+            "Solving constraints to reach address: 0x{:x}",
+            target_address
+        );
+
         let mut solution = HashMap::new();
-        
+
         for (name, var) in &self.vars {
             let value = self.generate_constrained_input(var)?;
             solution.insert(name.clone(), value);
         }
-        
-        log::info!("Solution found: {} symbolic variables solved", solution.len());
+
+        log::info!(
+            "Solution found: {} symbolic variables solved",
+            solution.len()
+        );
         Ok(solution)
     }
 
     fn generate_constrained_input(&self, var: &SymbolicVar) -> Result<Vec<u8>, String> {
         let mut data = vec![0x41; var.size];
-        
+
         for constraint in &var.constraints {
             match constraint {
                 Constraint::NoNullBytes => {
@@ -116,13 +125,13 @@ impl SymbolicExecutor {
                 _ => {}
             }
         }
-        
+
         Ok(data)
     }
 
     pub fn analyze_binary(&self, binary_path: &str) -> Result<AnalysisResult, String> {
         log::info!("Analyzing binary for symbolic execution: {}", binary_path);
-        
+
         Ok(AnalysisResult {
             vulnerable_functions: vec!["strcpy".to_string(), "gets".to_string()],
             buffer_sizes: vec![256, 512],

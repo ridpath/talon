@@ -3,6 +3,8 @@ target/
 Cargo.lock
 **/*.rs.bk
 *.rlib
+*.o
+*.a
 
 # Executable and binary artifacts
 *.exe
@@ -42,7 +44,10 @@ temp_commands.txt
 test_*.talon
 **/test_*.talon
 test_*.*
+*_test.txt
+*_test_*.txt
 test_output.*
+test_output_*.txt
 tests/temp/
 tests/output/
 test_results/
@@ -51,6 +56,17 @@ test_results/
 test_chain_state.json
 stdlib_functions.txt
 extract_functions.ps1
+*_results.txt
+full_test*.txt
+unit_*.txt
+recursive_test*.txt
+baseline.txt
+bench_error.txt
+debug_*.txt
+diff.txt
+dot_*.txt
+commit_setup.txt
+builtin_error.txt
 
 # Keep structured test files
 !tests/**/*.rs
@@ -259,6 +275,16 @@ benchmark_*.txt
 benchmark_*.json
 .github/benchmark-baselines/
 criterion-results/
+scripts/benchmarks/BENCHMARKS.md
+scripts/benchmarks/*.log
+scripts/benchmarks/*.txt
+scripts/benchmarks/temp/
+comparison_*.txt
+pwntools_bench.log
+talon_bench.log
+talon_results_raw.txt
+talon_results.txt
+pwntools_results.txt
 
 # GDB and debugging artifacts
 .gdb_history

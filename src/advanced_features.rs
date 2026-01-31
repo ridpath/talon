@@ -1,7 +1,6 @@
 // ADVANCED FEATURES MODULE
 // Consolidated implementation of all world-class exploitation features
 
-
 // ═══════════════════════ HEAP FENG SHUI ═══════════════════════
 
 pub struct HeapGroomer {
@@ -37,7 +36,7 @@ pub struct GadgetFinder;
 impl GadgetFinder {
     pub fn find_one_gadget(libc_path: &str) -> Result<Vec<OneGadget>, String> {
         log::info!("Finding one-gadgets in: {}", libc_path);
-        
+
         Ok(vec![
             OneGadget {
                 offset: 0x4f3d5,
@@ -50,17 +49,18 @@ impl GadgetFinder {
         ])
     }
 
-    pub fn find_magic_gadget(pattern: &str, constraints: &[String]) -> Result<Vec<MagicGadget>, String> {
+    pub fn find_magic_gadget(
+        pattern: &str,
+        constraints: &[String],
+    ) -> Result<Vec<MagicGadget>, String> {
         log::info!("Finding magic gadgets: {}", pattern);
         log::info!("Constraints: {:?}", constraints);
-        
-        Ok(vec![
-            MagicGadget {
-                address: 0x401234,
-                instructions: vec!["int 0x80".to_string(), "ret".to_string()],
-                matches_constraints: true,
-            }
-        ])
+
+        Ok(vec![MagicGadget {
+            address: 0x401234,
+            instructions: vec!["int 0x80".to_string(), "ret".to_string()],
+            matches_constraints: true,
+        }])
     }
 }
 
@@ -117,9 +117,9 @@ impl SolidityAuditor {
 
     pub fn detect_vulnerabilities(&self, types: &[String]) -> Result<Vec<Vulnerability>, String> {
         log::info!("Scanning for vulnerabilities: {:?}", types);
-        
+
         let mut vulns = Vec::new();
-        
+
         if types.contains(&"reentrancy".to_string()) {
             vulns.push(Vulnerability {
                 vuln_type: "reentrancy".to_string(),
@@ -128,7 +128,7 @@ impl SolidityAuditor {
                 description: "State change after external call".to_string(),
             });
         }
-        
+
         Ok(vulns)
     }
 
@@ -168,19 +168,20 @@ impl DistributedExploiter {
     pub fn new(target_range: String, threads: u32) -> Self {
         log::info!("Initializing distributed exploiter");
         log::info!("Target range: {}, Threads: {}", target_range, threads);
-        DistributedExploiter { target_range, threads }
+        DistributedExploiter {
+            target_range,
+            threads,
+        }
     }
 
     pub async fn exploit_all(&self, exploit_type: &str) -> Result<Vec<ExploitResult>, String> {
         log::info!("Exploiting all targets with: {}", exploit_type);
-        
-        Ok(vec![
-            ExploitResult {
-                target: "192.168.1.100".to_string(),
-                success: true,
-                output: Some("Shell spawned".to_string()),
-            }
-        ])
+
+        Ok(vec![ExploitResult {
+            target: "192.168.1.100".to_string(),
+            success: true,
+            output: Some("Shell spawned".to_string()),
+        }])
     }
 }
 
@@ -200,10 +201,10 @@ impl ASLRBypasser {
         log::info!("Bypassing ASLR for: {}", binary);
         log::info!("Method: {}", method);
         log::info!("Leak gadgets: {:?}", leak_gadgets);
-        
+
         let leaked_address = 0x7ffff7a0d000u64;
         log::info!("Leaked base address: 0x{:x}", leaked_address);
-        
+
         Ok(leaked_address)
     }
 }
@@ -215,7 +216,7 @@ pub struct BinaryDiffer;
 impl BinaryDiffer {
     pub fn diff(file1: &str, file2: &str) -> Result<DiffResult, String> {
         log::info!("Diffing {} vs {}", file1, file2);
-        
+
         Ok(DiffResult {
             patches: vec!["Function 'check_password' modified".to_string()],
             nday_candidates: vec!["Removed bounds check in parse_input()".to_string()],
@@ -236,7 +237,7 @@ pub struct WasmAnalyzer;
 impl WasmAnalyzer {
     pub fn analyze(wasm_path: &str) -> Result<WasmAnalysis, String> {
         log::info!("Analyzing WASM module: {}", wasm_path);
-        
+
         Ok(WasmAnalysis {
             functions: vec!["main".to_string(), "vulnerable_parse".to_string()],
             imports: vec!["env.memory".to_string()],
@@ -266,7 +267,7 @@ pub struct ContainerEscaper;
 impl ContainerEscaper {
     pub fn escape(methods: &[String]) -> Result<(), String> {
         log::info!("Attempting container escape with methods: {:?}", methods);
-        
+
         for method in methods {
             match method.as_str() {
                 "cgroup_release_agent" => {
@@ -278,7 +279,7 @@ impl ContainerEscaper {
                 _ => {}
             }
         }
-        
+
         Ok(())
     }
 
@@ -295,16 +296,16 @@ pub struct CloudExploiter;
 impl CloudExploiter {
     pub fn exploit_metadata_service(provider: &str) -> Result<CloudCredentials, String> {
         log::info!("Exploiting {} metadata service", provider);
-        
+
         let url = match provider {
             "aws" => "http://169.254.169.254/latest/meta-data/",
             "gcp" => "http://metadata.google.internal/",
             "azure" => "http://169.254.169.254/metadata/instance",
             _ => return Err(format!("Unknown provider: {}", provider)),
         };
-        
+
         log::info!("Metadata URL: {}", url);
-        
+
         Ok(CloudCredentials {
             access_key: "AKIA...".to_string(),
             secret_key: "secret...".to_string(),
@@ -328,9 +329,9 @@ impl ShellcodeTranslator {
     pub fn translate(shellcode: &[u8], from: &str, to: &str) -> Result<Vec<u8>, String> {
         log::info!("Translating shellcode from {} to {}", from, to);
         log::info!("Input size: {} bytes", shellcode.len());
-        
+
         let translated = vec![0x90; shellcode.len()];
-        
+
         log::info!("Output size: {} bytes", translated.len());
         Ok(translated)
     }
@@ -343,13 +344,13 @@ pub struct Decompiler;
 impl Decompiler {
     pub fn decompile_function(address: u64, output_lang: &str) -> Result<String, String> {
         log::info!("Decompiling function at 0x{:x} to {}", address, output_lang);
-        
+
         let code = match output_lang {
             "c" => "int vulnerable_func(char *input) {\n    char buffer[256];\n    strcpy(buffer, input);\n}",
             "rust" => "fn vulnerable_func(input: &str) {\n    // Decompiled code\n}",
             _ => "// Decompiled code",
         };
-        
+
         Ok(code.to_string())
     }
 }
@@ -359,13 +360,17 @@ impl Decompiler {
 pub struct AutoPatcher;
 
 impl AutoPatcher {
-    pub fn patch(file: &str, function: Option<&str>, fix_type: &str) -> Result<PatchResult, String> {
+    pub fn patch(
+        file: &str,
+        function: Option<&str>,
+        fix_type: &str,
+    ) -> Result<PatchResult, String> {
         log::info!("Auto-patching {} (fix: {})", file, fix_type);
-        
+
         if let Some(func) = function {
             log::info!("Target function: {}", func);
         }
-        
+
         Ok(PatchResult {
             patches_applied: vec!["Added bounds check".to_string()],
             verification: "Fuzzing passed 10000 iterations".to_string(),

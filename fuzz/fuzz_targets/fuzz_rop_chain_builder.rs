@@ -6,11 +6,11 @@ fuzz_target!(|data: &[u8]| {
     if data.len() < 16 || data.len() % 8 != 0 {
         return;
     }
-    
+
     if data.len() > 1024 {
         return;
     }
-    
+
     let mut addresses = Vec::new();
     for chunk in data.chunks_exact(8) {
         let addr = u64::from_le_bytes([
@@ -19,7 +19,7 @@ fuzz_target!(|data: &[u8]| {
         ]);
         addresses.push(addr);
     }
-    
+
     let mut elf = Vec::new();
     elf.extend_from_slice(&[0x7f, 0x45, 0x4c, 0x46, 0x02, 0x01, 0x01, 0x00]);
     elf.extend_from_slice(&[0x00; 8]);
@@ -30,14 +30,14 @@ fuzz_target!(|data: &[u8]| {
     elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
     elf.extend_from_slice(&[0x00, 0x00, 0x00, 0x00]);
     elf.extend_from_slice(&[0x40, 0x00, 0x38, 0x00, 0x01, 0x00, 0x00, 0x00]);
-    
+
     while elf.len() < 4096 {
         elf.push(0x90);
     }
-    
+
     use std::io::Write;
     use tempfile::NamedTempFile;
-    
+
     if let Ok(mut file) = NamedTempFile::new() {
         if file.write_all(&elf).is_ok() && file.flush().is_ok() {
             if let Some(path) = file.path().to_str() {
