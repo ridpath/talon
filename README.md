@@ -10,7 +10,7 @@ kernel exploit prototyping, smart contract auditing language
 <img src="talon.png" alt="Talon scripting language logo" width="50%">
 
 
-TALON is a domain-specific language for exploit development and binary analysis, featuring Rust-native compilation, LLVM-backed code generation, and an ergonomic exploitation API.
+TALON is a compiled, exploit language for offensive security and binary research. Built on a Rust/LLVM engine, it provides a native environment to automate ROP chain synthesis, libc resolution, and binary patching—allowing researchers to move from initial analysis to functional exploit payloads with minimal overhead.
 
 **Core Architecture:**
 - Rust-based interpreter with async I/O primitives
@@ -304,50 +304,7 @@ cargo test heap_                       # All heap-related tests
 cargo test format_string              # Format string tests
 ```
 
-### Test Organization
 
-**Unit Tests** (`src/` - 88 tests, 100% passing):
-- Parser and AST validation
-- Binary analysis (ELF/PE/Mach-O)
-- ROP gadget finder
-- Heap exploitation primitives
-- Shellcode generation and encoding
-- Packing/unpacking primitives
-- Cyclic pattern generation
-- Format string exploitation
-
-**Doc Tests** (`src/` - 28 tests, 100% passing):
-- API documentation examples
-- Inline code samples
-- Usage patterns
-
-**Integration Tests** (`tests/integration/` - 582/719 passing):
-- Standard library coverage (163 stdlib tests)
-- Multi-stage exploit chains (30 scenarios)
-- LSP/IDE integration (110+ protocol tests)
-- Example script validation
-
-### Code Coverage
-
-```bash
-# Install coverage tool
-cargo install cargo-tarpaulin
-
-# Generate HTML coverage report
-cargo tarpaulin --out Html --all-features
-
-# Generate and upload to Codecov
-./scripts/generate_coverage.sh         # Linux/macOS
-.\scripts\generate_coverage.ps1        # Windows
-```
-
-**Coverage Targets**:
-- Overall: >80%
-- Parser: >95%
-- Exploitation modules: >90%
-- Standard library: >80%
-
-See **`docs/COVERAGE.md`** for detailed coverage analysis.
 
 ### Fuzzing
 
@@ -453,14 +410,6 @@ All commits are automatically tested via **GitHub Actions**:
 - Benchmark result archiving
 - Performance trend tracking
 
-### Quality Metrics
-
-| Metric | Target | Current Status |
-|--------|--------|----------------|
-| Test Coverage | >80% | [![codecov](https://codecov.io/gh/ridpath/talon/branch/main/graph/badge.svg)](https://codecov.io/gh/ridpath/talon) |
-| Build Status | Passing | [![CI](https://github.com/ridpath/talon/workflows/CI/badge.svg)](https://github.com/ridpath/talon/actions/workflows/ci.yml) |
-| Security Audit | No Critical | [![Security](https://github.com/ridpath/talon/workflows/Security%20Audit/badge.svg)](https://github.com/ridpath/talon/actions/workflows/security.yml) |
-| Fuzz Stability | No Crashes | Daily fuzzing (10 targets) |
 
 ### Testing Documentation
 
