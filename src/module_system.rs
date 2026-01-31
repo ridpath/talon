@@ -106,7 +106,32 @@ pub fn parse_import_statement(stmt: &str) -> Option<(String, Option<Vec<String>>
         return Some((parts[1].to_string(), None));
     }
 
-    if parts.len() >= 4 && parts[2] == "from" {
+    // Handle: import { symbol1, symbol2 } from module
+    if parts.len() >= 5 && parts[1] == "{" {
+        // Find the closing brace
+        let mut brace_end = 0;
+        for (i, &part) in parts.iter().enumerate().skip(2) {
+            if part == "}" {
+                brace_end = i;
+                break;
+            }
+        }
+        
+        if brace_end > 0 && brace_end + 2 < parts.len() && parts[brace_end + 1] == "from" {
+            // Collect all symbol parts between { and }
+            let symbol_parts: Vec<&str> = parts[2..brace_end].to_vec();
+            let symbols: Vec<String> = symbol_parts
+                .join(" ")
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+            return Some((parts[brace_end + 2].to_string(), Some(symbols)));
+        }
+    }
+
+    // Handle: import {symbol1,symbol2} from module (no spaces)
+    if parts.len() >= 4 && parts[1].starts_with('{') && parts[2] == "from" {
         let symbols: Vec<String> = parts[1]
             .trim_matches(|c| c == '{' || c == '}')
             .split(',')

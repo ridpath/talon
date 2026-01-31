@@ -401,10 +401,11 @@ mod tests {
         let received_clone = Arc::clone(&received);
         
         obs.subscribe(move |value| {
+            let value_copy = *value;
             let received = Arc::clone(&received_clone);
             tokio::spawn(async move {
                 let mut r = received.write().await;
-                r.push(*value);
+                r.push(value_copy);
             });
         }).await;
         

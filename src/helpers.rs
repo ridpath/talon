@@ -2,6 +2,12 @@ use std::collections::HashMap;
 
 pub struct ScriptHelper;
 
+impl Default for ScriptHelper {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ScriptHelper {
     pub fn new() -> Self {
         ScriptHelper
@@ -86,7 +92,7 @@ end
     
     pub fn generate_quick_start(exploit_type: &str) -> String {
         match exploit_type {
-            "pwn" => format!(r#"
+            "pwn" => r#"
 # Talon Quick Start: Binary Exploitation
 
 # 1. Information gathering
@@ -106,9 +112,9 @@ stack overflow with padding overflow_size and return to ret_addr
 
 # 5. Execute
 execute shellcode in memory
-"#),
+"#.to_string(),
             
-            "web3" => format!(r#"
+            "web3" => r#"
 # Talon Quick Start: Web3 Exploitation
 
 # 1. Contract analysis
@@ -125,9 +131,9 @@ simulate wallet drain from "0xVictim" token "0xToken" amount "1000"
 
 # 4. Execute
 call ethereum node "https://mainnet.infura.io/v3/KEY" with data "0x..."
-"#),
+"#.to_string(),
             
-            "fuzzing" => format!(r#"
+            "fuzzing" => r#"
 # Talon Quick Start: Fuzzing
 
 # 1. Basic file fuzzing
@@ -144,7 +150,7 @@ fuzzer.run("./target", 10000)
 # 4. Format-specific fuzzing
 fuzz png "image.png"
 fuzz elf "binary"
-"#),
+"#.to_string(),
             
             "recon" => r##"
 # Talon Quick Start: Reconnaissance
@@ -261,7 +267,7 @@ pub struct DocGenerator;
 
 impl DocGenerator {
     pub fn generate_cheatsheet() -> String {
-        format!(r#"
+        r#"
 ═══════════════════════════════════════════════════════════════
                     TALON DSL CHEAT SHEET
 ═══════════════════════════════════════════════════════════════
@@ -341,7 +347,7 @@ ADVANCED FEATURES
 TIP: Run 'talon list-templates' to see exploit templates!
 TIP: Use 'talon repl' for interactive testing!
 ═══════════════════════════════════════════════════════════════
-"#)
+"#.to_string()
     }
     
     pub fn generate_example(category: &str) -> String {

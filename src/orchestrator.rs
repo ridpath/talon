@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::sync::Arc;
 use tokio::sync::{RwLock, Semaphore};
@@ -331,11 +329,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_parallel_execute() {
+        use std::pin::Pin;
+        use std::future::Future;
+        
         let runtime = OrchestratorRuntime::new(4);
-        let tasks = vec![
-            ("task1".to_string(), async { Ok::<_, String>(1) }),
-            ("task2".to_string(), async { Ok::<_, String>(2) }),
-            ("task3".to_string(), async { Ok::<_, String>(3) }),
+        let tasks: Vec<(String, Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>)> = vec![
+            ("task1".to_string(), Box::pin(async { Ok::<_, String>(1) })),
+            ("task2".to_string(), Box::pin(async { Ok::<_, String>(2) })),
+            ("task3".to_string(), Box::pin(async { Ok::<_, String>(3) })),
         ];
 
         let results = runtime.parallel_execute(tasks).await;
@@ -344,13 +345,16 @@ mod tests {
 
     #[tokio::test]
     async fn test_race_execute() {
+        use std::pin::Pin;
+        use std::future::Future;
+        
         let runtime = OrchestratorRuntime::new(4);
-        let tasks = vec![
-            ("slow".to_string(), async {
+        let tasks: Vec<(String, Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>)> = vec![
+            ("slow".to_string(), Box::pin(async {
                 tokio::time::sleep(Duration::from_millis(100)).await;
                 Ok::<_, String>(1)
-            }),
-            ("fast".to_string(), async { Ok::<_, String>(2) }),
+            })),
+            ("fast".to_string(), Box::pin(async { Ok::<_, String>(2) })),
         ];
 
         let result = runtime.race_execute(tasks).await;

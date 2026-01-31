@@ -23,37 +23,7 @@ pub struct SQLInjectionTester {
 impl SQLInjectionTester {
     /// Creates a new SQL injection tester with common payloads
     pub fn new() -> Self {
-        let payloads = vec![
-            "' OR '1'='1".to_string(),
-            "' OR '1'='1' --".to_string(),
-            "' OR '1'='1' /*".to_string(),
-            "admin' --".to_string(),
-            "admin' #".to_string(),
-            "' UNION SELECT NULL--".to_string(),
-            "' UNION SELECT NULL,NULL--".to_string(),
-            "' UNION SELECT NULL,NULL,NULL--".to_string(),
-            "' AND 1=1--".to_string(),
-            "' AND 1=2--".to_string(),
-            "1' ORDER BY 1--".to_string(),
-            "1' ORDER BY 2--".to_string(),
-            "1' ORDER BY 3--".to_string(),
-            "' AND SLEEP(5)--".to_string(),
-            "'; WAITFOR DELAY '0:0:5'--".to_string(),
-            "' || pg_sleep(5)--".to_string(),
-        ];
-        
-        let error_patterns = vec![
-            "SQL syntax".to_string(),
-            "mysql_fetch".to_string(),
-            "ORA-".to_string(),
-            "PostgreSQL".to_string(),
-            "Microsoft SQL".to_string(),
-            "ODBC".to_string(),
-            "SQLite".to_string(),
-            "syntax error".to_string(),
-        ];
-        
-        SQLInjectionTester { payloads, error_patterns }
+        Self::default()
     }
     
     /// Tests a URL for SQL injection vulnerabilities
@@ -118,12 +88,54 @@ impl SQLInjectionTester {
     }
 }
 
+impl Default for SQLInjectionTester {
+    fn default() -> Self {
+        let payloads = vec![
+            "' OR '1'='1".to_string(),
+            "' OR '1'='1' --".to_string(),
+            "' OR '1'='1' /*".to_string(),
+            "admin' --".to_string(),
+            "admin' #".to_string(),
+            "' UNION SELECT NULL--".to_string(),
+            "' UNION SELECT NULL,NULL--".to_string(),
+            "' UNION SELECT NULL,NULL,NULL--".to_string(),
+            "' AND 1=1--".to_string(),
+            "' AND 1=2--".to_string(),
+            "1' ORDER BY 1--".to_string(),
+            "1' ORDER BY 2--".to_string(),
+            "1' ORDER BY 3--".to_string(),
+            "' AND SLEEP(5)--".to_string(),
+            "'; WAITFOR DELAY '0:0:5'--".to_string(),
+            "' || pg_sleep(5)--".to_string(),
+        ];
+        
+        let error_patterns = vec![
+            "SQL syntax".to_string(),
+            "mysql_fetch".to_string(),
+            "ORA-".to_string(),
+            "PostgreSQL".to_string(),
+            "Microsoft SQL".to_string(),
+            "ODBC".to_string(),
+            "SQLite".to_string(),
+            "syntax error".to_string(),
+        ];
+        
+        SQLInjectionTester { payloads, error_patterns }
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // XSS (CROSS-SITE SCRIPTING)
 // ────────────────────────────────────────────────────────────────────────────
 
 pub struct XSSChecker {
     payloads: Vec<String>,
+}
+
+impl Default for XSSChecker {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl XSSChecker {
@@ -201,6 +213,12 @@ pub struct SSRFTester {
     payloads: Vec<String>,
 }
 
+impl Default for SSRFTester {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SSRFTester {
     pub fn new() -> Self {
         let payloads = vec![
@@ -271,6 +289,12 @@ pub struct LFITester {
     payloads: Vec<String>,
 }
 
+impl Default for LFITester {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LFITester {
     pub fn new() -> Self {
         let payloads = vec![
@@ -336,6 +360,12 @@ impl LFITester {
 
 pub struct TemplateInjectionTester {
     payloads: HashMap<String, Vec<String>>,
+}
+
+impl Default for TemplateInjectionTester {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl TemplateInjectionTester {
@@ -526,6 +556,12 @@ pub struct CommandInjectionTester {
     payloads: Vec<String>,
 }
 
+impl Default for CommandInjectionTester {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CommandInjectionTester {
     pub fn new() -> Self {
         let payloads = vec![
@@ -589,6 +625,12 @@ impl CommandInjectionTester {
 
 pub struct DirectoryTraversalTester {
     payloads: Vec<String>,
+}
+
+impl Default for DirectoryTraversalTester {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl DirectoryTraversalTester {

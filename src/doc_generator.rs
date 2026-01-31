@@ -666,7 +666,7 @@ impl DocGenerator {
     fn add_function(&mut self, doc: FunctionDoc) {
         let module = doc.module.clone();
         self.modules.entry(module.clone())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(doc.name.clone());
         
         self.functions.insert(doc.name.clone(), doc);
@@ -829,7 +829,7 @@ impl DocGenerator {
         fs::create_dir_all(output_dir)
             .map_err(|e| format!("Failed to create directory: {}", e))?;
         
-        for (module_name, _) in &self.modules {
+        for module_name in self.modules.keys() {
             let module_path = output_dir.join(format!("{}.md", module_name));
             let mut content = String::new();
             
@@ -847,7 +847,7 @@ impl DocGenerator {
                         content.push_str(&format!("- **{}** (`{}`): {}\n", 
                                                 param.name, param.type_hint, param.description));
                     }
-                    content.push_str("\n");
+                    content.push('\n');
                 }
                 
                 content.push_str(&format!("### Returns\n\n{}\n\n", doc.returns));

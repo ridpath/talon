@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 mod ast;
 mod parser;
 mod parser_utils;
@@ -245,7 +247,8 @@ fn run_script(path: &str) -> Result<(), String> {
     }
 
     let commands = parser::parse_script(&script)?;
-    interpreter::interpret(&commands)?;
+    let rt = tokio::runtime::Runtime::new().unwrap();
+    rt.block_on(interpreter::interpret(&commands))?;
     Ok(())
 }
 

@@ -1,8 +1,5 @@
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 use serde::{Deserialize, Serialize};
 use crate::ast::Command;

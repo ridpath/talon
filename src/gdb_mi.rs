@@ -35,7 +35,7 @@ impl GDBSession {
         log::info!("Starting GDB-MI session for: {}", binary);
         
         let mut process = Command::new("gdb")
-            .args(&["--interpreter=mi", binary])
+            .args(["--interpreter=mi", binary])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())

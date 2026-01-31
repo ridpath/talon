@@ -107,6 +107,7 @@ pub fn cyclic_find_bytes(pattern: &[u8]) -> Option<usize> {
 /// 
 /// # Example
 /// ```
+/// # use talon::cyclic_tools::cyclic_find_hex;
 /// let offset = cyclic_find_hex("0x61616162");
 /// ```
 pub fn cyclic_find_hex(hex_str: &str) -> Option<usize> {
@@ -120,7 +121,7 @@ pub fn cyclic_find_hex(hex_str: &str) -> Option<usize> {
 
 /// Internal De Bruijn sequence generator using FKM algorithm
 fn de_bruijn(
-    sequence: &mut [u8],
+    _sequence: &mut [u8],
     a: &mut [usize],
     t: usize,
     p: usize,
@@ -129,18 +130,18 @@ fn de_bruijn(
     result: &mut Vec<u8>,
 ) {
     if t > n {
-        if n % p == 0 {
+        if n.is_multiple_of(p) {
             for j in 1..=p {
                 result.push(ALPHABET[a[j]]);
             }
         }
     } else {
         a[t] = a[t - p];
-        de_bruijn(sequence, a, t + 1, p, k, n, result);
+        de_bruijn(_sequence, a, t + 1, p, k, n, result);
         
         for j in (a[t - p] + 1)..k {
             a[t] = j;
-            de_bruijn(sequence, a, t + 1, t, k, n, result);
+            de_bruijn(_sequence, a, t + 1, t, k, n, result);
         }
     }
 }

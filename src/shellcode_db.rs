@@ -35,12 +35,7 @@ pub struct ShellcodeDatabase {
 impl ShellcodeDatabase {
     /// Create a new shellcode database with pre-loaded shellcodes
     pub fn new() -> Self {
-        let mut db = ShellcodeDatabase {
-            shellcodes: HashMap::new(),
-        };
-        
-        db.load_builtin_shellcodes();
-        db
+        Self::default()
     }
     
     /// Load all built-in shellcodes
@@ -344,6 +339,17 @@ impl ShellcodeDatabase {
     }
 }
 
+impl Default for ShellcodeDatabase {
+    fn default() -> Self {
+        let mut db = ShellcodeDatabase {
+            shellcodes: HashMap::new(),
+        };
+        
+        db.load_builtin_shellcodes();
+        db
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────────
 // HELPER FUNCTIONS
 // ────────────────────────────────────────────────────────────────────────────
@@ -354,9 +360,11 @@ pub fn get_shellcode_db() -> ShellcodeDatabase {
 }
 
 /// Quick lookup for shellcode by name
-pub fn get_shellcode(name: &str) -> Option<Vec<u8>> {
+pub fn get_shellcode(name: &str) -> Result<ShellcodeEntry, String> {
     let db = get_shellcode_db();
-    db.get(name).map(|entry| entry.bytes.clone())
+    db.get(name)
+        .cloned()
+        .ok_or_else(|| format!("Shellcode '{}' not found in database", name))
 }
 
 /// List all available shellcodes
@@ -377,7 +385,7 @@ mod tests {
     #[test]
     fn test_shellcode_db_creation() {
         let db = ShellcodeDatabase::new();
-        assert!(db.shellcodes.len() > 0);
+        assert!(!db.shellcodes.is_empty());
     }
 
     #[test]
@@ -392,13 +400,16 @@ mod tests {
     fn test_list_by_arch() {
         let db = ShellcodeDatabase::new();
         let x64_scs = db.list_by_arch("x86-64");
-        assert!(x64_scs.len() > 0);
+        assert!(!x64_scs.is_empty());
     }
 
     #[test]
     fn test_shellcode_size() {
         let shellcode = get_shellcode("x64_execve_sh");
-        assert!(shellcode.is_some());
-        assert!(shellcode.unwrap().len() > 0);
+        assert!(shellcode.is_ok());
+        let entry = shellcode.unwrap();
+        assert!(!entry.bytes.is_empty());
+        assert_eq!(entry.name, "x64_execve_sh");
+        assert_eq!(entry.arch, "x86-64");
     }
 }

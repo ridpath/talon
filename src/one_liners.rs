@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub struct OneLinerLibrary;
 
 impl OneLinerLibrary {

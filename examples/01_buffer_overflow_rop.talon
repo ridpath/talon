@@ -2,7 +2,7 @@
 # This script demonstrates a classic buffer overflow exploitation using Return-Oriented Programming
 
 print("[*] Buffer Overflow Exploit - ROP Chain")
-print("=" * 60)
+print("============================================================")
 
 let target_host = "127.0.0.1"
 let target_port = 9999

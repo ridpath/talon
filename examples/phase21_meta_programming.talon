@@ -6,7 +6,7 @@
 # ============================================================================
 
 print("Meta-Programming Demonstration")
-print("=" * 80)
+print("================================================================================")
 
 # Introspect the current script's AST
 let script_ast = get_ast(current_script)
@@ -29,7 +29,7 @@ print("Generated strategy:", exploit_code)
 # ============================================================================
 
 print("\nReactive Memory Bindings")
-print("=" * 80)
+print("================================================================================")
 
 # Connect to target process
 let session = connect("localhost", 9999)
@@ -50,7 +50,7 @@ watch_memory(session, 0x600000, size: 4, callback: "on_score_change")
 # ============================================================================
 
 print("\nEvent-Driven Exploitation")
-print("=" * 80)
+print("================================================================================")
 
 # Register event handler for memory changes
 on session.memory_change(0x401000) {
@@ -78,7 +78,7 @@ watch session.register["rip"] in [0x400000, 0x500000] {
 # ============================================================================
 
 print("\nProbabilistic Execution")
-print("=" * 80)
+print("================================================================================")
 
 # Try all strategies simultaneously, use whichever succeeds first
 let winning_approach = try_all timeout: "10s" {
@@ -110,7 +110,7 @@ print("Winner:", winning_approach)
 # ============================================================================
 
 print("\nRace Condition Exploitation")
-print("=" * 80)
+print("================================================================================")
 
 # Exploit timing windows with synchronized threads
 race sync_gap: "5ms" {
@@ -139,7 +139,7 @@ race sync_gap: "5ms" {
 # ============================================================================
 
 print("\nSelf-Optimizing Parameters")
-print("=" * 80)
+print("================================================================================")
 
 # Create a tunable parameter that learns the optimal value
 let heap_spray_size = tunable(initial: 1024, range: [512, 8192])
@@ -163,7 +163,7 @@ print("Learned optimal spray size:", heap_spray_size.value)
 # ============================================================================
 
 print("\nScript Continuity")
-print("=" * 80)
+print("================================================================================")
 
 # Save complete script state including network connections
 checkpoint_script("before_exploit")
@@ -184,7 +184,7 @@ if exploit_result == "crashed" {
 # ============================================================================
 
 print("\nStrategy Branching")
-print("=" * 80)
+print("================================================================================")
 
 # Fork current strategy to try an alternative approach
 let main_strategy = current_strategy()
@@ -205,7 +205,7 @@ if test_result.success_rate > 0.8 {
 # ============================================================================
 
 print("\nSelf-Modifying Code")
-print("=" * 80)
+print("================================================================================")
 
 # Detect target OS and patch function implementations
 if target.os == "windows" {

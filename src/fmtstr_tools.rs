@@ -19,13 +19,17 @@ pub enum Architecture {
 }
 
 impl FormatString {
-    /// Create a new format string exploiter
+    /// Create a new format string exploiter from binary analysis
     /// 
     /// # Example
-    /// ```
+    /// ```no_run
+    /// # use talon::fmtstr_tools::FormatString;
+    /// # fn main() -> Result<(), String> {
     /// let mut fmt = FormatString::new("./vuln", 6)?;
     /// fmt.write(0x601048, 0xdeadbeef);
     /// let payload = fmt.generate()?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new(binary_path: &str, offset: usize) -> Result<Self, String> {
         log::info!("Initializing format string exploit for {}", binary_path);
@@ -40,6 +44,27 @@ impl FormatString {
             arch,
             writes: HashMap::new(),
         })
+    }
+    
+    /// Create a new format string exploiter with default settings (x86-64, no binary analysis)
+    /// 
+    /// # Example
+    /// ```
+    /// # use talon::fmtstr_tools::FormatString;
+    /// # fn main() -> Result<(), String> {
+    /// let mut fmt = FormatString::from_offset(6);
+    /// fmt.write(0x601048, 0xdeadbeef);
+    /// let payload = fmt.generate()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn from_offset(offset: usize) -> Self {
+        FormatString {
+            binary_path: String::new(),
+            offset,
+            arch: Architecture::X8664,
+            writes: HashMap::new(),
+        }
     }
     
     /// Add a write operation
@@ -189,7 +214,7 @@ pub fn fmtstr_write(address: u64, value: u64, offset: usize) -> Vec<u8> {
     payload.extend_from_slice(&address.to_le_bytes());
     
     // Padding
-    payload.extend_from_slice(&vec![b'A'; 8]);
+    payload.extend_from_slice(&[b'A'; 8]);
     
     // Format string
     let bytes_to_write = (value & 0xFFFF) as usize;
@@ -242,6 +267,6 @@ mod tests {
     #[test]
     fn test_format_string_creation() {
         // Would need a real binary to fully test
-        assert_eq!(std::mem::size_of::<FormatString>() > 0, true);
+        assert!(std::mem::size_of::<FormatString>() > 0);
     }
 }

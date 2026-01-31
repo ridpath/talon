@@ -388,7 +388,7 @@ mod tests {
     #[test]
     fn test_cache_align() {
         let steps = HeapGroom::cache_align(0x50, 64);
-        assert!(steps.len() > 0);
+        assert!(!steps.is_empty());
     }
 
     #[test]
@@ -406,7 +406,7 @@ mod tests {
     #[test]
     fn test_tcache_filling() {
         let steps = HeapGroom::fill_tcache(vec![0x20, 0x40], 7);
-        assert!(steps.len() > 0);
+        assert!(!steps.is_empty());
     }
 
     #[test]

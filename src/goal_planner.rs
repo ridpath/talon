@@ -1,10 +1,8 @@
-#![allow(dead_code)]
-
 use std::collections::{HashMap, HashSet, VecDeque};
 use serde::{Deserialize, Serialize};
 use crate::ast::{Command, Expr, Literal};
 use crate::z3_solver::{Z3Solver, Z3Constraint, Z3Type};
-use crate::rop_gadget_finder::{ROPGadgetFinder, Gadget, GadgetCategory, Architecture};
+use crate::rop_gadget_finder::{ROPGadgetFinder, GadgetCategory, Architecture};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Goal {
@@ -241,7 +239,7 @@ impl GoalPlanner {
             }
         }
 
-        let mut commands = vec![
+        let commands = vec![
             Command::VarDecl {
                 name: "target_addr".to_string(),
                 value: Expr::Literal(Literal::Number(target as i64)),

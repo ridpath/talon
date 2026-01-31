@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::io::{self, Write};
 
 pub struct TutorialSystem {

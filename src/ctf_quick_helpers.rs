@@ -204,8 +204,8 @@ impl QuickHelpers {
     pub fn nop_sled(size: usize, arch: &str) -> Vec<u8> {
         match arch {
             "x64" | "x86" => vec![0x90; size],  // NOP
-            "arm" => vec![0x00, 0xf0, 0x20, 0xe3].repeat(size / 4),  // NOP (ARM)
-            "mips" => vec![0x00, 0x00, 0x00, 0x00].repeat(size / 4),  // NOP (MIPS)
+            "arm" => [0x00, 0xf0, 0x20, 0xe3].repeat(size / 4),  // NOP (ARM)
+            "mips" => [0x00, 0x00, 0x00, 0x00].repeat(size / 4),  // NOP (MIPS)
             _ => vec![0x90; size],
         }
     }
@@ -225,11 +225,7 @@ impl QuickHelpers {
     
     // Quick padding calculation
     pub fn calc_padding(current_size: usize, target_size: usize) -> usize {
-        if target_size > current_size {
-            target_size - current_size
-        } else {
-            0
-        }
+        target_size.saturating_sub(current_size)
     }
     
     // Quick endianness swap
@@ -485,11 +481,7 @@ pub fn calc_rop_chain_size(num_gadgets: usize, ptr_size: usize) -> usize {
 }
 
 pub fn calc_shellcode_padding(shellcode_len: usize, target_size: usize) -> usize {
-    if target_size > shellcode_len {
-        target_size - shellcode_len
-    } else {
-        0
-    }
+    target_size.saturating_sub(shellcode_len)
 }
 
 // Quick common port numbers for CTF

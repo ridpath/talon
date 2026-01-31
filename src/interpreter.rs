@@ -141,7 +141,6 @@ pub fn run_repl() {
     crate::repl::run_repl();
 }
 
-#[tokio::main]
 pub async fn interpret(commands: &[Command]) -> Result<(), String> {
     let shellcode = Arc::new(RwLock::new(None));
     let variables = Arc::new(RwLock::new(HashMap::new()));
@@ -290,7 +289,7 @@ fn interpret_with_scope<'a>(
                                     if n == param_name {
                                         eval_expr(e, variables.clone(), functions.clone(), macros.clone()).await?
                                     } else {
-                                        return Err(format!("Argument name mismatch"));
+                                        return Err("Argument name mismatch".to_string());
                                     }
                                 } else {
                                     eval_expr(e, variables.clone(), functions.clone(), macros.clone()).await?
@@ -337,14 +336,12 @@ fn interpret_with_scope<'a>(
             }
             Command::Control(Control::If { condition, then_body, else_body }) => {
                 let cond = eval_expr(condition, variables.clone(), functions.clone(), macros.clone()).await?;
-                if cond.to_string() == "true" || cond.to_string().parse::<i64>().map_or(false, |n| n != 0) {
+                if cond.to_string() == "true" || cond.to_string().parse::<i64>().is_ok_and(|n| n != 0) {
                     if let Some(ret) = interpret_with_scope(then_body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
                         return Ok(Some(ret));
                     }
-                } else {
-                    if let Some(ret) = interpret_with_scope(else_body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
-                        return Ok(Some(ret));
-                    }
+                } else if let Some(ret) = interpret_with_scope(else_body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await? {
+                    return Ok(Some(ret));
                 }
             }
             Command::Control(Control::For { var, iterable, body }) => {
@@ -389,7 +386,7 @@ fn interpret_with_scope<'a>(
                     let cond = eval_expr(condition, variables.clone(), functions.clone(), macros.clone()).await?;
                     let cond_bool = match cond {
                         Value::Number(n) => n != 0,
-                        Value::String(s) => s == "true" || s.parse::<i64>().map_or(false, |n| n != 0),
+                        Value::String(s) => s == "true" || s.parse::<i64>().is_ok_and(|n| n != 0),
                         _ => cond.to_string() == "true",
                     };
                     if !cond_bool {
@@ -514,7 +511,7 @@ fn interpret_with_scope<'a>(
             }
             Command::DecodeBase64 { data } => {
                 let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone()).await?;
-                let raw = decode(&val.to_string()).map_err(|e| e.to_string())?;
+                let raw = decode(val.to_string()).map_err(|e| e.to_string())?;
                 println!("[DECODED] {}", String::from_utf8_lossy(&raw));
             }
             Command::Assemble { code } => {
@@ -529,7 +526,7 @@ fn interpret_with_scope<'a>(
                     println!("[SHELLCODE] Executing {} bytes", code.len());
                     let cs = Capstone::new().x86().mode(ArchMode::Mode64).build().ok();
                     if let Some(cs) = cs {
-                        if let Ok(insns) = cs.disasm_all(&code, 0x1000) {
+                        if let Ok(insns) = cs.disasm_all(code, 0x1000) {
                             println!("[TRACE]");
                             for i in insns.iter().take(20) {
                                 println!("   0x{:x}: {}", i.address(), i);
@@ -1652,6 +1649,55 @@ fn eval_expr<'a>(
                     };
                     Ok(Value::Number(out))
                 }
+                (Value::String(s), Value::Number(n)) if op == "*" => {
+                    if *n < 0 {
+                        return Err("Cannot repeat string with negative count".into());
+                    }
+                    Ok(Value::String(s.repeat(*n as usize)))
+                }
+                (Value::Number(n), Value::String(s)) if op == "*" => {
+                    if *n < 0 {
+                        return Err("Cannot repeat string with negative count".into());
+                    }
+                    Ok(Value::String(s.repeat(*n as usize)))
+                }
+                (Value::String(lv), Value::String(rv)) if op == "+" => {
+                    Ok(Value::String(format!("{}{}", lv, rv)))
+                }
+                (Value::String(lv), _) if op == "+" => {
+                    let rv_str = match r {
+                        Value::Number(n) => n.to_string(),
+                        Value::Bytes(b) => format!("{:?}", b),
+                        Value::List(l) => format!("{:?}", l),
+                        Value::Map(m) => format!("{:?}", m),
+                        Value::Set(s) => format!("{:?}", s),
+                        Value::Null => "null".to_string(),
+                        _ => return Err(format!("TYPE ERROR\nCannot concatenate string with {:?}", r)),
+                    };
+                    Ok(Value::String(format!("{}{}", lv, rv_str)))
+                }
+                (_, Value::String(rv)) if op == "+" => {
+                    let lv_str = match l {
+                        Value::Number(n) => n.to_string(),
+                        Value::Bytes(b) => format!("{:?}", b),
+                        Value::List(l) => format!("{:?}", l),
+                        Value::Map(m) => format!("{:?}", m),
+                        Value::Set(s) => format!("{:?}", s),
+                        Value::Null => "null".to_string(),
+                        _ => return Err(format!("TYPE ERROR\nCannot concatenate {:?} with string", l)),
+                    };
+                    Ok(Value::String(format!("{}{}", lv_str, rv)))
+                }
+                (Value::Bytes(lv), Value::Bytes(rv)) if op == "+" => {
+                    let mut result = lv.clone();
+                    result.extend_from_slice(rv);
+                    Ok(Value::Bytes(result))
+                }
+                (Value::List(lv), Value::List(rv)) if op == "+" => {
+                    let mut result = lv.clone();
+                    result.extend(rv.clone());
+                    Ok(Value::List(result))
+                }
                 _ => {
                     Err(format!("TYPE ERROR\nBinary operation requires numbers\n\nGot: {:?} {} {:?}\n\nFix:\n  1. Ensure both operands are numeric\n  2. Use explicit conversion if needed", l, op, r))
                 }
@@ -1822,7 +1868,7 @@ fn eval_expr<'a>(
                 }
                 "shellcode" => {
                     let arch_str = arg_map.get("arch")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
                     
@@ -1854,7 +1900,7 @@ fn eval_expr<'a>(
                 }
                 "shellcode_gen" => {
                     let arch_str = arg_map.get("arch")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "x64".to_string());
                     
@@ -1993,7 +2039,7 @@ fn eval_expr<'a>(
                 }
                 "shellcode_reverse_tcp" => {
                     let lhost = arg_map.get("lhost")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .ok_or("shellcode_reverse_tcp() requires lhost parameter")?;
                     
@@ -2029,7 +2075,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(shellcode))
                 }
                 "shellcode_bind_tcp" => {
-                    let lport = if let Some(Value::Number(p)) = arg_map.get("lport").or_else(|| arg_values.get(0)) {
+                    let lport = if let Some(Value::Number(p)) = arg_map.get("lport").or_else(|| arg_values.first()) {
                         *p as u16
                     } else {
                         return Err("shellcode_bind_tcp() requires lport parameter".to_string());
@@ -2059,7 +2105,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(shellcode))
                 }
                 "nop_sled" => {
-                    let size = if let Some(Value::Number(s)) = arg_values.get(0) {
+                    let size = if let Some(Value::Number(s)) = arg_values.first() {
                         *s as usize
                     } else {
                         return Err("nop_sled() requires size argument".to_string());
@@ -2262,7 +2308,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(chain_bytes))
                 }
                 "rop_ret2syscall" => {
-                    return Err("rop_ret2syscall() not yet implemented - use rop_solve() with 'syscall' goal instead".to_string());
+                    Err("rop_ret2syscall() not yet implemented - use rop_solve() with 'syscall' goal instead".to_string())
                 }
                 "rop_solve" => {
                     use crate::rop_tools::{AutoROPSolver, ROPGoal, ROPStrategy};
@@ -2382,7 +2428,7 @@ fn eval_expr<'a>(
                     Ok(Value::List(addresses))
                 }
                 "fmtstr_payload" => {
-                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(0)) {
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.first()) {
                         *off as usize
                     } else {
                         return Err("fmtstr_payload() requires offset argument".to_string());
@@ -2416,7 +2462,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(payload))
                 }
                 "fmtstr_leak" => {
-                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.get(0)) {
+                    let offset = if let Some(Value::Number(off)) = arg_map.get("offset").or_else(|| arg_values.first()) {
                         *off as usize
                     } else {
                         return Err("fmtstr_leak() requires offset argument".to_string());
@@ -2433,7 +2479,7 @@ fn eval_expr<'a>(
                     Ok(Value::String(payload))
                 }
                 "fmtstr_leak_stack" => {
-                    let start = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.get(0)) {
+                    let start = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.first()) {
                         *s as usize
                     } else {
                         return Err("fmtstr_leak_stack() requires start offset".to_string());
@@ -2456,7 +2502,7 @@ fn eval_expr<'a>(
                     Ok(Value::String(payload))
                 }
                 "fmtstr_write" => {
-                    let address = if let Some(Value::Number(addr)) = arg_map.get("address").or_else(|| arg_values.get(0)) {
+                    let address = if let Some(Value::Number(addr)) = arg_map.get("address").or_else(|| arg_values.first()) {
                         *addr as u64
                     } else {
                         return Err("fmtstr_write() requires address argument".to_string());
@@ -2486,7 +2532,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(payload))
                 }
                 "fmtstr_got_overwrite" => {
-                    let got_entry = if let Some(Value::Number(got)) = arg_map.get("got").or_else(|| arg_values.get(0)) {
+                    let got_entry = if let Some(Value::Number(got)) = arg_map.get("got").or_else(|| arg_values.first()) {
                         *got as u64
                     } else {
                         return Err("fmtstr_got_overwrite() requires GOT entry address".to_string());
@@ -2515,7 +2561,7 @@ fn eval_expr<'a>(
                 }
                 "fmtstr_find_offset" => {
                     let pattern = arg_map.get("pattern")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .unwrap_or_else(|| "AAAA".to_string());
                     
@@ -2538,7 +2584,7 @@ fn eval_expr<'a>(
                     Ok(Value::String(format!("{}{}", pattern, ".%p".repeat(max_offset))))
                 }
                 "fmtstr_dump" => {
-                    let start_offset = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.get(0)) {
+                    let start_offset = if let Some(Value::Number(s)) = arg_map.get("start").or_else(|| arg_values.first()) {
                         *s as usize
                     } else {
                         1
@@ -2564,7 +2610,7 @@ fn eval_expr<'a>(
                 }
                 "fmtstr_analyze" => {
                     let binary = arg_map.get("binary")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .map(|v| v.to_string())
                         .ok_or("fmtstr_analyze() requires binary path")?;
                     
@@ -2588,19 +2634,34 @@ fn eval_expr<'a>(
                 }
                 "interactive" => {
                     if arg_values.is_empty() {
-                        return Err("interactive() requires socket/connection argument".to_string());
+                        return Err("interactive() requires connection object or host/port".to_string());
                     }
                     
-                    let host = arg_map.get("host")
-                        .or_else(|| arg_values.get(0))
-                        .map(|v| v.to_string())
-                        .unwrap_or_else(|| "127.0.0.1".to_string());
-                    
-                    let port = if let Some(Value::Number(p)) = arg_map.get("port").or_else(|| arg_values.get(1)) {
-                        *p as u16
+                    let (host, port) = if let Value::Map(m) = &arg_values[0] {
+                        let h = m.get("host")
+                            .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
+                            .unwrap_or_else(|| "127.0.0.1".to_string());
+                        let p = m.get("port")
+                            .and_then(|v| if let Value::Number(n) = v { Some(*n as u16) } else { None })
+                            .unwrap_or(1337);
+                        (h, p)
                     } else {
-                        1337
+                        let h = arg_map.get("host")
+                            .or_else(|| arg_values.first())
+                            .map(|v| v.to_string())
+                            .unwrap_or_else(|| "127.0.0.1".to_string());
+                        
+                        let p = if let Some(Value::Number(n)) = arg_map.get("port").or_else(|| arg_values.get(1)) {
+                            *n as u16
+                        } else {
+                            1337
+                        };
+                        (h, p)
                     };
+                    
+                    use colored::Colorize;
+                    println!("{} Switching to interactive mode ({}:{})", "[INTERACTIVE]".green(), host, port);
+                    println!("{} Press Ctrl+C to exit", "[INTERACTIVE]".yellow());
                     
                     let mut shell = crate::interactive_shell::create_interactive_shell(&host, port)
                         .map_err(|e| format!("Failed to create interactive shell: {}", e))?;
@@ -2840,7 +2901,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(result))
                 }
                 "fit" => {
-                    let data = match arg_values.get(0) {
+                    let data = match arg_values.first() {
                         Some(Value::Bytes(b)) => b.clone(),
                         Some(Value::String(s)) => s.as_bytes().to_vec(),
                         _ => return Err("fit() requires data argument".to_string()),
@@ -2864,7 +2925,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(result))
                 }
                 "xor" => {
-                    let data = match arg_values.get(0) {
+                    let data = match arg_values.first() {
                         Some(Value::Bytes(b)) => b.clone(),
                         Some(Value::String(s)) => s.as_bytes().to_vec(),
                         _ => return Err("xor() requires data argument".to_string()),
@@ -2883,7 +2944,7 @@ fn eval_expr<'a>(
                     Ok(Value::Bytes(result))
                 }
                 "asm" => {
-                    let code = match arg_values.get(0) {
+                    let code = match arg_values.first() {
                         Some(Value::String(s)) => s,
                         _ => return Err("asm() requires assembly code string".to_string()),
                     };
@@ -2899,7 +2960,7 @@ fn eval_expr<'a>(
                     }
                 }
                 "enhex" | "hexdump" => {
-                    let data = match arg_values.get(0) {
+                    let data = match arg_values.first() {
                         Some(Value::Bytes(b)) => b,
                         Some(Value::String(s)) => s.as_bytes(),
                         _ => return Err("enhex() requires data argument".to_string()),
@@ -2907,7 +2968,7 @@ fn eval_expr<'a>(
                     Ok(Value::String(hex::encode(data)))
                 }
                 "unhex" | "fromhex" => {
-                    let hex_str = match arg_values.get(0) {
+                    let hex_str = match arg_values.first() {
                         Some(Value::String(s)) => s.trim().replace(" ", "").replace("0x", ""),
                         _ => return Err("unhex() requires hex string argument".to_string()),
                     };
@@ -2917,7 +2978,7 @@ fn eval_expr<'a>(
                     }
                 }
                 "rol" | "rotate_left" => {
-                    let value = match arg_values.get(0) {
+                    let value = match arg_values.first() {
                         Some(Value::Number(n)) => *n as u64,
                         _ => return Err("rol() requires numeric value".to_string()),
                     };
@@ -2928,7 +2989,7 @@ fn eval_expr<'a>(
                     Ok(Value::Number(value.rotate_left(bits) as i64))
                 }
                 "ror" | "rotate_right" => {
-                    let value = match arg_values.get(0) {
+                    let value = match arg_values.first() {
                         Some(Value::Number(n)) => *n as u64,
                         _ => return Err("ror() requires numeric value".to_string()),
                     };
@@ -2939,7 +3000,7 @@ fn eval_expr<'a>(
                     Ok(Value::Number(value.rotate_right(bits) as i64))
                 }
                 "bits" | "to_bits" => {
-                    let value = match arg_values.get(0) {
+                    let value = match arg_values.first() {
                         Some(Value::Number(n)) => *n as u64,
                         _ => return Err("bits() requires numeric value".to_string()),
                     };
@@ -2951,7 +3012,7 @@ fn eval_expr<'a>(
                     Ok(Value::String(bit_str))
                 }
                 "unbits" | "from_bits" => {
-                    let bit_str = match arg_values.get(0) {
+                    let bit_str = match arg_values.first() {
                         Some(Value::String(s)) => s,
                         _ => return Err("unbits() requires bit string".to_string()),
                     };
@@ -3013,7 +3074,7 @@ fn eval_expr<'a>(
                 }
                 "remote" => {
                     let host = arg_map.get("host")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .ok_or("remote() requires 'host' parameter")?
                         .to_string();
                     
@@ -3039,9 +3100,37 @@ fn eval_expr<'a>(
                     
                     Ok(Value::Map(conn_map))
                 }
+                "connect" => {
+                    let host = arg_map.get("host")
+                        .or_else(|| arg_values.first())
+                        .ok_or("connect() requires 'host' parameter")?
+                        .to_string();
+                    
+                    let port = if let Some(Value::Number(p)) = arg_map.get("port").or_else(|| arg_values.get(1)) {
+                        *p as u16
+                    } else {
+                        return Err("connect() requires 'port' parameter".to_string());
+                    };
+                    
+                    use colored::Colorize;
+                    
+                    println!("{} Connecting to {}:{}", "[CONNECT]".cyan(), host.yellow(), port.to_string().yellow());
+                    let socket = Socket::connect(format!("{}:{}", host, port))?;
+                    println!("{} Connection established", "[CONNECT]".green());
+                    
+                    let conn_id = CONNECTIONS.lock().await.add_socket(socket);
+                    
+                    let mut conn_map = HashMap::new();
+                    conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
+                    conn_map.insert("host".to_string(), Value::String(host));
+                    conn_map.insert("port".to_string(), Value::Number(port as i64));
+                    conn_map.insert("type".to_string(), Value::String("socket".to_string()));
+                    
+                    Ok(Value::Map(conn_map))
+                }
                 "process" => {
                     let binary = arg_map.get("binary")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .ok_or("process() requires 'binary' parameter")?
                         .to_string();
                     
@@ -3069,7 +3158,7 @@ fn eval_expr<'a>(
                 }
                 "send" => {
                     let conn = arg_map.get("conn")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .ok_or("send() requires connection object")?;
                     
                     let data_val = arg_map.get("data")
@@ -3109,7 +3198,7 @@ fn eval_expr<'a>(
                 }
                 "sendline" => {
                     let conn = arg_map.get("conn")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .ok_or("sendline() requires connection object")?;
                     
                     let data_val = arg_map.get("data")
@@ -3149,7 +3238,7 @@ fn eval_expr<'a>(
                 }
                 "recv" => {
                     let conn = arg_map.get("conn")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .ok_or("recv() requires connection object")?;
                     
                     let n = if let Some(Value::Number(num)) = arg_map.get("n").or_else(|| arg_values.get(1)) {
@@ -3184,7 +3273,7 @@ fn eval_expr<'a>(
                 }
                 "recvline" => {
                     let conn = arg_map.get("conn")
-                        .or_else(|| arg_values.get(0))
+                        .or_else(|| arg_values.first())
                         .ok_or("recvline() requires connection object")?;
                     
                     let conn_id = if let Value::Map(m) = conn {
@@ -3210,6 +3299,101 @@ fn eval_expr<'a>(
                     
                     println!("[RECVLINE] Received line: {} bytes", data.len());
                     Ok(Value::Bytes(data))
+                }
+                "recv_until" => {
+                    let conn = arg_map.get("conn")
+                        .or_else(|| arg_values.first())
+                        .ok_or("recv_until() requires connection object")?;
+                    
+                    let delim_val = arg_map.get("delim")
+                        .or_else(|| arg_values.get(1))
+                        .ok_or("recv_until() requires 'delim' parameter")?;
+                    
+                    let conn_id = if let Value::Map(m) = conn {
+                        if let Some(Value::Number(id)) = m.get("id") {
+                            *id as u64
+                        } else {
+                            return Err("Invalid connection object: missing 'id'".to_string());
+                        }
+                    } else {
+                        return Err("recv_until() requires connection object".to_string());
+                    };
+                    
+                    let delim = match delim_val {
+                        Value::String(s) => s.as_bytes().to_vec(),
+                        Value::Bytes(b) => b.clone(),
+                        _ => return Err("recv_until() delimiter must be string or bytes".to_string()),
+                    };
+                    
+                    let mut registry = CONNECTIONS.lock().await;
+                    let data = match registry.get_mut(conn_id) {
+                        Some(Connection::Socket(socket)) => {
+                            socket.recvuntil(&delim)?
+                        }
+                        Some(Connection::Process(process)) => {
+                            process.recvuntil(&delim)?
+                        }
+                        None => return Err(format!("Connection {} not found", conn_id)),
+                    };
+                    
+                    println!("[RECV_UNTIL] Received {} bytes", data.len());
+                    Ok(Value::Bytes(data))
+                }
+                "recvuntil" => {
+                    let conn = arg_map.get("conn")
+                        .or_else(|| arg_values.first())
+                        .ok_or("recvuntil() requires connection object")?;
+                    
+                    let delim_val = arg_map.get("delim")
+                        .or_else(|| arg_values.get(1))
+                        .ok_or("recvuntil() requires 'delim' parameter")?;
+                    
+                    let conn_id = if let Value::Map(m) = conn {
+                        if let Some(Value::Number(id)) = m.get("id") {
+                            *id as u64
+                        } else {
+                            return Err("Invalid connection object: missing 'id'".to_string());
+                        }
+                    } else {
+                        return Err("recvuntil() requires connection object".to_string());
+                    };
+                    
+                    let delim = match delim_val {
+                        Value::String(s) => s.as_bytes().to_vec(),
+                        Value::Bytes(b) => b.clone(),
+                        _ => return Err("recvuntil() delimiter must be string or bytes".to_string()),
+                    };
+                    
+                    let mut registry = CONNECTIONS.lock().await;
+                    let data = match registry.get_mut(conn_id) {
+                        Some(Connection::Socket(socket)) => {
+                            socket.recvuntil(&delim)?
+                        }
+                        Some(Connection::Process(process)) => {
+                            process.recvuntil(&delim)?
+                        }
+                        None => return Err(format!("Connection {} not found", conn_id)),
+                    };
+                    
+                    println!("[RECVUNTIL] Received {} bytes", data.len());
+                    Ok(Value::Bytes(data))
+                }
+                "leak_address" => {
+                    if arg_values.len() < 2 {
+                        return Err("leak_address() requires 2 arguments: leak_address(conn, function_name)".into());
+                    }
+                    
+                    let _conn = &arg_values[0];
+                    let func_name = match &arg_values[1] {
+                        Value::String(s) => s.clone(),
+                        _ => return Err("leak_address() function_name must be a string".into()),
+                    };
+                    
+                    println!("[LEAK_ADDRESS] Attempting to leak address of '{}'", func_name);
+                    println!("[LEAK_ADDRESS] Note: This is a stub implementation for testing");
+                    println!("[LEAK_ADDRESS] In production, this would build a ROP chain and leak the actual address");
+                    
+                    Ok(Value::Number(0x7ffff7a0d000))
                 }
                 "print" => {
                     for (i, val) in arg_values.iter().enumerate() {
@@ -3332,7 +3516,7 @@ fn eval_expr<'a>(
                         }
                     };
                     let range_list: Vec<Value> = (start..end)
-                        .map(|i| Value::Number(i))
+                        .map(Value::Number)
                         .collect();
                     Ok(Value::List(range_list))
                 }
@@ -3371,6 +3555,263 @@ fn eval_expr<'a>(
                         }
                         Value::Null => Ok(Value::String("null".to_string())),
                         _ => Ok(Value::String(format!("{:?}", arg_values[0])))
+                    }
+                }
+                "checksec" => {
+                    if arg_values.is_empty() {
+                        return Err("checksec() requires 1 argument: checksec(binary_path)".into());
+                    }
+                    match &arg_values[0] {
+                        Value::String(path) => {
+                            use crate::binary_analyzer::BinaryAnalyzer;
+                            let analysis = BinaryAnalyzer::analyze(path)?;
+                            let protections = analysis.protections;
+                            
+                            let mut result = HashMap::new();
+                            result.insert("nx".to_string(), Value::Number(if protections.nx { 1 } else { 0 }));
+                            result.insert("pie".to_string(), Value::Number(if protections.pie { 1 } else { 0 }));
+                            result.insert("canary".to_string(), Value::Number(if protections.canary { 1 } else { 0 }));
+                            result.insert("relro".to_string(), Value::String(
+                                match protections.relro {
+                                    crate::binary_analyzer::RelroLevel::Full => "Full".to_string(),
+                                    crate::binary_analyzer::RelroLevel::Partial => "Partial".to_string(),
+                                    crate::binary_analyzer::RelroLevel::None => "None".to_string(),
+                                }
+                            ));
+                            result.insert("aslr".to_string(), Value::Number(if protections.aslr { 1 } else { 0 }));
+                            result.insert("fortify".to_string(), Value::Number(if protections.fortify { 1 } else { 0 }));
+                            
+                            Ok(Value::Map(result))
+                        }
+                        _ => Err("checksec() requires string path argument".into())
+                    }
+                }
+                "analyze" => {
+                    if arg_values.is_empty() {
+                        return Err("analyze() requires 1 argument: analyze(binary_path)".into());
+                    }
+                    match &arg_values[0] {
+                        Value::String(path) => {
+                            use crate::elf_tools::ElfContext;
+                            let elf = ElfContext::load(path)?;
+                            
+                            let mut result = HashMap::new();
+                            
+                            let mut plt_map = HashMap::new();
+                            for (name, addr) in elf.plt {
+                                plt_map.insert(name, Value::Number(addr as i64));
+                            }
+                            result.insert("plt".to_string(), Value::Map(plt_map));
+                            
+                            let mut got_map = HashMap::new();
+                            for (name, addr) in elf.got {
+                                got_map.insert(name, Value::Number(addr as i64));
+                            }
+                            result.insert("got".to_string(), Value::Map(got_map));
+                            
+                            let mut symbols_map = HashMap::new();
+                            for (name, addr) in elf.symbols {
+                                symbols_map.insert(name, Value::Number(addr as i64));
+                            }
+                            result.insert("symbols".to_string(), Value::Map(symbols_map));
+                            
+                            result.insert("nx".to_string(), Value::Number(if elf.nx { 1 } else { 0 }));
+                            result.insert("pie".to_string(), Value::Number(if elf.pie { 1 } else { 0 }));
+                            result.insert("canary".to_string(), Value::Number(if elf.canary { 1 } else { 0 }));
+                            result.insert("relro".to_string(), Value::Number(if elf.relro { 1 } else { 0 }));
+                            result.insert("fortify".to_string(), Value::Number(if elf.fortify { 1 } else { 0 }));
+                            result.insert("base_addr".to_string(), Value::Number(elf.base_addr as i64));
+                            
+                            Ok(Value::Map(result))
+                        }
+                        _ => Err("analyze() requires string path argument".into())
+                    }
+                }
+                "Elf" => {
+                    if arg_values.is_empty() {
+                        return Err("Elf() requires 1 argument: Elf(binary_path)".into());
+                    }
+                    match &arg_values[0] {
+                        Value::String(path) => {
+                            use crate::elf_tools::ElfContext;
+                            let elf = ElfContext::load(path)?;
+                            
+                            let mut result = HashMap::new();
+                            
+                            let mut plt_map = HashMap::new();
+                            for (name, addr) in elf.plt {
+                                plt_map.insert(name, Value::Number(addr as i64));
+                            }
+                            result.insert("plt".to_string(), Value::Map(plt_map));
+                            
+                            let mut got_map = HashMap::new();
+                            for (name, addr) in elf.got {
+                                got_map.insert(name, Value::Number(addr as i64));
+                            }
+                            result.insert("got".to_string(), Value::Map(got_map));
+                            
+                            let mut symbols_map = HashMap::new();
+                            for (name, addr) in elf.symbols {
+                                symbols_map.insert(name, Value::Number(addr as i64));
+                            }
+                            result.insert("symbols".to_string(), Value::Map(symbols_map));
+                            
+                            result.insert("nx".to_string(), Value::Number(if elf.nx { 1 } else { 0 }));
+                            result.insert("pie".to_string(), Value::Number(if elf.pie { 1 } else { 0 }));
+                            result.insert("canary".to_string(), Value::Number(if elf.canary { 1 } else { 0 }));
+                            result.insert("relro".to_string(), Value::Number(if elf.relro { 1 } else { 0 }));
+                            result.insert("fortify".to_string(), Value::Number(if elf.fortify { 1 } else { 0 }));
+                            result.insert("base_addr".to_string(), Value::Number(elf.base_addr as i64));
+                            result.insert("path".to_string(), Value::String(path.clone()));
+                            
+                            Ok(Value::Map(result))
+                        }
+                        _ => Err("Elf() requires string path argument".into())
+                    }
+                }
+                "Libc" => {
+                    if arg_values.is_empty() {
+                        return Err("Libc() requires 1 argument: Libc(version_or_path)".into());
+                    }
+                    match &arg_values[0] {
+                        Value::String(version) => {
+                            use crate::libc_db::LibcDatabase;
+                            let db = LibcDatabase::new();
+                            
+                            let libc_version = if let Some(libc) = db.get(version) {
+                                libc.clone()
+                            } else {
+                                return Err(format!("Libc version '{}' not found. Available: ubuntu18.04, ubuntu20.04, ubuntu22.04, debian10", version));
+                            };
+                            
+                            let mut result = HashMap::new();
+                            
+                            let mut symbols_map = HashMap::new();
+                            symbols_map.insert("system".to_string(), Value::Number(libc_version.system as i64));
+                            symbols_map.insert("execve".to_string(), Value::Number(libc_version.execve as i64));
+                            symbols_map.insert("sh".to_string(), Value::Number(libc_version.sh_string as i64));
+                            symbols_map.insert("bin_sh".to_string(), Value::Number(libc_version.bin_sh_string as i64));
+                            symbols_map.insert("dup2".to_string(), Value::Number(libc_version.dup2 as i64));
+                            symbols_map.insert("read".to_string(), Value::Number(libc_version.read as i64));
+                            symbols_map.insert("write".to_string(), Value::Number(libc_version.write as i64));
+                            symbols_map.insert("open".to_string(), Value::Number(libc_version.open as i64));
+                            symbols_map.insert("mprotect".to_string(), Value::Number(libc_version.mprotect as i64));
+                            symbols_map.insert("__malloc_hook".to_string(), Value::Number(libc_version.malloc_hook as i64));
+                            symbols_map.insert("__free_hook".to_string(), Value::Number(libc_version.free_hook as i64));
+                            symbols_map.insert("__realloc_hook".to_string(), Value::Number(libc_version.realloc_hook as i64));
+                            result.insert("symbols".to_string(), Value::Map(symbols_map));
+                            
+                            let mut one_gadgets = Vec::new();
+                            for &gadget in &libc_version.one_gadgets {
+                                one_gadgets.push(Value::Number(gadget as i64));
+                            }
+                            result.insert("one_gadgets".to_string(), Value::List(one_gadgets));
+                            
+                            result.insert("name".to_string(), Value::String(libc_version.name.clone()));
+                            result.insert("build_id".to_string(), Value::String(libc_version.build_id.clone()));
+                            result.insert("base".to_string(), Value::Number(0));
+                            
+                            Ok(Value::Map(result))
+                        }
+                        Value::Map(m) if m.contains_key("base") => {
+                            let version = m.get("version")
+                                .and_then(|v| if let Value::String(s) = v { Some(s.as_str()) } else { None })
+                                .ok_or("Libc object requires 'version' field")?;
+                            
+                            let base = m.get("base")
+                                .and_then(|v| if let Value::Number(n) = v { Some(*n as u64) } else { None })
+                                .ok_or("Libc object requires numeric 'base' field")?;
+                            
+                            use crate::libc_db::LibcDatabase;
+                            let db = LibcDatabase::new();
+                            let libc_version = db.get(version)
+                                .ok_or(format!("Libc version '{}' not found", version))?;
+                            
+                            let mut result = HashMap::new();
+                            
+                            let mut symbols_map = HashMap::new();
+                            symbols_map.insert("system".to_string(), Value::Number((base + libc_version.system) as i64));
+                            symbols_map.insert("execve".to_string(), Value::Number((base + libc_version.execve) as i64));
+                            symbols_map.insert("sh".to_string(), Value::Number((base + libc_version.sh_string) as i64));
+                            symbols_map.insert("bin_sh".to_string(), Value::Number((base + libc_version.bin_sh_string) as i64));
+                            symbols_map.insert("dup2".to_string(), Value::Number((base + libc_version.dup2) as i64));
+                            symbols_map.insert("read".to_string(), Value::Number((base + libc_version.read) as i64));
+                            symbols_map.insert("write".to_string(), Value::Number((base + libc_version.write) as i64));
+                            symbols_map.insert("open".to_string(), Value::Number((base + libc_version.open) as i64));
+                            symbols_map.insert("mprotect".to_string(), Value::Number((base + libc_version.mprotect) as i64));
+                            symbols_map.insert("__malloc_hook".to_string(), Value::Number((base + libc_version.malloc_hook) as i64));
+                            symbols_map.insert("__free_hook".to_string(), Value::Number((base + libc_version.free_hook) as i64));
+                            symbols_map.insert("__realloc_hook".to_string(), Value::Number((base + libc_version.realloc_hook) as i64));
+                            result.insert("symbols".to_string(), Value::Map(symbols_map));
+                            
+                            let mut one_gadgets = Vec::new();
+                            for &gadget in &libc_version.one_gadgets {
+                                one_gadgets.push(Value::Number((base + gadget) as i64));
+                            }
+                            result.insert("one_gadgets".to_string(), Value::List(one_gadgets));
+                            
+                            result.insert("name".to_string(), Value::String(libc_version.name.clone()));
+                            result.insert("build_id".to_string(), Value::String(libc_version.build_id.clone()));
+                            result.insert("base".to_string(), Value::Number(base as i64));
+                            
+                            Ok(Value::Map(result))
+                        }
+                        _ => Err("Libc() requires string version or map with base".into())
+                    }
+                }
+                "ROP" => {
+                    if arg_values.is_empty() {
+                        return Err("ROP() requires 1 argument: ROP(elf_obj or binary_path)".into());
+                    }
+                    
+                    let binary_path = match &arg_values[0] {
+                        Value::String(path) => path.clone(),
+                        Value::Map(m) => {
+                            m.get("path")
+                                .and_then(|v| if let Value::String(s) = v { Some(s.clone()) } else { None })
+                                .ok_or("ROP() requires ELF object with 'path' field or binary path string")?
+                        }
+                        _ => return Err("ROP() requires ELF object or binary path string".into())
+                    };
+                    
+                    use crate::rop_tools::RopChain;
+                    let rop = RopChain::new(&binary_path)?;
+                    
+                    let mut gadgets_map = HashMap::new();
+                    for gadget in rop.gadgets.iter().take(100) {
+                        let gadget_str = gadget.instructions.join("; ");
+                        gadgets_map.insert(gadget_str, Value::Number(gadget.address as i64));
+                    }
+                    
+                    let mut result = HashMap::new();
+                    result.insert("binary".to_string(), Value::String(binary_path));
+                    result.insert("gadgets".to_string(), Value::Map(gadgets_map));
+                    result.insert("gadget_count".to_string(), Value::Number(rop.gadgets.len() as i64));
+                    
+                    Ok(Value::Map(result))
+                }
+                "find" => {
+                    if arg_values.len() < 2 {
+                        return Err("find() requires 2 arguments: find(rop_obj, pattern)".into());
+                    }
+                    
+                    match (&arg_values[0], &arg_values[1]) {
+                        (Value::Map(m), Value::String(pattern)) => {
+                            if let Some(Value::Map(gadgets_map)) = m.get("gadgets") {
+                                let pattern_lower = pattern.to_lowercase();
+                                
+                                for (gadget_str, addr) in gadgets_map {
+                                    if gadget_str.to_lowercase().contains(&pattern_lower) {
+                                        return Ok(addr.clone());
+                                    }
+                                }
+                                
+                                Err(format!("Gadget not found: '{}'. Try searching for a simpler pattern.", pattern))
+                            } else {
+                                Err("find() requires ROP object (from ROP() or quick_rop())".into())
+                            }
+                        }
+                        _ => Err("find() requires (rop_object, string pattern)".into())
                     }
                 }
                 "read" => {
@@ -5114,7 +5555,7 @@ fn eval_expr<'a>(
                             let mut addr = 0x400000i64;
                             for offset_val in offsets {
                                 if let Value::Number(offset) = offset_val {
-                                    addr = addr + offset;
+                                    addr += offset;
                                 }
                             }
                             Ok(Value::Number(addr))
@@ -5134,11 +5575,12 @@ fn eval_expr<'a>(
                     }
                 }
                 "anticheat_detect" => {
-                    let mut detected = Vec::new();
-                    detected.push(Value::String("EasyAntiCheat: Not detected".to_string()));
-                    detected.push(Value::String("BattlEye: Not detected".to_string()));
-                    detected.push(Value::String("Vanguard: Not detected".to_string()));
-                    detected.push(Value::String("VAC: Not detected".to_string()));
+                    let detected = vec![
+                        Value::String("EasyAntiCheat: Not detected".to_string()),
+                        Value::String("BattlEye: Not detected".to_string()),
+                        Value::String("Vanguard: Not detected".to_string()),
+                        Value::String("VAC: Not detected".to_string()),
+                    ];
                     Ok(Value::List(detected))
                 }
                 "kernel_driver_status" => {
@@ -5224,8 +5666,8 @@ fn eval_expr<'a>(
                     match &arg_values[0] {
                         Value::Bytes(code) => {
                             let mut obfuscated = code.clone();
-                            for i in 0..obfuscated.len() {
-                                obfuscated[i] = obfuscated[i].wrapping_add(1);
+                            for byte in &mut obfuscated {
+                                *byte = byte.wrapping_add(1);
                             }
                             Ok(Value::Bytes(obfuscated))
                         }
@@ -5896,9 +6338,24 @@ fn eval_expr<'a>(
                     }
                     match &arg_values[0] {
                         Value::String(binary) => {
-                            let help = crate::quick_mode::quick_rop(binary);
-                            println!("{}", help);
-                            Ok(Value::Null)
+                            use crate::rop_tools::RopChain;
+                            let rop = RopChain::new(binary)?;
+                            
+                            let mut gadgets_map = HashMap::new();
+                            for gadget in &rop.gadgets {
+                                let gadget_str = gadget.instructions.join("; ");
+                                gadgets_map.insert(gadget_str, Value::Number(gadget.address as i64));
+                            }
+                            
+                            let mut result = HashMap::new();
+                            result.insert("binary".to_string(), Value::String(binary.clone()));
+                            result.insert("gadgets".to_string(), Value::Map(gadgets_map));
+                            result.insert("gadget_count".to_string(), Value::Number(rop.gadgets.len() as i64));
+                            result.insert("_type".to_string(), Value::String("ROP".to_string()));
+                            
+                            println!("[ROP] Loaded {} gadgets from {}", rop.gadgets.len(), binary);
+                            
+                            Ok(Value::Map(result))
                         }
                         _ => Err("quick_rop() requires string binary path".into())
                     }
@@ -5981,7 +6438,22 @@ fn eval_expr<'a>(
                         msg
                     })
                 }
-                _ => Err("TYPE ERROR\nIndexing requires list or string base and numeric index\n\nExamples:\n  data[0]  (list access)\n  str[5]   (string access)".into()),
+                (Value::Map(map), Value::String(key)) => {
+                    map.get(&key).cloned().ok_or_else(|| {
+                        let available_keys: Vec<_> = map.keys().take(5).cloned().collect();
+                        let mut msg = format!("KEY NOT FOUND\nKey '{}' not in map\n\n", key);
+                        if !available_keys.is_empty() {
+                            msg.push_str("Available keys:\n");
+                            for k in available_keys {
+                                msg.push_str(&format!("  - {}\n", k));
+                            }
+                        } else {
+                            msg.push_str("Note: Map is empty.\n");
+                        }
+                        msg
+                    })
+                }
+                _ => Err("TYPE ERROR\nIndexing requires:\n  - list[number]\n  - string[number]\n  - map[string]\n\nExamples:\n  data[0]\n  str[5]\n  elf.symbols[\"main\"]".into()),
             }
         }
         Expr::Slice { base, start, end } => {
@@ -6127,11 +6599,11 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let len2 = s2.len();
     let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
     
-    for i in 0..=len1 {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
     }
-    for j in 0..=len2 {
-        matrix[0][j] = j;
+    for (j, cell) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
+        *cell = j;
     }
     
     for (i, c1) in s1.chars().enumerate() {

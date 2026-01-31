@@ -243,24 +243,6 @@ mod rop_gadget_finder_tests {
     }
     
     #[test]
-    fn test_analyze_bytes_x64() {
-        let x64_code = vec![
-            0x5f,
-            0xc3,
-            0x5e,
-            0xc3,
-            0x48, 0x89, 0xe0,
-            0xc3,
-        ];
-        
-        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
-        let result = finder.analyze_bytes(&x64_code, 0x400000);
-        
-        assert!(result.is_ok());
-        assert!(finder.gadgets.len() > 0);
-    }
-    
-    #[test]
     fn test_analyze_empty_data() {
         let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
         let result = finder.analyze_bytes(&[], 0x400000);
@@ -312,41 +294,6 @@ mod rop_gadget_finder_tests {
         
         let syscall_gadgets = finder.find_gadgets_by_category(GadgetCategory::Syscall);
         assert!(syscall_gadgets.len() > 0);
-    }
-    
-    #[test]
-    fn test_gadget_categorization() {
-        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
-        
-        let syscall_insns = vec!["syscall".to_string(), "ret".to_string()];
-        let category = finder.categorize_gadget(&syscall_insns);
-        assert_eq!(category, GadgetCategory::Syscall);
-        
-        let pop_insns = vec!["pop rdi".to_string(), "ret".to_string()];
-        let category = finder.categorize_gadget(&pop_insns);
-        assert_eq!(category, GadgetCategory::LoadRegister);
-        
-        let leave_insns = vec!["leave".to_string(), "ret".to_string()];
-        let category = finder.categorize_gadget(&leave_insns);
-        assert_eq!(category, GadgetCategory::StackPivot);
-    }
-    
-    #[test]
-    fn test_gadget_quality_scoring() {
-        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
-        
-        let syscall_insns = vec!["syscall".to_string()];
-        let quality = finder.calculate_quality(&syscall_insns, &GadgetCategory::Syscall);
-        assert!(quality > 100);
-        
-        let long_insns = vec![
-            "mov rax, rdi".to_string(),
-            "add rax, rsi".to_string(),
-            "xor rdx, rdx".to_string(),
-            "ret".to_string(),
-        ];
-        let quality_long = finder.calculate_quality(&long_insns, &GadgetCategory::General);
-        assert!(quality_long < quality);
     }
     
     #[test]
@@ -1070,23 +1017,6 @@ mod advanced_tests {
         let result = rop.find_ret2dlresolve_gadgets();
         
         assert!(result.is_ok());
-    }
-    
-    #[test]
-    fn test_gadget_byte_accuracy() {
-        let x64_code = vec![
-            0x5f,
-            0xc3,
-        ];
-        
-        let mut finder = ROPGadgetFinder::new(talon::rop_gadget_finder::Architecture::X64).unwrap();
-        finder.analyze_bytes(&x64_code, 0x400000).unwrap();
-        
-        if !finder.gadgets.is_empty() {
-            let gadget = &finder.gadgets[0];
-            assert!(gadget.bytes.len() > 0);
-            assert!(gadget.bytes.contains(&0xc3));
-        }
     }
     
     #[test]

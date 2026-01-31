@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use crate::session_state::ExploitSession;
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -307,14 +305,18 @@ mod tests {
 
     #[tokio::test]
     async fn test_resilient_executor() {
+        use std::sync::atomic::{AtomicUsize, Ordering};
+        use std::sync::Arc;
+        
         let executor = ResilientExecutor::new();
         let session = ExploitSession::new();
         
-        let mut call_count = 0;
-        let result = executor.execute_resilient(&session, || {
-            call_count += 1;
+        let call_count = Arc::new(AtomicUsize::new(0));
+        let call_count_clone = Arc::clone(&call_count);
+        let result = executor.execute_resilient(&session, move || {
+            let count = call_count_clone.fetch_add(1, Ordering::SeqCst);
             Box::pin(async move {
-                if call_count < 2 {
+                if count < 1 {
                     Err("Simulated failure".to_string())
                 } else {
                     Ok(42)

@@ -250,7 +250,7 @@ impl DifferentialFuzzer {
         input
     }
     
-    fn execute_target(&self, target: &str, input: &Vec<u8>) -> Result<ExecutionResult, String> {
+    fn execute_target(&self, target: &str, input: &[u8]) -> Result<ExecutionResult, String> {
         let start = Instant::now();
         
         let mut child = Command::new(target)
@@ -308,7 +308,7 @@ impl DifferentialFuzzer {
     
     fn analyze_divergence(
         &self,
-        input: &Vec<u8>,
+        input: &[u8],
         old_result: &ExecutionResult,
         new_result: &ExecutionResult,
     ) -> Option<DivergenceCase> {
@@ -317,7 +317,7 @@ impl DifferentialFuzzer {
                 DetectionMode::CrashesOnlyInOld => {
                     if old_result.crashed && !new_result.crashed {
                         return Some(DivergenceCase {
-                            input: input.clone(),
+                            input: input.to_owned(),
                             old_result: old_result.clone(),
                             new_result: new_result.clone(),
                             divergence_type: DivergenceType::CrashFixed,
@@ -329,7 +329,7 @@ impl DifferentialFuzzer {
                 DetectionMode::CrashesOnlyInNew => {
                     if !old_result.crashed && new_result.crashed {
                         return Some(DivergenceCase {
-                            input: input.clone(),
+                            input: input.to_owned(),
                             old_result: old_result.clone(),
                             new_result: new_result.clone(),
                             divergence_type: DivergenceType::CrashIntroduced,
@@ -341,7 +341,7 @@ impl DifferentialFuzzer {
                 DetectionMode::BehaviorChange => {
                     if old_result.exit_code != new_result.exit_code {
                         return Some(DivergenceCase {
-                            input: input.clone(),
+                            input: input.to_owned(),
                             old_result: old_result.clone(),
                             new_result: new_result.clone(),
                             divergence_type: DivergenceType::BehaviorChanged,
@@ -353,7 +353,7 @@ impl DifferentialFuzzer {
                 DetectionMode::OutputDivergence => {
                     if old_result.stdout != new_result.stdout {
                         return Some(DivergenceCase {
-                            input: input.clone(),
+                            input: input.to_owned(),
                             old_result: old_result.clone(),
                             new_result: new_result.clone(),
                             divergence_type: DivergenceType::OutputChanged,
@@ -365,7 +365,7 @@ impl DifferentialFuzzer {
                 DetectionMode::SanitizerViolations => {
                     if new_result.asan_violation && !old_result.asan_violation {
                         return Some(DivergenceCase {
-                            input: input.clone(),
+                            input: input.to_owned(),
                             old_result: old_result.clone(),
                             new_result: new_result.clone(),
                             divergence_type: DivergenceType::MemorySafetyViolation,
@@ -380,7 +380,7 @@ impl DifferentialFuzzer {
                     
                     if time_diff > 100 {
                         return Some(DivergenceCase {
-                            input: input.clone(),
+                            input: input.to_owned(),
                             old_result: old_result.clone(),
                             new_result: new_result.clone(),
                             divergence_type: DivergenceType::TimingChanged,
@@ -392,7 +392,7 @@ impl DifferentialFuzzer {
                 DetectionMode::ReturnCodeChange => {
                     if old_result.exit_code != new_result.exit_code {
                         return Some(DivergenceCase {
-                            input: input.clone(),
+                            input: input.to_owned(),
                             old_result: old_result.clone(),
                             new_result: new_result.clone(),
                             divergence_type: DivergenceType::BehaviorChanged,
@@ -521,7 +521,7 @@ if __name__ == "__main__":
             id,
             divergence.divergence_type,
             divergence.severity,
-            format!("bytes({:?})", divergence.input),
+            divergence.input.iter().map(|b| format!("{}", b)).collect::<Vec<_>>().join(", "),
             self.target_old,
             self.target_old,
             self.target_new,

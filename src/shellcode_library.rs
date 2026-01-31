@@ -27,6 +27,12 @@ pub struct ShellcodeLibrary {
     shellcodes: HashMap<(Architecture, Payload), Vec<u8>>,
 }
 
+impl Default for ShellcodeLibrary {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ShellcodeLibrary {
     pub fn new() -> Self {
         let mut lib = ShellcodeLibrary {
@@ -541,7 +547,7 @@ mod tests {
         
         let sh = lib.get(Architecture::X64, Payload::ExecveShBin);
         assert!(sh.is_some());
-        assert!(sh.unwrap().len() > 0);
+        assert!(!sh.unwrap().is_empty());
         
         let exit = lib.get(Architecture::X64, Payload::Exit);
         assert!(exit.is_some());
@@ -556,7 +562,7 @@ mod tests {
         
         let result = lib.get_with_params(Architecture::X64, Payload::ShellReverseTcp, &params);
         assert!(result.is_ok());
-        assert!(result.unwrap().len() > 0);
+        assert!(!result.unwrap().is_empty());
     }
 
     #[test]
@@ -567,7 +573,7 @@ mod tests {
         
         let result = lib.get_with_params(Architecture::X64, Payload::ShellBindTcp, &params);
         assert!(result.is_ok());
-        assert!(result.unwrap().len() > 0);
+        assert!(!result.unwrap().is_empty());
     }
 
     #[test]

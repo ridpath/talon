@@ -1,9 +1,9 @@
 # New CTF Exploitation Functions Showcase
 # Demonstrates all newly added human-readable DSL functions
 
-print("=" * 70)
+print("======================================================================")
 print("TALON - New CTF Exploitation Functions")
-print("=" * 70)
+print("======================================================================")
 
 # ========================================================================
 # 1. FLAT_PACK - Pack multiple values into bytes
@@ -124,7 +124,7 @@ print("  Use pause() to stop execution for inspection")
 # 10. Combined CTF Exploit Example
 # ========================================================================
 print("\n[10] Complete CTF Exploit Example")
-print("=" * 70)
+print("======================================================================")
 
 # Binary analysis
 let binary = "./vuln"
@@ -178,7 +178,7 @@ print("\n[+] Payload ready for delivery!")
 # 11. Advanced Techniques
 # ========================================================================
 print("\n[11] Advanced Techniques")
-print("=" * 70)
+print("======================================================================")
 
 # Shellcode generation and encoding
 let basic_nops = asm("nop\nnop\nnop\nnop", "x64")
@@ -201,7 +201,7 @@ print("[*] Multi-stage payload:", len(combined), "bytes")
 # ========================================================================
 print("\n" + "=" * 70)
 print("Summary: All new functions demonstrated successfully!")
-print("=" * 70)
+print("======================================================================")
 print("\nNew functions added:")
 print("  - flat() / flat_pack()  : Pack multiple values to bytes")
 print("  - fit()                 : Fit payload to exact size")

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::process::Command;
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};

@@ -21,10 +21,14 @@ impl Socket {
     /// Connect to a remote host
     /// 
     /// # Example
-    /// ```
+    /// ```no_run
+    /// # use talon::interactive_io::Socket;
+    /// # fn main() -> Result<(), String> {
     /// let mut conn = Socket::connect("192.168.1.1:9001")?;
     /// conn.sendline(b"Hello");
     /// let response = conn.recvline()?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Self, String> {
         let stream = TcpStream::connect(addr)
@@ -316,6 +320,37 @@ impl Process {
             }
             
             Ok(line)
+        } else {
+            Err("No stdout available".to_string())
+        }
+    }
+    
+    /// Receive until a delimiter is found
+    pub fn recvuntil(&mut self, delim: &[u8]) -> Result<Vec<u8>, String> {
+        if let Some(ref mut stdout) = self.stdout {
+            let mut result = Vec::new();
+            let mut byte_buf = [0u8; 1];
+            
+            loop {
+                stdout.read_exact(&mut byte_buf)
+                    .map_err(|e| format!("Read failed: {}", e))?;
+                result.push(byte_buf[0]);
+                
+                // Check if we found the delimiter
+                if result.len() >= delim.len() {
+                    let tail = &result[result.len() - delim.len()..];
+                    if tail == delim {
+                        break;
+                    }
+                }
+                
+                // Safety limit
+                if result.len() > 10_000_000 {
+                    return Err("recvuntil timeout: delimiter not found".to_string());
+                }
+            }
+            
+            Ok(result)
         } else {
             Err("No stdout available".to_string())
         }

@@ -29,10 +29,14 @@ impl ElfContext {
     /// Load an ELF binary and parse all symbols
     /// 
     /// # Example
-    /// ```
+    /// ```no_run
+    /// # use talon::elf_tools::ElfContext;
+    /// # fn main() -> Result<(), String> {
     /// let elf = ElfContext::load("./vulnerable")?;
     /// let main_addr = elf.symbols.get("main");
     /// let puts_plt = elf.plt.get("puts");
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn load(path: &str) -> Result<Self, String> {
         log::info!("Loading ELF binary: {}", path);
@@ -282,13 +286,13 @@ mod tests {
     fn test_elf_context_creation() {
         // This test would require a sample ELF binary
         // For now, just verify the struct exists
-        assert_eq!(std::mem::size_of::<ElfContext>() > 0, true);
+        assert!(std::mem::size_of::<ElfContext>() > 0);
     }
 
     #[test]
     fn test_symbol_lookup() {
         // Would need a real ELF file to test properly
         let symbols: HashMap<String, u64> = HashMap::new();
-        assert!(symbols.get("main").is_none());
+        assert!(!symbols.contains_key("main"));
     }
 }

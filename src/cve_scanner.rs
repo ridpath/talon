@@ -68,6 +68,12 @@ pub struct CVEScanner {
     offline_mode: bool,
 }
 
+impl Default for CVEScanner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl CVEScanner {
     pub fn new() -> Self {
         println!("╔═══════════════════════════════════════════════════════════════╗");
@@ -245,7 +251,7 @@ impl CVEScanner {
         #[cfg(target_os = "windows")]
         {
             if let Ok(output) = Command::new("ping")
-                .args(&["-n", "1", "-w", "1000", "exploit-db.com"])
+                .args(["-n", "1", "-w", "1000", "exploit-db.com"])
                 .output()
             {
                 self.exploit_db_available = output.status.success();
@@ -274,7 +280,7 @@ impl CVEScanner {
         println!("[SCAN] Scanning target: {}", target);
         println!("[SCAN] 📋 Checking {} CVEs...", cve_list.len());
         
-        if !fs::metadata(target).is_ok() {
+        if fs::metadata(target).is_err() {
             return Err(format!("Target not found: {}", target));
         }
         
@@ -462,7 +468,7 @@ impl CVEScanner {
         
         #[cfg(target_os = "windows")]
         {
-            if let Ok(output) = Command::new("dumpbin").args(&["/exports", target]).output() {
+            if let Ok(output) = Command::new("dumpbin").args(["/exports", target]).output() {
                 let symbols_str = String::from_utf8_lossy(&output.stdout);
                 
                 for func in vulnerable_functions {
@@ -566,8 +572,8 @@ if __name__ == "__main__":
             .map(|v| v.confidence)
             .sum::<f64>() / vulnerable_count.max(1) as f64;
         
-        let risk = (base_score * exploit_multiplier * (confidence_avg / 100.0)).min(10.0);
-        risk
+        
+        (base_score * exploit_multiplier * (confidence_avg / 100.0)).min(10.0)
     }
     
     fn generate_recommendations(&self, vulnerabilities: &[VulnerabilityStatus]) -> Vec<String> {

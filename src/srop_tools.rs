@@ -182,11 +182,7 @@ pub struct SropBuilder {
 impl SropBuilder {
     /// Create a new SROP builder
     pub fn new() -> Self {
-        SropBuilder {
-            frames: Vec::new(),
-            syscall_gadget: None,
-            sigreturn_syscall: 15, // rt_sigreturn syscall number
-        }
+        Self::default()
     }
     
     /// Set the syscall gadget address
@@ -243,6 +239,16 @@ impl SropBuilder {
         
         log::info!("Built SROP chain: {} bytes", chain.len());
         chain
+    }
+}
+
+impl Default for SropBuilder {
+    fn default() -> Self {
+        SropBuilder {
+            frames: Vec::new(),
+            syscall_gadget: None,
+            sigreturn_syscall: 15, // rt_sigreturn syscall number
+        }
     }
 }
 
@@ -340,6 +346,6 @@ mod tests {
         assert_eq!(builder.frames.len(), 1);
         
         let chain = builder.build();
-        assert!(chain.len() > 0);
+        assert!(!chain.is_empty());
     }
 }

@@ -35,9 +35,14 @@ impl RopChain {
     /// Create a new ROP chain builder
     /// 
     /// # Example
-    /// ```
+    /// ```no_run
+    /// # use talon::rop_tools::RopChain;
+    /// # fn main() -> Result<(), String> {
     /// let mut rop = RopChain::new("./vulnerable")?;
-    /// let pop_rdi = rop.find_gadget("pop rdi; ret")?;
+    /// let pop_rdi = rop.find_gadget("pop rdi; ret")
+    ///     .ok_or_else(|| "Gadget not found".to_string())?;
+    /// # Ok(())
+    /// # }
     /// ```
     pub fn new(binary_path: &str) -> Result<Self, String> {
         log::info!("Initializing ROP chain builder for {}", binary_path);
@@ -210,11 +215,11 @@ impl RopChain {
             // Check for 'ret' (0xc3) or 'ret n' (0xc2)
             if window[0] == 0xc3 || window[0] == 0xc2 {
                 // Disassemble backwards to find gadget
-                let start = if offset >= 20 { offset - 20 } else { 0 };
+                let start = offset.saturating_sub(20);
                 let end = if offset + 1 < buffer.len() { offset + 1 } else { buffer.len() };
                 
                 if let Ok(insns) = cs.disasm_all(&buffer[start..end], start as u64) {
-                    if insns.len() > 0 {
+                    if !insns.is_empty() {
                         // Create gadget from last few instructions
                         let mut instructions = Vec::new();
                         let mut bytes = Vec::new();
@@ -241,7 +246,7 @@ impl RopChain {
         }
         
         // Filter to useful gadgets (1-5 instructions ending in ret)
-        gadgets.retain(|g| g.instructions.len() <= 5 && g.instructions.len() > 0);
+        gadgets.retain(|g| g.instructions.len() <= 5 && !g.instructions.is_empty());
         
         // Score and sort gadgets
         for gadget in &mut gadgets {
@@ -270,8 +275,7 @@ impl RopChain {
             
             // High value gadgets
             if instr_lower.starts_with("pop rdi") { score += 50; }
-            else if instr_lower.starts_with("pop rsi") { score += 45; }
-            else if instr_lower.starts_with("pop rdx") { score += 45; }
+            else if instr_lower.starts_with("pop rsi") || instr_lower.starts_with("pop rdx") { score += 45; }
             else if instr_lower.starts_with("pop rax") { score += 40; }
             else if instr_lower.starts_with("pop rcx") { score += 35; }
             else if instr_lower.starts_with("syscall") { score += 100; }
@@ -282,8 +286,7 @@ impl RopChain {
             // Medium value
             else if instr_lower.starts_with("mov") { score += 15; }
             else if instr_lower.starts_with("lea") { score += 20; }
-            else if instr_lower.starts_with("add") { score += 10; }
-            else if instr_lower.starts_with("sub") { score += 10; }
+            else if instr_lower.starts_with("add") || instr_lower.starts_with("sub") { score += 10; }
             
             // Penalties for bad instructions
             else if instr_lower.starts_with("call") { score = score.saturating_sub(30); }
@@ -536,7 +539,7 @@ impl AutoROPSolver {
                     instructions: vec!["execve('/bin/sh', NULL, NULL)".to_string()],
                 }],
                 payload_description: "Single gadget that spawns shell with proper constraints".to_string(),
-                constraints_satisfied: self.check_constraints(&vec![gadget]),
+                constraints_satisfied: self.check_constraints(&[gadget]),
                 success_probability: 0.95,
             })
         } else {
@@ -762,7 +765,7 @@ impl AutoROPSolver {
                 instructions: gadget.instructions.clone(),
             }],
             payload_description: "JOP (Jump-Oriented Programming) chain using indirect jumps".to_string(),
-            constraints_satisfied: self.check_constraints(&vec![gadget.address]),
+            constraints_satisfied: self.check_constraints(&[gadget.address]),
             success_probability: 0.70,
         })
     }
@@ -788,7 +791,7 @@ impl AutoROPSolver {
                 instructions: gadget.instructions.clone(),
             }],
             payload_description: "COP (Call-Oriented Programming) chain using indirect calls".to_string(),
-            constraints_satisfied: self.check_constraints(&vec![gadget.address]),
+            constraints_satisfied: self.check_constraints(&[gadget.address]),
             success_probability: 0.68,
         })
     }
@@ -810,7 +813,7 @@ impl AutoROPSolver {
                 instructions: pivot.instructions.clone(),
             }],
             payload_description: "Stack pivot to gain control over ROP chain location".to_string(),
-            constraints_satisfied: self.check_constraints(&vec![pivot.address]),
+            constraints_satisfied: self.check_constraints(&[pivot.address]),
             success_probability: 0.82,
         })
     }
@@ -854,7 +857,7 @@ impl AutoROPSolver {
         true
     }
     
-    fn check_constraints(&self, chain: &[u64]) -> bool {
+    pub fn check_constraints(&self, chain: &[u64]) -> bool {
         for constraint in &self.constraints {
             match constraint {
                 Constraint::NoNullBytes => {
@@ -983,7 +986,7 @@ mod tests {
     #[test]
     fn test_rop_chain_creation() {
         // Would need a real binary to test
-        assert_eq!(std::mem::size_of::<RopChain>() > 0, true);
+        assert!(std::mem::size_of::<RopChain>() > 0);
     }
 
     #[test]
@@ -1001,8 +1004,8 @@ mod tests {
     
     #[test]
     fn test_gadget_scoring() {
-        let score1 = RopChain::score_gadget(&vec!["pop rdi".to_string(), "ret".to_string()]);
-        let score2 = RopChain::score_gadget(&vec!["syscall".to_string()]);
+        let score1 = RopChain::score_gadget(&["pop rdi".to_string(), "ret".to_string()]);
+        let score2 = RopChain::score_gadget(&["syscall".to_string()]);
         
         assert!(score2 > score1); // syscall is more valuable
     }

@@ -90,6 +90,8 @@ INSTALLATION.md
 
 # Temporary and workflow directories
 .zenflow/
+*.ai-scratch
+*_agent_*.log
 -p/
 *.tmp
 *.temp
@@ -174,6 +176,7 @@ api_keys.*
 *_payload.*
 payload_*.bin
 exploit_*.bin
+demo_payload.bin
 rop_payload.bin
 rop_solution.json
 kernel_exploit.json
@@ -185,6 +188,11 @@ shellcode_*.bin
 poc_*.py
 poc_*.c
 poc_*.talon
+
+# Example vulnerable binaries (built from source)
+examples/vuln_binary
+examples/vuln_binary.exe
+examples/vuln_binary_32
 
 # CVE scan results and vulnerability reports (sensitive)
 cve_scan_results.json
@@ -224,10 +232,13 @@ afl-*
 fuzzer_stats
 crash_*.log
 fuzz/artifacts/
+fuzz/artifacts/**/*.profraw
 fuzz/target/
+fuzz/target/coverage/
 *.profdata
 *.profraw
 coverage/
+tarpaulin-report/
 tarpaulin-report.html
 tarpaulin-report.json
 htmlcov/

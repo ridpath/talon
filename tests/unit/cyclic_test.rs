@@ -1,5 +1,5 @@
 use talon::cyclic_tools::*;
-use talon::cyclic_pattern::{cyclic, cyclic_find, CyclicPattern};
+use talon::cyclic_pattern::{CyclicPattern};
 
 #[test]
 fn test_cyclic_generation() {
@@ -221,8 +221,8 @@ fn test_cyclic_pattern_find_offset_from_string() {
 fn test_cyclic_find_wrapper() {
     let pattern = cyclic(1000);
     
-    let search_str = std::str::from_utf8(&pattern[100..104]).unwrap();
-    let offset = cyclic_find(&pattern, search_str);
+    let search_bytes = &pattern[100..104];
+    let offset = cyclic_find_bytes(search_bytes);
     assert_eq!(offset, Some(100));
 }
 
@@ -235,7 +235,7 @@ fn test_cyclic_find_wrapper_hex() {
     let value = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
     let hex_str = format!("0x{:08x}", value);
     
-    let found = cyclic_find(&pattern, &hex_str);
+    let found = cyclic_find_hex(&hex_str);
     assert_eq!(found, Some(offset));
 }
 
@@ -246,30 +246,30 @@ fn test_cyclic_find_wrapper_decimal() {
     let offset = 150;
     let bytes = &pattern[offset..offset + 4];
     let value = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]);
-    let dec_str = format!("{}", value);
     
-    let found = cyclic_find(&pattern, &dec_str);
+    let found = cyclic_find(value as u64);
     assert_eq!(found, Some(offset));
 }
 
 #[test]
 fn test_cyclic_find_wrapper_empty_pattern() {
-    let pattern: Vec<u8> = vec![];
-    let result = cyclic_find(&pattern, "test");
+    // Test with bytes that won't be in the cyclic pattern
+    let empty_bytes = vec![0xFF, 0xFF, 0xFF, 0xFF];
+    let result = cyclic_find_bytes(&empty_bytes);
     assert_eq!(result, None);
 }
 
 #[test]
 fn test_cyclic_find_wrapper_empty_search() {
-    let pattern = cyclic(100);
-    let result = cyclic_find(&pattern, "");
+    // Test with invalid hex string
+    let result = cyclic_find_hex("");
     assert_eq!(result, None);
 }
 
 #[test]
 fn test_cyclic_find_not_found() {
-    let pattern = cyclic(100);
-    let result = cyclic_find(&pattern, "0xffffffff");
+    // Test with value that won't be in a small cyclic pattern
+    let result = cyclic_find_hex("0xffffffff");
     assert_eq!(result, None);
 }
 

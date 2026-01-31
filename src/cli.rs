@@ -60,7 +60,8 @@ pub fn run(args: Vec<String>) {
         [_, "run", file] => {
             let script = fs::read_to_string(file).expect("Unable to read script file");
             let cmds = crate::parser::parse_script(&script).expect("Parse failed");
-            crate::interpreter::interpret(&cmds).expect("Interpretation failed");
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(crate::interpreter::interpret(&cmds)).expect("Interpretation failed");
         }
 
         [_, "wasm", file] => {
@@ -175,7 +176,8 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
                 println!("Running plugin script: {}", path);
                 let script = fs::read_to_string(path).expect("Failed to load plugin");
                 let cmds = crate::parser::parse_script(&script).expect("Parse failed");
-                crate::interpreter::interpret(&cmds).expect("Plugin run failed");
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                rt.block_on(crate::interpreter::interpret(&cmds)).expect("Plugin run failed");
             } else if path.ends_with(".so") {
                 println!("Dynamic plugin loading not implemented");
             } else {
@@ -186,14 +188,16 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
         [_, "fuzz", file] => {
             let script = fs::read_to_string(file).expect("Unable to read script file");
             let cmds = crate::parser::parse_script(&script).expect("Parse failed");
-            crate::interpreter::interpret(&cmds).expect("Fuzzing run failed");
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(crate::interpreter::interpret(&cmds)).expect("Fuzzing run failed");
         }
 
         [_, "load-template", name] => {
             let path = format!("talon_std/exploit/{}", name);
             let script = fs::read_to_string(&path).expect("Template missing");
             let cmds = crate::parser::parse_script(&script).expect("Parse failed");
-            crate::interpreter::interpret(&cmds).expect("Template execution failed");
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(crate::interpreter::interpret(&cmds)).expect("Template execution failed");
         }
 
         [_, "list-templates"] => {
@@ -216,7 +220,8 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
             let path = format!("talon_std/{}", file);
             let script = fs::read_to_string(&path).expect("Stdlib file not found");
             let cmds = crate::parser::parse_script(&script).expect("Parse failed");
-            crate::interpreter::interpret(&cmds).expect("Execution failed");
+            let rt = tokio::runtime::Runtime::new().unwrap();
+            rt.block_on(crate::interpreter::interpret(&cmds)).expect("Execution failed");
         }
 
         [_, "debug", file] => {

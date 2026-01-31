@@ -5,6 +5,12 @@ pub struct FlagFinder {
     patterns: Vec<Regex>,
 }
 
+impl Default for FlagFinder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FlagFinder {
     pub fn new() -> Self {
         let patterns = vec![
@@ -152,7 +158,7 @@ impl FlagSubmitter {
             .build()
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-        let mut request = client.post(&format!("{}/api/v1/challenges/attempt", self.url));
+        let mut request = client.post(format!("{}/api/v1/challenges/attempt", self.url));
         
         for (key, value) in &self.headers {
             request = request.header(key, value);

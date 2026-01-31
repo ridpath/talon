@@ -62,6 +62,12 @@ pub struct SimilarityEngine {
     vendor_signatures: HashMap<String, Vec<Vec<f32>>>,
 }
 
+impl Default for SimilarityEngine {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl SimilarityEngine {
     pub fn new() -> Self {
         println!("╔═══════════════════════════════════════════════════════════════╗");
@@ -462,8 +468,8 @@ impl SimilarityEngine {
         
         features[8] = if name.starts_with('_') { 0.6 } else { 0.4 };
         
-        for i in 9..16 {
-            features[i] = ((name_hash.wrapping_mul(i as u64).wrapping_add(address)) % 100) as f32 / 100.0;
+        for (i, item) in features.iter_mut().enumerate().take(16).skip(9) {
+            *item = ((name_hash.wrapping_mul(i as u64).wrapping_add(address)) % 100) as f32 / 100.0;
         }
         
         features
@@ -486,7 +492,7 @@ impl SimilarityEngine {
         
         let cosine_sim = dot_product / (norm1.sqrt() * norm2.sqrt());
         
-        cosine_sim.max(0.0).min(1.0) as f64
+        cosine_sim.clamp(0.0, 1.0) as f64
     }
     
     fn calculate_confidence(&self, similarity: f64, func1: &FunctionEmbedding, func2: &FunctionEmbedding) -> f64 {
@@ -512,7 +518,7 @@ impl SimilarityEngine {
             return MatchType::ExactMatch;
         }
         
-        for (_vendor, signatures) in &self.vendor_signatures {
+        for signatures in self.vendor_signatures.values() {
             for sig in signatures {
                 let vendor_sim = self.compute_similarity(&func1.features, sig);
                 if vendor_sim >= 0.85 {

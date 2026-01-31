@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use goblin::Object;
@@ -142,7 +140,7 @@ impl VulnForecastEngine {
         let binary_data = fs::read(binary_path)
             .map_err(|e| format!("Failed to read binary: {}", e))?;
         
-        let obj = Object::parse(&binary_data)
+        let _obj = Object::parse(&binary_data)
             .map_err(|e| format!("Failed to parse binary: {}", e))?;
 
         for (_cve_id, cve) in &self.cve_database {

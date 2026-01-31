@@ -2,7 +2,7 @@
 # Demonstrates living scripts, goal-oriented planning, and autonomous exploit synthesis
 
 print("TALON Phase 22: The Exploit Organism")
-print("=" * 80)
+print("================================================================================")
 
 # ============================================================================
 # 1. SYMBIOTIC EXECUTION: LIVE BIDIRECTIONAL STATE BINDING

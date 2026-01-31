@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use futures::future::join_all;
@@ -346,16 +344,19 @@ mod tests {
 
     #[tokio::test]
     async fn test_race() {
+        use std::pin::Pin;
+        use std::future::Future;
+        
         let executor = ParallelExecutor::new(4);
         
-        let operations = vec![
-            async {
+        let operations: Vec<Pin<Box<dyn Future<Output = Result<i32, String>> + Send>>> = vec![
+            Box::pin(async {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
                 Ok::<_, String>(1)
-            },
-            async {
+            }),
+            Box::pin(async {
                 Ok::<_, String>(2)
-            },
+            }),
         ];
 
         let result = executor.race(operations).await;

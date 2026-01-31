@@ -60,7 +60,7 @@ impl FormatStringPayload {
         
         for (idx, (_, value)) in self.writes.iter().enumerate() {
             for byte_idx in 0..8 {
-                let byte_value = ((value >> (byte_idx * 8)) & 0xFF) as u64;
+                let byte_value = (value >> (byte_idx * 8)) & 0xFF;
                 
                 if byte_value < current_written {
                     return Err(format!("Cannot write byte value {} when already written {}", byte_value, current_written));
@@ -102,7 +102,7 @@ impl FormatStringPayload {
         
         for (idx, (_, value)) in self.writes.iter().enumerate() {
             for byte_idx in 0..4 {
-                let byte_value = ((value >> (byte_idx * 8)) & 0xFF) as u64;
+                let byte_value = (value >> (byte_idx * 8)) & 0xFF;
                 
                 if byte_value < current_written {
                     return Err(format!("Cannot write byte value {} when already written {}", byte_value, current_written));
@@ -194,7 +194,7 @@ mod tests {
         assert!(result.is_ok(), "Failed to generate payload: {:?}", result.err());
         
         let data = result.unwrap();
-        assert!(data.len() > 0);
+        assert!(!data.is_empty());
     }
 
     #[test]

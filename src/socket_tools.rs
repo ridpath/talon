@@ -53,12 +53,9 @@ pub fn port_scan_connect(host: &str, start_port: u16, end_port: u16, timeout_ms:
     for port in start_port..=end_port {
         let addr = format!("{}:{}", host, port);
         if let Ok(addr) = addr.parse::<SocketAddr>() {
-            match TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
-                Ok(_) => {
-                    println!("[SCAN] Port {} OPEN", port);
-                    open_ports.push(port);
-                }
-                Err(_) => {}
+            if TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)).is_ok() {
+                println!("[SCAN] Port {} OPEN", port);
+                open_ports.push(port);
             }
         }
     }
@@ -84,12 +81,9 @@ pub fn port_scan_parallel(host: &str, start_port: u16, end_port: u16, timeout_ms
             for port in start..=end {
                 let addr = format!("{}:{}", host, port);
                 if let Ok(addr) = addr.parse::<SocketAddr>() {
-                    match TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
-                        Ok(_) => {
-                            println!("[SCAN] Port {} OPEN", port);
-                            open_ports.lock().unwrap().push(port);
-                        }
-                        Err(_) => {}
+                    if TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)).is_ok() {
+                        println!("[SCAN] Port {} OPEN", port);
+                        open_ports.lock().unwrap().push(port);
                     }
                 }
             }
@@ -131,7 +125,7 @@ pub fn proxy_connect(proxy_host: &str, proxy_port: u16, target_host: &str, targe
     if response_str.contains("200") {
         Ok(proxy)
     } else {
-        Err(Error::new(ErrorKind::Other, "Proxy connection failed"))
+        Err(Error::other("Proxy connection failed"))
     }
 }
 
@@ -178,12 +172,9 @@ pub fn subnet_scan(subnet: &str, port: u16, timeout_ms: u64) -> Vec<String> {
         let addr = format!("{}:{}", host, port);
         
         if let Ok(addr) = addr.parse::<SocketAddr>() {
-            match TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
-                Ok(_) => {
-                    println!("[SUBNET] Host {} is alive", host);
-                    alive_hosts.push(host);
-                }
-                Err(_) => {}
+            if TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)).is_ok() {
+                println!("[SUBNET] Host {} is alive", host);
+                alive_hosts.push(host);
             }
         }
     }

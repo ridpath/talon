@@ -374,7 +374,7 @@ mod tests {
         
         let gadgets = pwn.one_gadgets("ubuntu20.04");
         assert!(gadgets.is_ok());
-        assert!(gadgets.unwrap().len() > 0);
+        assert!(!gadgets.unwrap().is_empty());
     }
 
     #[test]

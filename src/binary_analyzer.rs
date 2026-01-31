@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use std::process::Command;
 use std::path::Path;
 use serde::{Deserialize, Serialize};

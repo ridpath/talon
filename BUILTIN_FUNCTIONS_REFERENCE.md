@@ -189,6 +189,173 @@ let addr = u64(leaked)
 print("Leaked address:", hex(addr))
 ```
 
+## Binary Analysis
+
+### `Elf(path)`
+Loads and analyzes an ELF binary, returning an object with all relevant information.
+
+Returns: Map with `plt`, `got`, `symbols`, `nx`, `pie`, `canary`, `relro`, `fortify`, `base_addr`, `path`
+
+```talon
+let elf = Elf("./vuln")
+let main = elf["symbols"]["main"]
+let puts_plt = elf["plt"]["puts"]
+let libc_got = elf["got"]["__libc_start_main"]
+
+print("[*] Binary base:", hex(elf["base_addr"]))
+print("[*] PIE:", elf["pie"], "| NX:", elf["nx"], "| Canary:", elf["canary"])
+```
+
+### `analyze(path)`
+Alias for `Elf()`. Loads and analyzes an ELF binary.
+
+```talon
+let binary = analyze("./target")
+print("Entry point:", hex(binary["symbols"]["_start"]))
+```
+
+### `checksec(path)`
+Displays security features of a binary.
+
+```talon
+checksec("./vuln")
+```
+
+## Libc Database
+
+### `Libc(version)`
+Loads libc offsets for a specific version. Returns offsets relative to base address 0.
+
+Returns: Map with `symbols`, `one_gadgets`, `name`, `build_id`, `base`
+
+Available versions: `ubuntu18.04`, `ubuntu20.04`, `ubuntu22.04`, `debian10`
+
+```talon
+let libc = Libc("ubuntu20.04")
+let system_offset = libc["symbols"]["system"]
+let binsh_offset = libc["symbols"]["bin_sh"]
+let one_gadgets = libc["one_gadgets"]
+
+print("[*] Libc:", libc["name"])
+print("[*] Build ID:", libc["build_id"])
+print("[*] One-gadgets:", one_gadgets)
+```
+
+### `Libc({version, base})`
+Loads libc with a specific base address. Returns absolute addresses.
+
+```talon
+let libc_base = leaked_addr - 0x21b10
+let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+let system_addr = libc_resolved["symbols"]["system"]
+let binsh_addr = libc_resolved["symbols"]["bin_sh"]
+
+print("[*] system():", hex(system_addr))
+print("[*] /bin/sh:", hex(binsh_addr))
+```
+
+Available symbols: `system`, `execve`, `sh`, `bin_sh`, `dup2`, `read`, `write`, `open`, `mprotect`, `__malloc_hook`, `__free_hook`, `__realloc_hook`
+
+## ROP Gadgets
+
+### `ROP(elf_obj | path)`
+Creates a ROP chain builder with automatic gadget discovery.
+
+Returns: Map with `binary`, `gadgets`, `gadget_count`
+
+```talon
+let elf = Elf("./vuln")
+let rop = ROP(elf)
+
+print("[*] Found", rop["gadget_count"], "gadgets")
+```
+
+### `find(rop_obj, pattern)`
+Searches for gadgets matching a pattern (case-insensitive).
+
+Returns: Address of first matching gadget
+
+```talon
+let rop = ROP("./binary")
+let pop_rdi = find(rop, "pop rdi; ret")
+let pop_rsi = find(rop, "pop rsi")
+let ret = find(rop, "ret")
+
+let payload = cyclic(264) + p64(pop_rdi) + p64(binsh) + p64(system)
+```
+
+### `quick_rop(path)`
+Quick ROP gadget finder. Returns ROP object with all gadgets.
+
+```talon
+let rop = quick_rop("./vuln")
+let gadget = find(rop, "pop rax")
+```
+
+## Exploit Patterns
+
+### `cyclic(length)`
+Generates a De Bruijn sequence for finding buffer overflow offsets.
+
+```talon
+let pattern = cyclic(200)
+send(conn, pattern)
+
+let offset = cyclic_find("daab")
+print("Offset:", offset)
+```
+
+## Network I/O
+
+### `connect(host, port)`
+Establishes a TCP connection.
+
+Returns: Connection handle
+
+```talon
+let conn = connect("pwn.chal.ctf", 1337)
+let local = connect("127.0.0.1", 4444)
+```
+
+### `send(conn, data)`
+Sends data over a connection.
+
+```talon
+send(conn, "AAAA")
+send(conn, p64(0xdeadbeef))
+send(conn, payload)
+```
+
+### `recv(conn, size)`
+Receives specified number of bytes.
+
+Returns: Bytes received
+
+```talon
+let data = recv(conn, 1024)
+let leak = recv(conn, 8)
+let addr = u64(leak)
+```
+
+### `recvuntil(conn, delimiter)`
+Receives data until a delimiter is found.
+
+Returns: All data up to and including the delimiter
+
+```talon
+let banner = recvuntil(conn, "\n")
+let prompt = recvuntil(conn, "> ")
+let response = recvuntil(conn, "Enter choice:")
+```
+
+### `interactive(conn)`
+Drops into an interactive shell with bidirectional I/O.
+
+```talon
+send(conn, payload)
+interactive(conn)
+```
+
 ## Function Categories Summary
 
 | Category | Functions |
@@ -201,5 +368,10 @@ print("Leaked address:", hex(addr))
 | Output | `print()` |
 | Binary Pack | `p64()`, `p32()`, `p16()`, `p8()` |
 | Binary Unpack | `u64()`, `u32()`, `u16()`, `u8()` |
+| Binary Analysis | `Elf()`, `analyze()`, `checksec()` |
+| Libc Database | `Libc()` |
+| ROP Gadgets | `ROP()`, `find()`, `quick_rop()` |
+| Exploit Patterns | `cyclic()`, `cyclic_find()` |
+| Network I/O | `connect()`, `send()`, `recv()`, `recvuntil()`, `interactive()` |
 
 Note: TALON includes many more built-ins across exploitation, analysis, fuzzing, and tooling. See the main README "Built-in Functions" section for the full category listing.

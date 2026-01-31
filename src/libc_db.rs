@@ -51,6 +51,12 @@ pub struct LibcDatabase {
     pub versions: HashMap<String, LibcVersion>,
 }
 
+impl Default for LibcDatabase {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl LibcDatabase {
     /// Create new libc database with pre-loaded versions
     pub fn new() -> Self {
@@ -184,6 +190,13 @@ pub fn resolve_libc_symbol(libc_name: &str, base_addr: u64, symbol: &str) -> Opt
     db.resolve_address(libc_name, base_addr, symbol)
 }
 
+/// Get one-gadget addresses for a libc version
+pub fn get_one_gadgets(libc_name: &str, base_addr: u64) -> Result<Vec<u64>, String> {
+    let db = LibcDatabase::new();
+    db.get_one_gadgets(libc_name, base_addr)
+        .ok_or_else(|| format!("Libc version '{}' not found", libc_name))
+}
+
 /// List all available libc versions
 pub fn list_libc_versions() {
     let db = get_libc_db();
@@ -221,7 +234,7 @@ mod tests {
     #[test]
     fn test_libc_db_creation() {
         let db = LibcDatabase::new();
-        assert!(db.versions.len() > 0);
+        assert!(!db.versions.is_empty());
     }
 
     #[test]
@@ -247,7 +260,7 @@ mod tests {
         let base = 0x7ffff7a0d000u64;
         let gadgets = db.get_one_gadgets("ubuntu20.04", base);
         assert!(gadgets.is_some());
-        assert!(gadgets.unwrap().len() > 0);
+        assert!(!gadgets.unwrap().is_empty());
     }
 
     #[test]

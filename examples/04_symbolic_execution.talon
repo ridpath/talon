@@ -2,7 +2,7 @@
 # Automatically find input that reaches a specific code path
 
 print("[*] Symbolic Execution Example")
-print("=" * 60)
+print("============================================================")
 
 let binary = "./crackme"
 let target_address = 0x401337  # Address of win() function

@@ -236,6 +236,30 @@ pub fn unpack8(bytes: &[u8]) -> Result<u8, String> {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
+// PWNTOOLS-STYLE ALIASES
+// ────────────────────────────────────────────────────────────────────────────
+
+/// Pwntools-style alias for pack64
+pub fn p64(value: u64) -> Vec<u8> {
+    pack64(value)
+}
+
+/// Pwntools-style alias for unpack64
+pub fn u64(bytes: &[u8]) -> Result<u64, String> {
+    unpack64(bytes)
+}
+
+/// Pwntools-style alias for pack32
+pub fn p32(value: u32) -> Vec<u8> {
+    pack32(value)
+}
+
+/// Pwntools-style alias for unpack32
+pub fn u32(bytes: &[u8]) -> Result<u32, String> {
+    unpack32(bytes)
+}
+
+// ────────────────────────────────────────────────────────────────────────────
 // ADVANCED PACKING UTILITIES
 // ────────────────────────────────────────────────────────────────────────────
 

@@ -1,4 +1,3 @@
-#![allow(dead_code)]
 use std::collections::HashMap;
 use serde::{Deserialize, Serialize};
 use crate::ai_exploit_gen::{AIExploitGenerator, AIConfig, AIProvider, ExploitRequest};

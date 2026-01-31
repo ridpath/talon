@@ -2,7 +2,7 @@
 # Demonstrates arbitrary write using format string vulnerability
 
 print("[*] Format String Exploit")
-print("=" * 60)
+print("============================================================")
 
 let target = "127.0.0.1:8888"
 let binary = "./format_vuln"

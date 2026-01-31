@@ -147,7 +147,8 @@ impl NotebookManager {
         let cmds = crate::parser::parse_script(code)
             .map_err(|e| format!("Parse error: {}", e))?;
         
-        crate::interpreter::interpret(&cmds)
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(crate::interpreter::interpret(&cmds))
             .map_err(|e| format!("Execution error: {}", e))?;
         
         let result = "Executed successfully";

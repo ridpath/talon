@@ -15,7 +15,8 @@ fn main() -> Result<(), String> {
     
     // Simulate crashed EIP/RIP value (in real scenario, from debugger)
     let crashed_rip = 0x6161616c6161616b_u64; // 'kaaalaaa'
-    let offset = cyclic_find(crashed_rip)?;
+    let offset = cyclic_find(crashed_rip)
+        .ok_or_else(|| format!("Pattern 0x{:x} not found in cyclic sequence", crashed_rip))?;
     println!("[+] Buffer overflow offset: {} bytes", offset);
     
     // Step 2: Build ROP chain

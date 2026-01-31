@@ -99,7 +99,7 @@ impl BaseEncoder {
             result.push(ALPHABET[index] as char);
         }
         
-        while result.len() % 8 != 0 {
+        while !result.len().is_multiple_of(8) {
             result.push('=');
         }
         
@@ -372,8 +372,7 @@ impl MorseCode {
         
         text.to_uppercase()
             .chars()
-            .filter_map(|c| map.get(&c))
-            .map(|&s| s)
+            .filter_map(|c| map.get(&c)).copied()
             .collect::<Vec<_>>()
             .join(" ")
     }

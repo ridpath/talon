@@ -302,8 +302,8 @@ fn test_safe_linking_bypass() {
 
 #[test]
 fn test_safe_linking_mangle_demangle() {
-    let chunk_addr = 0x555555554290;
-    let target_addr = 0x555555554500;
+    let chunk_addr = 0x555555554290u64;
+    let target_addr = 0x555555554500u64;
     
     let mangled = target_addr ^ (chunk_addr >> 12);
     let demangled = mangled ^ (chunk_addr >> 12);
