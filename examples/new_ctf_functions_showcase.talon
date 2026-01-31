@@ -127,7 +127,7 @@ print("\n[10] Complete CTF Exploit Example")
 print("======================================================================")
 
 # Binary analysis
-let binary = "./vuln"
+let binary = "./vuln_binary"  # Compile from vuln.c in examples/
 print("[*] Target binary:", binary)
 
 # Find offset

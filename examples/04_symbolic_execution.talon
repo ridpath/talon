@@ -4,7 +4,7 @@
 print("[*] Symbolic Execution Example")
 print("============================================================")
 
-let binary = "./crackme"
+let binary = "./crackme"  # NOTE: Placeholder - replace with actual crackme binary
 let target_address = 0x401337  # Address of win() function
 
 print("[+] Binary: " + binary)
@@ -33,14 +33,14 @@ print("    [+] Created " + str(input_length) + " bytes of symbolic input")
 print("\n[*] Step 3: Exploring paths...")
 let result = symbolic_execute(binary, symbolic_input)
 
-if result.found
+if result["found"]
     print("    [+] Solution found!")
-    print("    Explored " + str(result.paths_explored) + " paths")
-    print("    Time: " + str(result.execution_time) + "s")
+    print("    Explored " + str(result["paths_explored"]) + " paths")
+    print("    Time: " + str(result["execution_time"]) + "s")
     
     # Step 4: Get concrete input that reaches target
     print("\n[*] Step 4: Extracting solution...")
-    let solution = result.concrete_input
+    let solution = result["concrete_input"]
     
     print("    Solution (hex): " + hexlify(solution))
     print("    Solution (ascii): " + ascii_safe(solution))
@@ -59,8 +59,8 @@ if result.found
     end
 else
     print("    [-] No solution found")
-    print("    Explored " + str(result.paths_explored) + " paths")
-    print("    Constraints: " + str(result.unsolvable_constraints))
+    print("    Explored " + str(result["paths_explored"]) + " paths")
+    print("    Constraints: " + str(result["unsolvable_constraints"]))
 end
 
 print("\n[+] Symbolic execution complete!")

@@ -133,21 +133,21 @@ interactive(conn)
 
 ```talon
 let elf = analyze("./binary")
-print(elf.pie)        # PIE enabled?
-print(elf.nx)         # NX enabled?
-print(elf.canary)     # Canary enabled?
-print(elf.plt)        # PLT entries
-print(elf.got)        # GOT entries
-print(elf.symbols)    # Symbol addresses
+print(elf["pie"])        # PIE enabled?
+print(elf["nx"])         # NX enabled?
+print(elf["canary"])     # Canary enabled?
+print(elf["plt"])        # PLT entries
+print(elf["got"])        # GOT entries
+print(elf["symbols"])    # Symbol addresses
 ```
 
 ### ROP Gadgets
 
 ```talon
 let gadgets = quick_rop("./binary")
-let pop_rdi = gadgets.find("pop rdi; ret")
-let pop_rsi_r15 = gadgets.find("pop rsi; pop r15; ret")
-let ret = gadgets.find("ret")
+let pop_rdi = find(gadgets, "pop rdi; ret")
+let pop_rsi_r15 = find(gadgets, "pop rsi; pop r15; ret")
+let ret = find(gadgets, "ret")
 ```
 
 ### Packing/Unpacking

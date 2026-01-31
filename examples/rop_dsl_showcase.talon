@@ -5,8 +5,8 @@ print("════════════════════════�
 print("    TALON ROP DSL - Complete Showcase")
 print("═══════════════════════════════════════════════════════════\n")
 
-let binary = "./vuln_binary"
-let libc_base = 0x7ffff7a00000
+let binary = "./vuln_binary"  # Compile from vuln.c in examples/ using Makefile
+let libc_base = 0x7ffff7a00000  # This should be leaked dynamically in real exploit
 
 # ═══════════════════════════════════════════════════════════════
 # Example 1: Basic ROP Chain Creation

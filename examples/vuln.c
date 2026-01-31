@@ -3,6 +3,8 @@
 #include <string.h>
 #include <unistd.h>
 
+char *gets(char *s);
+
 void win() {
     printf("[!] You've reached the secret function!\n");
     system("/bin/sh");

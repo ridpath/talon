@@ -492,8 +492,8 @@ impl DocGenerator {
             ],
             returns: "map containing binary metadata and all symbols".to_string(),
             examples: vec![
-                "let elf = parse_elf(\"./vuln\")\nlet main = elf.sym_main\nlet puts_plt = elf.plt_puts\nlet puts_got = elf.got_puts".to_string(),
-                "let elf = parse_elf(\"/lib/x86_64-linux-gnu/libc.so.6\")\nif elf.pie { print(\"PIE enabled\") }".to_string(),
+                "let elf = parse_elf(\"./vuln\")\nlet main = elf[\"sym_main\"]\nlet puts_plt = elf[\"plt_puts\"]\nlet puts_got = elf[\"got_puts\"]".to_string(),
+                "let elf = parse_elf(\"/lib/x86_64-linux-gnu/libc.so.6\")\nif elf[\"pie\"] { print(\"PIE enabled\") }".to_string(),
             ],
             module: "binary".to_string(),
             tags: vec!["elf".to_string(), "binary".to_string(), "symbols".to_string(), "got".to_string(), "plt".to_string()],

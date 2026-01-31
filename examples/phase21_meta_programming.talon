@@ -193,7 +193,7 @@ let experimental = fork_strategy("try_heap_overflow")
 # Test experimental strategy
 let test_result = test_strategy(experimental)
 
-if test_result.success_rate > 0.8 {
+if test_result["success_rate"] > 0.8 {
     print("Experimental strategy is better, merging...")
     merge_strategy(experimental, main_strategy)
 } else {

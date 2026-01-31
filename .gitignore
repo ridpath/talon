@@ -193,6 +193,10 @@ poc_*.talon
 examples/vuln_binary
 examples/vuln_binary.exe
 examples/vuln_binary_32
+examples/format_string_vuln
+examples/format_string_vuln.exe
+examples/heap_vuln
+examples/heap_vuln.exe
 
 # CVE scan results and vulnerability reports (sensitive)
 cve_scan_results.json

