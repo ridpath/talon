@@ -476,13 +476,16 @@ impl REPL {
 
     fn execute(&mut self, code: &str) {
         match parse_script(code) {
-            Ok(commands) => match interpret(&commands) {
-                Ok(_) => {
-                    println!("[OK] Success");
-                }
-                Err(e) => {
-                    let enhanced_error = ErrorHelper::suggest_fix(&e);
-                    println!("[ERROR] Execution Error:\n{}", enhanced_error);
+            Ok(commands) => {
+                let rt = tokio::runtime::Runtime::new().unwrap();
+                match rt.block_on(interpret(&commands)) {
+                    Ok(_) => {
+                        println!("[OK] Success");
+                    }
+                    Err(e) => {
+                        let enhanced_error = ErrorHelper::suggest_fix(&e);
+                        println!("[ERROR] Execution Error:\n{}", enhanced_error);
+                    }
                 }
             },
             Err(e) => {

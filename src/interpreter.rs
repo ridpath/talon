@@ -72,16 +72,25 @@ pub fn run_repl() {
     crate::repl::run_repl();
 }
 
-#[tokio::main]
 pub async fn interpret(commands: &[Command]) -> Result<(), String> {
+    interpret_with_options(commands, false).await
+}
+
+pub async fn interpret_with_options(commands: &[Command], dry_run: bool) -> Result<(), String> {
     let shellcode = Arc::new(RwLock::new(None));
     let variables = Arc::new(RwLock::new(HashMap::new()));
     let constants = Arc::new(RwLock::new(HashMap::new()));
     let functions = Arc::new(RwLock::new(HashMap::new()));
     let macros = Arc::new(RwLock::new(HashMap::new()));
     let safety = Arc::new(RwLock::new(RuntimeSafety::new(SafetyConfig::default())));
+    let context = Arc::new(RwLock::new(HashMap::new()));
+    
+    if dry_run {
+        context.write().await.insert("__dry_run__".to_string(), Value::Number(1));
+    }
+    
     interpret_with_scope(
-        commands, variables, constants, functions, macros, shellcode, safety,
+        commands, variables, constants, functions, macros, shellcode, safety, context, dry_run,
     )
     .await?;
     Ok(())
@@ -131,6 +140,7 @@ impl std::fmt::Display for Value {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn interpret_with_scope<'a>(
     commands: &'a [Command],
     variables: Arc<RwLock<HashMap<String, Value>>>,
@@ -139,6 +149,8 @@ fn interpret_with_scope<'a>(
     macros: Arc<RwLock<HashMap<String, MacroDef>>>,
     shellcode: Arc<RwLock<Option<Vec<u8>>>>,
     safety: Arc<RwLock<RuntimeSafety>>,
+    context: Arc<RwLock<HashMap<String, Value>>>,
+    dry_run: bool,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Option<Value>, String>> + Send + 'a>>
 {
     Box::pin(async move {
@@ -172,6 +184,8 @@ fn interpret_with_scope<'a>(
                         macros.clone(),
                         shellcode.clone(),
                         safety.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                 }
@@ -181,7 +195,7 @@ fn interpret_with_scope<'a>(
                     value,
                 }) => {
                     let val =
-                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                     let typed_val = match var_type {
                     TypeHint::Int => Value::Number(val.to_string().parse::<i64>()
@@ -203,13 +217,13 @@ fn interpret_with_scope<'a>(
                 }
                 Command::ConstDecl { name, value } => {
                     let val =
-                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                     constants.write().await.insert(name.clone(), val);
                 }
                 Command::DestructuringDecl { vars, value } => {
                     let val =
-                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                     let val_str = val.to_string();
                     let parts: Vec<&str> = val_str.split(':').collect();
@@ -229,7 +243,7 @@ fn interpret_with_scope<'a>(
                 }
                 Command::VarDecl { name, value } => {
                     let val =
-                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                     variables.write().await.insert(name.clone(), val);
                 }
@@ -238,7 +252,7 @@ fn interpret_with_scope<'a>(
                         return Err(format!("Cannot reassign constant {}", name));
                     }
                     let val =
-                        eval_expr(value, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(value, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                     variables.write().await.insert(name.clone(), val);
                 }
@@ -261,7 +275,7 @@ fn interpret_with_scope<'a>(
                         let mut arg_values = Vec::new();
                         for e in args {
                             arg_values.push(
-                                eval_expr(e, variables.clone(), functions.clone(), macros.clone())
+                                eval_expr(e, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                                     .await?,
                             );
                         }
@@ -276,6 +290,8 @@ fn interpret_with_scope<'a>(
                             macros.clone(),
                             shellcode.clone(),
                             safety.clone(),
+                            context.clone(),
+                            dry_run,
                         )
                         .await?
                         {
@@ -300,6 +316,8 @@ fn interpret_with_scope<'a>(
                                                 variables.clone(),
                                                 functions.clone(),
                                                 macros.clone(),
+                                                context.clone(),
+                                                dry_run,
                                             )
                                             .await?
                                         } else {
@@ -311,6 +329,8 @@ fn interpret_with_scope<'a>(
                                             variables.clone(),
                                             functions.clone(),
                                             macros.clone(),
+                                            context.clone(),
+                                            dry_run,
                                         )
                                         .await?
                                     }
@@ -322,6 +342,8 @@ fn interpret_with_scope<'a>(
                                             variables.clone(),
                                             functions.clone(),
                                             macros.clone(),
+                                            context.clone(),
+                                            dry_run,
                                         )
                                         .await?
                                     } else {
@@ -342,10 +364,11 @@ fn interpret_with_scope<'a>(
                             let macs = macros.clone();
                             let sc = shellcode.clone();
                             let saf = safety.clone();
+                            let ctx = context.clone();
                             let body = func.body.clone();
                             tokio::spawn(async move {
                                 interpret_with_scope(
-                                    &body, local_vars, consts, funcs, macs, sc, saf,
+                                    &body, local_vars, consts, funcs, macs, sc, saf, ctx, dry_run,
                                 )
                                 .await
                                 .unwrap();
@@ -360,6 +383,8 @@ fn interpret_with_scope<'a>(
                             macros.clone(),
                             shellcode.clone(),
                             safety.clone(),
+                            context.clone(),
+                            dry_run,
                         )
                         .await?
                         {
@@ -371,13 +396,13 @@ fn interpret_with_scope<'a>(
                 }
                 Command::Expr(Expr::Return(expr)) => {
                     let ret_val =
-                        eval_expr(expr, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(expr, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                     return Ok(Some(ret_val));
                 }
                 Command::Expr(expr) => {
                     let _val =
-                        eval_expr(expr, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(expr, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                 }
                 Command::Control(Control::If {
@@ -390,6 +415,8 @@ fn interpret_with_scope<'a>(
                         variables.clone(),
                         functions.clone(),
                         macros.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                     if cond.to_string() == "true"
@@ -403,6 +430,8 @@ fn interpret_with_scope<'a>(
                             macros.clone(),
                             shellcode.clone(),
                             safety.clone(),
+                            context.clone(),
+                            dry_run,
                         )
                         .await?
                         {
@@ -417,6 +446,8 @@ fn interpret_with_scope<'a>(
                             macros.clone(),
                             shellcode.clone(),
                             safety.clone(),
+                            context.clone(),
+                            dry_run,
                         )
                         .await?
                         {
@@ -434,13 +465,15 @@ fn interpret_with_scope<'a>(
                         variables.clone(),
                         functions.clone(),
                         macros.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                     match items {
                     Value::List(list) => {
                         for item in list {
                             variables.write().await.insert(var.clone(), item);
-                            match interpret_with_scope(body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await {
+                            match interpret_with_scope(body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone(), context.clone(), dry_run).await {
                                 Ok(Some(ret)) => return Ok(Some(ret)),
                                 Err(e) if e == "continue" => continue,
                                 Err(e) if e == "break" => break,
@@ -456,7 +489,7 @@ fn interpret_with_scope<'a>(
                             let end = range[1].parse::<i64>().map_err(|e| e.to_string())?;
                             for i in start..end {
                                 variables.write().await.insert(var.clone(), Value::Number(i));
-                                match interpret_with_scope(body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone()).await {
+                                match interpret_with_scope(body, variables.clone(), constants.clone(), functions.clone(), macros.clone(), shellcode.clone(), safety.clone(), context.clone(), dry_run).await {
                                     Ok(Some(ret)) => return Ok(Some(ret)),
                                     Err(e) if e == "continue" => continue,
                                     Err(e) if e == "break" => break,
@@ -477,6 +510,8 @@ fn interpret_with_scope<'a>(
                         variables.clone(),
                         functions.clone(),
                         macros.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                     let cond_bool = match cond {
@@ -497,6 +532,8 @@ fn interpret_with_scope<'a>(
                         macros.clone(),
                         shellcode.clone(),
                         safety.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await
                     {
@@ -523,8 +560,9 @@ fn interpret_with_scope<'a>(
                         let macs = macros.clone();
                         let sc = shellcode.clone();
                         let saf = safety.clone();
+                        let ctx = context.clone();
                         handles.push(tokio::spawn(async move {
-                            interpret_with_scope(&[cmd], vars, consts, funcs, macs, sc, saf).await
+                            interpret_with_scope(&[cmd], vars, consts, funcs, macs, sc, saf, ctx, dry_run).await
                         }));
                     }
                     for handle in handles {
@@ -532,7 +570,7 @@ fn interpret_with_scope<'a>(
                     }
                 }
                 Command::Match(MatchBlock { expr, arms }) => {
-                    let val = eval_expr(expr, variables.clone(), functions.clone(), macros.clone())
+                    let val = eval_expr(expr, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                         .await?;
                     for arm in arms {
                         let _pat_val = eval_expr(
@@ -540,6 +578,8 @@ fn interpret_with_scope<'a>(
                             variables.clone(),
                             functions.clone(),
                             macros.clone(),
+                            context.clone(),
+                            dry_run,
                         )
                         .await?;
                         let matches = match (&arm.pattern, &val) {
@@ -549,7 +589,7 @@ fn interpret_with_scope<'a>(
                         };
                         let guard_ok = if let Some(g) = &arm.guard {
                             let guard_val =
-                                eval_expr(g, variables.clone(), functions.clone(), macros.clone())
+                                eval_expr(g, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                                     .await?;
                             guard_val.to_string() == "true"
                         } else {
@@ -564,6 +604,8 @@ fn interpret_with_scope<'a>(
                                 macros.clone(),
                                 shellcode.clone(),
                                 safety.clone(),
+                                context.clone(),
+                                dry_run,
                             )
                             .await?
                             {
@@ -586,6 +628,8 @@ fn interpret_with_scope<'a>(
                         macros.clone(),
                         shellcode.clone(),
                         safety.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await
                     {
@@ -603,6 +647,8 @@ fn interpret_with_scope<'a>(
                                 macros.clone(),
                                 shellcode.clone(),
                                 safety.clone(),
+                                context.clone(),
+                                dry_run,
                             )
                             .await?
                             {
@@ -621,9 +667,9 @@ fn interpret_with_scope<'a>(
                     println!("{}", String::from_utf8_lossy(&output.stdout));
                 }
                 Command::BitwiseOp { op, left, right } => {
-                    let l = eval_expr(left, variables.clone(), functions.clone(), macros.clone())
+                    let l = eval_expr(left, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                         .await?;
-                    let r = eval_expr(right, variables.clone(), functions.clone(), macros.clone())
+                    let r = eval_expr(right, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                         .await?;
                     let l_num = l.to_string().parse::<i64>().unwrap_or(0);
                     let r_num = r.to_string().parse::<i64>().unwrap_or(0);
@@ -644,7 +690,7 @@ fn interpret_with_scope<'a>(
                     let mut arg_vals = Vec::new();
                     for e in args {
                         arg_vals.push(
-                            eval_expr(e, variables.clone(), functions.clone(), macros.clone())
+                            eval_expr(e, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                                 .await?,
                         );
                     }
@@ -675,12 +721,12 @@ fn interpret_with_scope<'a>(
                     fs::write(path, &data).map_err(|e| e.to_string())?;
                 }
                 Command::EncodeBase64 { data } => {
-                    let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone())
+                    let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                         .await?;
                     println!("[ENCODED] {}", encode(val.to_string()));
                 }
                 Command::DecodeBase64 { data } => {
-                    let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone())
+                    let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                         .await?;
                     let raw = decode(&val.to_string()).map_err(|e| e.to_string())?;
                     println!("[DECODED] {}", String::from_utf8_lossy(&raw));
@@ -1576,7 +1622,7 @@ fn interpret_with_scope<'a>(
                     use crate::exploit_chaining::ExploitChain;
 
                     let payload =
-                        eval_expr(data, variables.clone(), functions.clone(), macros.clone())
+                        eval_expr(data, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
                     let payload_bytes = match payload {
                         Value::Bytes(b) => b,
@@ -1699,6 +1745,8 @@ fn interpret_with_scope<'a>(
                         variables.clone(),
                         functions.clone(),
                         macros.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                     let payload_bytes = match payload_val {
@@ -1743,6 +1791,8 @@ fn interpret_with_scope<'a>(
                         variables.clone(),
                         functions.clone(),
                         macros.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                     let leaked_value = match leaked {
@@ -1785,6 +1835,8 @@ fn interpret_with_scope<'a>(
                         variables.clone(),
                         functions.clone(),
                         macros.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                     let payload_bytes = match payload_val {
@@ -1940,6 +1992,8 @@ fn interpret_with_scope<'a>(
                         variables.clone(),
                         functions.clone(),
                         macros.clone(),
+                        context.clone(),
+                        dry_run,
                     )
                     .await?;
                     let payload_bytes = match payload_value {
@@ -2122,11 +2176,14 @@ fn interpret_with_scope<'a>(
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn eval_expr<'a>(
     expr: &'a Expr,
     vars: Arc<RwLock<HashMap<String, Value>>>,
     funcs: Arc<RwLock<HashMap<String, FunctionDef>>>,
     macros: Arc<RwLock<HashMap<String, MacroDef>>>,
+    context: Arc<RwLock<HashMap<String, Value>>>,
+    dry_run: bool,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, String>> + Send + 'a>> {
     Box::pin(async move {
         match expr {
@@ -2171,8 +2228,8 @@ fn eval_expr<'a>(
                 }
             }
             Expr::BinaryOp { op, left, right } => {
-                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
-                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
+                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 match (&l, &r) {
                 (Value::Number(lv), Value::Number(rv)) => {
                     let out = match op.as_str() {
@@ -2200,7 +2257,7 @@ fn eval_expr<'a>(
                     match e {
                         Expr::Spread(inner) => {
                             let spread_val =
-                                eval_expr(inner, vars.clone(), funcs.clone(), macros.clone())
+                                eval_expr(inner, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run)
                                     .await?;
                             match spread_val {
                                 Value::List(list_items) => {
@@ -2216,7 +2273,7 @@ fn eval_expr<'a>(
                         }
                         _ => {
                             values.push(
-                                eval_expr(e, vars.clone(), funcs.clone(), macros.clone()).await?,
+                                eval_expr(e, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?,
                             );
                         }
                     }
@@ -2228,7 +2285,7 @@ fn eval_expr<'a>(
                 for (k, v) in map {
                     result.insert(
                         k.clone(),
-                        eval_expr(v, vars.clone(), funcs.clone(), macros.clone()).await?,
+                        eval_expr(v, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?,
                     );
                 }
                 Ok(Value::Map(result))
@@ -2236,7 +2293,7 @@ fn eval_expr<'a>(
             Expr::Set(items) => {
                 let mut values = HashSet::new();
                 for e in items {
-                    let val = eval_expr(e, vars.clone(), funcs.clone(), macros.clone()).await?;
+                    let val = eval_expr(e, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                     values.insert(val.to_string());
                 }
                 Ok(Value::Set(values))
@@ -2246,7 +2303,7 @@ fn eval_expr<'a>(
                 let mut result = String::new();
                 for part in parts {
                     result.push_str(
-                        &eval_expr(part, vars.clone(), funcs.clone(), macros.clone())
+                        &eval_expr(part, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run)
                             .await?
                             .to_string(),
                     );
@@ -2254,7 +2311,7 @@ fn eval_expr<'a>(
                 Ok(Value::String(result))
             }
             Expr::MethodChain { base, calls } => {
-                let mut val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let mut val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 for call in calls {
                     val = match call.as_str() {
                         "trim" => Value::String(val.to_string().trim().to_string()),
@@ -2275,14 +2332,14 @@ fn eval_expr<'a>(
                 iterable,
             } => {
                 let items =
-                    eval_expr(iterable, vars.clone(), funcs.clone(), macros.clone()).await?;
+                    eval_expr(iterable, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 if let Value::List(list) = items {
                     let mut result = Vec::new();
                     for item in list {
                         let local_vars = Arc::new(RwLock::new(vars.read().await.clone()));
                         local_vars.write().await.insert(var.clone(), item);
                         result.push(
-                            eval_expr(expr, local_vars, funcs.clone(), macros.clone()).await?,
+                            eval_expr(expr, local_vars, funcs.clone(), macros.clone(), context.clone(), dry_run).await?,
                         );
                     }
                     Ok(Value::List(result))
@@ -2296,21 +2353,21 @@ fn eval_expr<'a>(
             Expr::Variant(name, Some(expr)) => Ok(Value::String(format!(
                 "{}({})",
                 name,
-                eval_expr(expr, vars.clone(), funcs.clone(), macros.clone()).await?
+                eval_expr(expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?
             ))),
             Expr::Variant(name, None) => Ok(Value::String(name.clone())),
             Expr::Env(key) => Ok(Value::String(std::env::var(key).unwrap_or_default())),
             Expr::RegexMatch { regex, haystack } => {
-                let hay = eval_expr(haystack, vars.clone(), funcs.clone(), macros.clone())
+                let hay = eval_expr(haystack, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run)
                     .await?
                     .to_string();
                 let re = Regex::new(regex).map_err(|e| e.to_string())?;
                 Ok(Value::String(re.is_match(&hay).to_string()))
             }
-            Expr::Await(expr) => eval_expr(expr, vars.clone(), funcs.clone(), macros.clone()).await, // Simplified async for now
+            Expr::Await(expr) => eval_expr(expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await, // Simplified async for now
             Expr::ComparisonOp { op, left, right } => {
-                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
-                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
+                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 let result = match (&l, &r) {
                     (Value::Number(lv), Value::Number(rv)) => match op.as_str() {
                         "==" => lv == rv,
@@ -2336,8 +2393,8 @@ fn eval_expr<'a>(
                 Ok(Value::Number(if result { 1 } else { 0 }))
             }
             Expr::BitwiseOp { op, left, right } => {
-                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone()).await?;
-                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
+                let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 if let (Value::Number(l), Value::Number(r)) = (l, r) {
                     let result = match op.as_str() {
                         "&" => l & r,
@@ -2358,7 +2415,7 @@ fn eval_expr<'a>(
 
                 for (arg_name, arg_expr) in args {
                     let value =
-                        eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone()).await?;
+                        eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                     arg_values.push(value.clone());
                     if let Some(name) = arg_name {
                         arg_map.insert(name.clone(), value);
@@ -2834,6 +2891,38 @@ fn eval_expr<'a>(
                         println!("{} Loading ELF: {}", "[ELF]".cyan(), path.yellow());
                         let elf = ElfContext::load(&path)?;
 
+                        let arch = match elf.elf.header.e_machine {
+                            goblin::elf::header::EM_X86_64 => "x64",
+                            goblin::elf::header::EM_386 => "x86",
+                            goblin::elf::header::EM_ARM => "arm",
+                            goblin::elf::header::EM_AARCH64 => "arm64",
+                            goblin::elf::header::EM_MIPS => "mips",
+                            _ => "unknown",
+                        };
+                        
+                        let bits = match elf.elf.header.e_machine {
+                            goblin::elf::header::EM_X86_64 | goblin::elf::header::EM_AARCH64 => 64,
+                            _ => 32,
+                        };
+                        
+                        let endian = if elf.elf.header.endianness().unwrap().is_little() {
+                            "little"
+                        } else {
+                            "big"
+                        };
+                        
+                        vars.write().await.insert("context_arch".to_string(), Value::String(arch.to_string()));
+                        vars.write().await.insert("context_bits".to_string(), Value::Number(bits));
+                        vars.write().await.insert("context_endian".to_string(), Value::String(endian.to_string()));
+                        
+                        println!(
+                            "{} Architecture: {} ({}bit, {} endian)",
+                            "[ELF]".cyan(),
+                            arch.green(),
+                            bits.to_string().green(),
+                            endian.green()
+                        );
+
                         println!(
                             "{} {} symbols, {} PLT entries, {} GOT entries",
                             "[ELF]".cyan(),
@@ -2846,24 +2935,24 @@ fn eval_expr<'a>(
                             "{} Security: NX={}, PIE={}, Canary={}, RELRO={}",
                             "[ELF]".cyan(),
                             if elf.nx {
-                                "[OK]".green()
+                                "enabled".green()
                             } else {
-                                "[ERROR]".red()
+                                "disabled".red()
                             },
                             if elf.pie {
-                                "[OK]".green()
+                                "enabled".green()
                             } else {
-                                "[ERROR]".red()
+                                "disabled".red()
                             },
                             if elf.canary {
-                                "[OK]".green()
+                                "enabled".green()
                             } else {
-                                "[ERROR]".red()
+                                "disabled".red()
                             },
                             if elf.relro {
-                                "[OK]".green()
+                                "enabled".green()
                             } else {
-                                "[ERROR]".red()
+                                "disabled".red()
                             }
                         );
 
@@ -3142,6 +3231,27 @@ fn eval_expr<'a>(
                             }
                         }
                         println!();
+                        Ok(Value::Null)
+                    }
+                    "copy" => {
+                        if arg_values.is_empty() {
+                            return Err("copy() requires data argument".to_string());
+                        }
+                        
+                        let data = match &arg_values[0] {
+                            Value::String(s) => s.clone(),
+                            Value::Bytes(b) => hex::encode(b),
+                            Value::Number(n) => n.to_string(),
+                            other => other.to_string(),
+                        };
+                        
+                        use arboard::Clipboard;
+                        let mut clipboard = Clipboard::new()
+                            .map_err(|e| format!("Failed to access clipboard: {}", e))?;
+                        clipboard.set_text(data.clone())
+                            .map_err(|e| format!("Failed to copy to clipboard: {}", e))?;
+                        
+                        println!("[CLIPBOARD] Copied {} bytes to clipboard", data.len());
                         Ok(Value::Null)
                     }
                     "split" => {
@@ -6352,6 +6462,8 @@ fn eval_expr<'a>(
                                 Arc::new(RwLock::new(crate::runtime_safety::RuntimeSafety::new(
                                     crate::runtime_safety::SafetyConfig::default(),
                                 ))),
+                                context.clone(),
+                                dry_run,
                             )
                             .await?;
                             Ok(result.unwrap_or(Value::Null))
@@ -6366,7 +6478,7 @@ fn eval_expr<'a>(
                     let mut arg_values = Vec::new();
                     for arg_expr in args {
                         arg_values.push(
-                            eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone())
+                            eval_expr(arg_expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run)
                                 .await?,
                         );
                     }
@@ -6376,9 +6488,9 @@ fn eval_expr<'a>(
                 }
             }
             Expr::Index { base, index } => {
-                let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 let index_val =
-                    eval_expr(index, vars.clone(), funcs.clone(), macros.clone()).await?;
+                    eval_expr(index, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 match (base_val, index_val) {
                 (Value::List(list), Value::Number(idx)) => {
                     let idx_usize = idx as usize;
@@ -6418,10 +6530,10 @@ fn eval_expr<'a>(
             }
             }
             Expr::Slice { base, start, end } => {
-                let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 let start_val =
-                    eval_expr(start, vars.clone(), funcs.clone(), macros.clone()).await?;
-                let end_val = eval_expr(end, vars.clone(), funcs.clone(), macros.clone()).await?;
+                    eval_expr(start, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
+                let end_val = eval_expr(end, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 match (base_val, start_val, end_val) {
                     (Value::List(list), Value::Number(s), Value::Number(e)) => {
                         let start = s as usize;
@@ -6439,7 +6551,7 @@ fn eval_expr<'a>(
                 }
             }
             Expr::Pack { size, value } => {
-                let val = eval_expr(value, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let val = eval_expr(value, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 if let Value::Number(n) = val {
                     let bytes = match size {
                         64 => n.to_le_bytes().to_vec(),
@@ -6454,7 +6566,7 @@ fn eval_expr<'a>(
                 }
             }
             Expr::Unpack { size, data } => {
-                let val = eval_expr(data, vars.clone(), funcs.clone(), macros.clone()).await?;
+                let val = eval_expr(data, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 if let Value::Bytes(bytes) = val {
                     let num = match size {
                         64 => {
@@ -6498,7 +6610,7 @@ fn eval_expr<'a>(
                 for (i, stage) in stages.iter().enumerate() {
                     if i == 0 {
                         current_value = Some(
-                            eval_expr(stage, vars.clone(), funcs.clone(), macros.clone()).await?,
+                            eval_expr(stage, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?,
                         );
                     } else {
                         match stage {
@@ -6560,6 +6672,8 @@ fn eval_expr<'a>(
                                         vars.clone(),
                                         funcs.clone(),
                                         macros.clone(),
+                                        context.clone(),
+                                        dry_run,
                                     )
                                     .await?,
                                 );

@@ -204,8 +204,9 @@ fn main() {
             }
 
             let dev_mode = args.contains(&"--dev".to_string());
+            let dry_run = args.contains(&"--dry-run".to_string());
 
-            if let Err(e) = run_script(&args[2], dev_mode) {
+            if let Err(e) = run_script(&args[2], dev_mode, dry_run) {
                 eprintln!("{} {}", "[ERROR]".red(), e);
                 std::process::exit(1);
             }
@@ -245,7 +246,7 @@ fn main() {
 }
 
 /// Handles running a .talon script file
-fn run_script(path: &str, dev_mode: bool) -> Result<(), String> {
+fn run_script(path: &str, dev_mode: bool, dry_run: bool) -> Result<(), String> {
     let script =
         fs::read_to_string(path).map_err(|e| format!("Failed to read script '{}': {}", path, e))?;
 
@@ -253,11 +254,20 @@ fn run_script(path: &str, dev_mode: bool) -> Result<(), String> {
         return Err("Script is empty".into());
     }
 
+    if dry_run {
+        println!("[DRY-RUN] Running in dry-run mode (no network I/O will be executed)");
+    }
+
     if dev_mode {
         fast_interpreter::run_fast(&script)?;
     } else {
         let commands = parser::parse_script(&script)?;
-        interpreter::interpret(&commands)?;
+        let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+        if dry_run {
+            rt.block_on(interpreter::interpret_with_options(&commands, true))?;
+        } else {
+            rt.block_on(interpreter::interpret(&commands))?;
+        }
     }
     
     Ok(())

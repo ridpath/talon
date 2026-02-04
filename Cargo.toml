@@ -85,6 +85,7 @@ dirs = "5.0"
 rustyline = "13.0"
 chrono = "0.4"
 lazy_static = "1.4"
+arboard = "3.4"
 
 # GAME HACKING & EXPLOITATION (Phase 12)
 sysinfo = "0.30"
