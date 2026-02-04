@@ -622,6 +622,55 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
             }
         }
 
+        [_, "cache", "stats"] => {
+            use crate::build_cache::BuildCache;
+            match BuildCache::new() {
+                Ok(cache) => match cache.get_cache_stats() {
+                    Ok(stats) => {
+                        println!("\n{}", "Build Cache Statistics:".bold().cyan());
+                        println!("  Total entries: {}", stats.total_entries);
+                        println!("  Total size: {:.2} MB", stats.total_size_mb());
+                        println!("  Cache location: {}", cache.cache_dir.display());
+                    }
+                    Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                },
+                Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+            }
+        }
+
+        [_, "cache", "clean"] => {
+            use crate::build_cache::BuildCache;
+            match BuildCache::new() {
+                Ok(cache) => {
+                    println!("{} Cleaning old cache entries...", "[CACHE]".blue());
+                    match cache.clean_old_entries(30) {
+                        Ok(cleaned) => {
+                            println!("{} Cleaned {} old entries", "[OK]".green(), cleaned);
+                        }
+                        Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                    }
+                }
+                Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+            }
+        }
+
+        [_, "cache", "clean", days] => {
+            use crate::build_cache::BuildCache;
+            let max_age: u64 = days.parse().unwrap_or(30);
+            match BuildCache::new() {
+                Ok(cache) => {
+                    println!("{} Cleaning entries older than {} days...", "[CACHE]".blue(), max_age);
+                    match cache.clean_old_entries(max_age) {
+                        Ok(cleaned) => {
+                            println!("{} Cleaned {} old entries", "[OK]".green(), cleaned);
+                        }
+                        Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                    }
+                }
+                Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+            }
+        }
+
         _ => {
             println!(
                 r#"
@@ -643,6 +692,11 @@ Usage:
   talon plugin <.talon|.so>  → Load plugin script
   talon vscode               → Write VSCode syntax JSON
   talon completion           → Emit shell autocompletion
+
+Cache Management:
+  talon cache stats          → Display cache statistics
+  talon cache clean          → Clean entries older than 30 days
+  talon cache clean <days>   → Clean entries older than specified days
 
 Flags:
   --static                   → Build statically linked binary

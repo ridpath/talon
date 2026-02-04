@@ -2,6 +2,7 @@ use crate::ast::{
     BlockchainCommand, Command, Control, CryptoCommand, Expr, Literal, OffensiveCommand, TryCatch,
     TypeHint, TypedVar,
 };
+use crate::build_cache::BuildCache;
 use std::collections::HashSet;
 use std::fmt::Write;
 
@@ -25,10 +26,30 @@ pub fn build_script(
     let cargo_toml = generate_cargo_toml(&crate_set)?;
     let rust_code = generate_main_rs(commands, &crate_set)?;
 
+    let cache = BuildCache::new()?;
+    let cache_key = BuildCache::compute_hash(&cargo_toml, &rust_code);
+
     let build_dir = "talon_build";
+    let binary_name = if cfg!(windows) { "talon_script.exe" } else { "talon_script" };
+    let output_binary = if static_build {
+        format!("{}/target/x86_64-unknown-linux-musl/release/{}", build_dir, binary_name)
+    } else {
+        format!("{}/target/release/{}", build_dir, binary_name)
+    };
+
+    if cache.check_cache(&cache_key) {
+        println!("[CACHE] Cache hit: {}", &cache_key[..16]);
+        std::fs::create_dir_all(std::path::Path::new(&output_binary).parent().unwrap())?;
+        cache.retrieve_cache(&cache_key, std::path::Path::new(&output_binary))?;
+        println!("[BUILD] Binary: {}", output_binary);
+        return Ok(());
+    }
+
+    println!("[CACHE] Cache miss: {}", &cache_key[..16]);
+    
     std::fs::create_dir_all(format!("{}/src", build_dir))?;
-    std::fs::write(format!("{}/Cargo.toml", build_dir), cargo_toml)?;
-    std::fs::write(format!("{}/src/main.rs", build_dir), rust_code)?;
+    std::fs::write(format!("{}/Cargo.toml", build_dir), &cargo_toml)?;
+    std::fs::write(format!("{}/src/main.rs", build_dir), &rust_code)?;
 
     let mut cargo_args = vec!["build", "--release"];
     if static_build {
@@ -41,7 +62,16 @@ pub fn build_script(
         .status()?;
 
     if status.success() {
-        println!("[BUILD] Binary: {}/target/release/talon_script", build_dir);
+        println!("[BUILD] Binary: {}", output_binary);
+        
+        cache.store_cache(
+            &cache_key,
+            std::path::Path::new(&output_binary),
+            &cargo_toml,
+            &rust_code,
+        )?;
+        println!("[CACHE] Stored in cache: {}", &cache_key[..16]);
+        
         Ok(())
     } else {
         Err("Cargo build failed".into())
@@ -191,9 +221,7 @@ fn generate_main_rs(
 
     writeln!(
         code,
-        "    let mut vars: HashMap<String, String> = HashMap::new```rust
-    new();
-"
+        "    let mut vars: HashMap<String, String> = HashMap::new();"
     )?;
     for cmd in commands {
         generate_command(&mut code, cmd, is_async)?;

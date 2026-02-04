@@ -1,4 +1,5 @@
 mod ast;
+mod build_cache;
 mod cli;
 mod codegen;
 mod dex_tools;
