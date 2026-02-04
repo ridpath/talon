@@ -391,18 +391,18 @@ Initial Analysis:
   file binary              # Check file type
   checksec binary          # Check protections
   strings binary | grep flag
-
+  
 Disassembly:
   objdump -d binary        # Quick disassembly
   ghidra binary            # Full analysis
-
+  
 Debugging:
   gdb binary
   > disas main
   > b *main
   > r < input.txt
   > x/20wx $rsp           # Examine stack
-
+  
 Common Vulnerabilities:
   • Buffer Overflow → Overwrite return address
   • Format String → %x %s %n
@@ -428,25 +428,25 @@ Enumeration:
   gobuster dir -u URL -w wordlist
   nikto -h URL
   curl -I URL              # Check headers
-
+  
 SQL Injection:
   ' OR '1'='1
   ' UNION SELECT NULL--
   sqlmap -u "URL?id=1" --dump
-
+  
 XSS:
   <script>alert(1)</script>
   <img src=x onerror=alert(1)>
-
+  
 Command Injection:
   ; id
   | whoami
   `cat /etc/passwd`
-
+  
 LFI/RFI:
   ../../../../etc/passwd
   php://filter/resource=index.php
-
+  
 Tools:
   • Burp Suite
   • SQLMap
@@ -466,18 +466,18 @@ Tools:
 Hash Identification:
   hashid hash
   hash-identifier
-
+  
 Common Ciphers:
   • Caesar/ROT13 → Shift cipher
   • XOR → Guess key length
   • Base64 → Decode iteratively
   • Substitution → Frequency analysis
-
+  
 RSA Attacks:
   • Small e → Cube root attack
   • Common modulus → GCD attack
   • Wiener's attack → Small d
-
+  
 Tools:
   hashcat -m MODE hash wordlist
   john --wordlist=list hash
@@ -498,21 +498,21 @@ File Analysis:
   binwalk file
   foremost file            # Carve files
   strings file | grep flag
-
+  
 Image Forensics:
   exiftool image.jpg
   steghide extract -sf image.jpg
   zsteg image.png
   stegsolve image.png
-
+  
 Memory Forensics:
   volatility -f dump.raw imageinfo
   volatility -f dump.raw pslist
-
+  
 Network Forensics:
   wireshark capture.pcap
   tshark -r capture.pcap
-
+  
 Disk Forensics:
   mount -o loop disk.img /mnt
   photorec disk.img

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::ast::{Command, Expr, Literal};
 use crate::rop_gadget_finder::{Architecture, GadgetCategory, ROPGadgetFinder};
 use crate::z3_solver::{Z3Constraint, Z3Solver, Z3Type};

@@ -1,4 +1,4 @@
-#![allow(clippy::upper_case_acronyms)]
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::net::SocketAddr;
@@ -167,7 +167,7 @@ impl ExploitSession {
         F: FnOnce(&mut SessionState) -> Result<(), String>,
     {
         let mut state = self.state.write().await;
-        updater(&mut state)
+        updater(&mut *state)
     }
 
     pub async fn set_libc_base(&self, address: u64) {

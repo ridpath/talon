@@ -294,8 +294,8 @@ impl AudioStego {
                 chunk_name, chunk_size
             );
 
-            if chunk_name == "fmt "
-                && pos + 8 + 16 <= data.len() {
+            if chunk_name == "fmt " {
+                if pos + 8 + 16 <= data.len() {
                     let audio_format = u16::from_le_bytes([data[pos + 8], data[pos + 9]]);
                     let channels = u16::from_le_bytes([data[pos + 10], data[pos + 11]]);
                     let sample_rate = u32::from_le_bytes([
@@ -309,6 +309,7 @@ impl AudioStego {
                     println!("[AUDIO-STEGO]   Channels: {}", channels);
                     println!("[AUDIO-STEGO]   Sample rate: {} Hz", sample_rate);
                 }
+            }
 
             pos += 8 + chunk_size;
             if chunk_size % 2 == 1 {

@@ -73,7 +73,7 @@ impl DisassemblerVisualizer {
 
         for insn in insns.iter() {
             let addr = insn.address();
-            let bytes_str = self.format_bytes(insn.bytes());
+            let bytes_str = self.format_bytes(&insn.bytes());
             let mnemonic = insn.mnemonic().unwrap_or("???");
             let op_str = insn.op_str().unwrap_or("");
 

@@ -38,7 +38,7 @@ let base_checkpoint = s.checkpoint("after_leak")
 
 # Branch 1: Try ROP approach
 print("Branch 1: ROP chain...")
-s.metadata.branch = "rop"
+s.metadata["branch"] = "rop"
 let rop_result = try_rop_exploit(s)
 
 # Go back to base and try branch 2
@@ -46,7 +46,7 @@ s.rewind(base_checkpoint)
 
 # Branch 2: Try ret2libc
 print("Branch 2: ret2libc...")
-s.metadata.branch = "ret2libc"
+s.metadata["branch"] = "ret2libc"
 let ret2libc_result = try_ret2libc_exploit(s)
 
 # Go back to base and try branch 3
@@ -54,12 +54,12 @@ s.rewind(base_checkpoint)
 
 # Branch 3: Try one-gadget
 print("Branch 3: one-gadget...")
-s.metadata.branch = "one_gadget"
+s.metadata["branch"] = "one_gadget"
 let gadget_result = try_one_gadget_exploit(s)
 
 # Choose best approach
 let best = max([rop_result, ret2libc_result, gadget_result], by: "success_rate")
-print("Best approach:", best.name)
+print("Best approach:", best["name"])
 
 # Example 3: Event Recording and Replay
 print("\nRecording exploit execution...")

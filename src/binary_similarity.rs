@@ -57,15 +57,9 @@ pub struct SimilarityResult {
 }
 
 pub struct SimilarityEngine {
-    _function_embeddings: HashMap<String, FunctionEmbedding>,
+    function_embeddings: HashMap<String, FunctionEmbedding>,
     known_vulnerable_patterns: HashMap<String, Vec<f32>>,
     vendor_signatures: HashMap<String, Vec<Vec<f32>>>,
-}
-
-impl Default for SimilarityEngine {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl SimilarityEngine {
@@ -75,7 +69,7 @@ impl SimilarityEngine {
         println!("╚═══════════════════════════════════════════════════════════════╝");
 
         let mut engine = SimilarityEngine {
-            _function_embeddings: HashMap::new(),
+            function_embeddings: HashMap::new(),
             known_vulnerable_patterns: HashMap::new(),
             vendor_signatures: HashMap::new(),
         };
@@ -136,7 +130,7 @@ impl SimilarityEngine {
     }
 
     fn init_vendor_signatures(&mut self) {
-        println!("[SIMILARITY]  Loading vendor code signatures...");
+        println!("[SIMILARITY] 🏢 Loading vendor code signatures...");
 
         self.vendor_signatures.insert(
             "glibc_2.31".to_string(),
@@ -561,8 +555,9 @@ impl SimilarityEngine {
 
         features[8] = if name.starts_with('_') { 0.6 } else { 0.4 };
 
-        for (i, item) in features.iter_mut().enumerate().take(16).skip(9) {
-            *item = ((name_hash.wrapping_mul(i as u64).wrapping_add(address)) % 100) as f32 / 100.0;
+        for i in 9..16 {
+            features[i] =
+                ((name_hash.wrapping_mul(i as u64).wrapping_add(address)) % 100) as f32 / 100.0;
         }
 
         features
@@ -585,7 +580,7 @@ impl SimilarityEngine {
 
         let cosine_sim = dot_product / (norm1.sqrt() * norm2.sqrt());
 
-        cosine_sim.clamp(0.0, 1.0) as f64
+        cosine_sim.max(0.0).min(1.0) as f64
     }
 
     fn calculate_confidence(
@@ -621,7 +616,7 @@ impl SimilarityEngine {
             return MatchType::ExactMatch;
         }
 
-        for signatures in self.vendor_signatures.values() {
+        for (_vendor, signatures) in &self.vendor_signatures {
             for sig in signatures {
                 let vendor_sim = self.compute_similarity(&func1.features, sig);
                 if vendor_sim >= 0.85 {

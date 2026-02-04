@@ -133,7 +133,8 @@ let payload = generate_format_string(offset, writes)
     }
 
     fn generate_heap_exploit(&self, _input: &str) -> String {
-        r#"# Auto-generated heap exploitation
+        format!(
+            r#"# Auto-generated heap exploitation
 heap_groom target: 0x603000
     spray size=0x100 count=100
     free indices=[50, 51, 52]
@@ -141,7 +142,8 @@ heap_groom target: 0x603000
 end
 
 let tcache_poison = craft_tcache_poison(target=0x601000)
-"#.to_string()
+"#
+        )
     }
 
     fn generate_symbolic_execution(&self, input: &str) -> String {

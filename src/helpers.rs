@@ -2,12 +2,6 @@ use std::collections::HashMap;
 
 pub struct ScriptHelper;
 
-impl Default for ScriptHelper {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ScriptHelper {
     pub fn new() -> Self {
         ScriptHelper
@@ -23,7 +17,7 @@ impl ScriptHelper {
 define function ret2libc(libc_base, cmd_string_addr)
     let pop_rdi = libc_base + 0x0002155f
     let system_addr = libc_base + 0x050d60
-
+    
     let payload = [pop_rdi, cmd_string_addr, system_addr]
     return payload
 end
@@ -113,7 +107,8 @@ end
 
     pub fn generate_quick_start(exploit_type: &str) -> String {
         match exploit_type {
-            "pwn" => r#"
+            "pwn" => format!(
+                r#"
 # Talon Quick Start: Binary Exploitation
 
 # 1. Information gathering
@@ -134,9 +129,10 @@ stack overflow with padding overflow_size and return to ret_addr
 # 5. Execute
 execute shellcode in memory
 "#
-            .to_string(),
+            ),
 
-            "web3" => r#"
+            "web3" => format!(
+                r#"
 # Talon Quick Start: Web3 Exploitation
 
 # 1. Contract analysis
@@ -154,9 +150,10 @@ simulate wallet drain from "0xVictim" token "0xToken" amount "1000"
 # 4. Execute
 call ethereum node "https://mainnet.infura.io/v3/KEY" with data "0x..."
 "#
-            .to_string(),
+            ),
 
-            "fuzzing" => r#"
+            "fuzzing" => format!(
+                r#"
 # Talon Quick Start: Fuzzing
 
 # 1. Basic file fuzzing
@@ -174,7 +171,7 @@ fuzzer.run("./target", 10000)
 fuzz png "image.png"
 fuzz elf "binary"
 "#
-            .to_string(),
+            ),
 
             "recon" => r##"
 # Talon Quick Start: Reconnaissance
@@ -340,7 +337,8 @@ pub struct DocGenerator;
 
 impl DocGenerator {
     pub fn generate_cheatsheet() -> String {
-        r#"
+        format!(
+            r#"
 ═══════════════════════════════════════════════════════════════
                     TALON DSL CHEAT SHEET
 ═══════════════════════════════════════════════════════════════
@@ -354,7 +352,7 @@ FUNCTIONS
   define function add(a, b)
       return a + b
   end
-
+  
   add(5, 10)                    # Call function
 
 CONTROL FLOW
@@ -363,7 +361,7 @@ CONTROL FLOW
   else
       # do something else
   end
-
+  
   for i in 0..10
       # loop body
   end
@@ -371,10 +369,10 @@ CONTROL FLOW
 EXPLOITATION BASICS
   # Buffer overflow
   stack overflow with padding 264 and return to 0xdeadbeef
-
+  
   # Format string
   format string exploit on "vuln" using offset 6
-
+  
   # Shellcode
   load shellcode from "payload.bin"
   execute shellcode in memory
@@ -387,7 +385,7 @@ BINARY ANALYSIS
   analyze pe file "malware.exe"
   disassemble "binary"
   scan strings in "file.exe"
-
+  
 WEB3 / BLOCKCHAIN
   parse abi json "contract.json"
   scan for reentrancy in "contract.sol"
@@ -403,14 +401,14 @@ ADVANCED FEATURES
       case 1: # handle 1
       case 2: # handle 2
   end
-
+  
   # Try-catch
   try
       # risky operation
   catch err
       # handle error
   end
-
+  
   # Async operations
   define async function fetch_data()
       await download_file()
@@ -421,7 +419,7 @@ TIP: Run 'talon list-templates' to see exploit templates!
 TIP: Use 'talon repl' for interactive testing!
 ═══════════════════════════════════════════════════════════════
 "#
-        .to_string()
+        )
     }
 
     pub fn generate_example(category: &str) -> String {
@@ -443,15 +441,15 @@ define function pwn_target()
     # 1. Recon
     analyze pe file "vulnerable.exe"
     scan strings in "vulnerable.exe"
-
+    
     # 2. Find offset
     find format offset for "vulnerable.exe"
-
+    
     # 3. Build payload
     let padding = 264
     let ret_addr = 0x080484ab
     stack overflow with padding padding and return to ret_addr
-
+    
     # 4. Execute
     execute shellcode in memory
 end

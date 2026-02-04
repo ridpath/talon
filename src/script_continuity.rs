@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use flate2::read::GzDecoder;
 use flate2::write::GzEncoder;
 use flate2::Compression;

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::binary_analyzer::{BinaryAnalysis, BinaryAnalyzer};
 use capstone::prelude::*;
 use goblin::Object;
@@ -160,7 +162,7 @@ impl VulnForecastEngine {
         let _obj =
             Object::parse(&binary_data).map_err(|e| format!("Failed to parse binary: {}", e))?;
 
-        for cve in self.cve_database.values() {
+        for (_cve_id, cve) in &self.cve_database {
             let mut confidence = 0.0;
 
             if cve.description.contains("SMB")

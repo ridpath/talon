@@ -28,7 +28,7 @@ pub fn process_escape_sequences(input: &str) -> String {
                     'u' => {
                         if chars.next() == Some('{') {
                             let mut unicode_hex = String::new();
-                            for ch in chars.by_ref() {
+                            while let Some(ch) = chars.next() {
                                 if ch == '}' {
                                     break;
                                 }
@@ -134,7 +134,7 @@ pub fn format_parse_error(input: &str, error: &str, line: usize, column: usize) 
         ));
     }
 
-    output.push('\n');
+    output.push_str("\n");
 
     if error.contains("expected") {
         output.push_str(&format!(

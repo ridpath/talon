@@ -114,7 +114,7 @@ pub fn handle_offensive_command(cmd: &OffensiveCommand) -> Result<(), String> {
                     for section in pe.section_headers() {
                         let name = std::str::from_utf8(&section.Name).unwrap_or("???");
                         println!(
-                            "   [*] {} (size: {})",
+                            "   ▶ {} (size: {})",
                             name.trim_matches(char::from(0)),
                             section.SizeOfRawData
                         );

@@ -5,12 +5,6 @@ pub struct FlagFinder {
     patterns: Vec<Regex>,
 }
 
-impl Default for FlagFinder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl FlagFinder {
     pub fn new() -> Self {
         let patterns = vec![
@@ -29,7 +23,6 @@ impl FlagFinder {
         FlagFinder { patterns }
     }
 
-    #[allow(dead_code)]
     pub fn with_custom_pattern(mut self, pattern: &str) -> Result<Self, String> {
         let regex = Regex::new(pattern).map_err(|e| format!("Invalid regex pattern: {}", e))?;
         self.patterns.push(regex);
@@ -52,13 +45,11 @@ impl FlagFinder {
         results
     }
 
-    #[allow(dead_code)]
     pub fn search_file(&self, filepath: &str) -> Result<Vec<String>, String> {
         let data = std::fs::read(filepath).map_err(|e| format!("Failed to read file: {}", e))?;
         Ok(self.search(&data))
     }
 
-    #[allow(dead_code)]
     pub fn search_recursive(&self, directory: &str) -> Result<Vec<FlagMatch>, String> {
         use walkdir::WalkDir;
 
@@ -83,7 +74,6 @@ impl FlagFinder {
 }
 
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct FlagMatch {
     pub flag: String,
     pub filepath: String,
@@ -102,14 +92,12 @@ impl FlagSubmitter {
         }
     }
 
-    #[allow(dead_code)]
     pub fn with_token(mut self, token: String) -> Self {
         self.headers
             .insert("Authorization".to_string(), format!("Bearer {}", token));
         self
     }
 
-    #[allow(dead_code)]
     pub fn with_header(mut self, key: String, value: String) -> Self {
         self.headers.insert(key, value);
         self
@@ -152,14 +140,13 @@ impl FlagSubmitter {
         }
     }
 
-    #[allow(dead_code)]
     pub fn submit_ctfd(&self, flag: &str, challenge_id: i64) -> Result<SubmitResponse, String> {
         let client = reqwest::blocking::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .build()
             .map_err(|e| format!("Failed to create HTTP client: {}", e))?;
 
-        let mut request = client.post(format!("{}/api/v1/challenges/attempt", self.url));
+        let mut request = client.post(&format!("{}/api/v1/challenges/attempt", self.url));
 
         for (key, value) in &self.headers {
             request = request.header(key, value);
@@ -197,18 +184,15 @@ pub fn flag_search(data: &[u8]) -> Vec<String> {
     FlagFinder::new().search(data)
 }
 
-#[allow(dead_code)]
 pub fn flag_search_custom(data: &[u8], pattern: &str) -> Result<Vec<String>, String> {
     let finder = FlagFinder::new().with_custom_pattern(pattern)?;
     Ok(finder.search(data))
 }
 
-#[allow(dead_code)]
 pub fn flag_search_file(filepath: &str) -> Result<Vec<String>, String> {
     FlagFinder::new().search_file(filepath)
 }
 
-#[allow(dead_code)]
 pub fn flag_search_dir(directory: &str) -> Result<Vec<FlagMatch>, String> {
     FlagFinder::new().search_recursive(directory)
 }
@@ -217,7 +201,6 @@ pub fn flag_submit(url: &str, flag: &str) -> Result<SubmitResponse, String> {
     FlagSubmitter::new(url.to_string()).submit(flag)
 }
 
-#[allow(dead_code)]
 pub fn flag_submit_with_token(
     url: &str,
     flag: &str,
@@ -228,7 +211,6 @@ pub fn flag_submit_with_token(
         .submit(flag)
 }
 
-#[allow(dead_code)]
 pub fn flag_submit_ctfd(
     url: &str,
     flag: &str,

@@ -48,17 +48,17 @@ const BASH_COMPLETION: &str = r#"#!/bin/bash
 
 _talon_completions() {
     local cur prev commands template_types
-
+    
     COMPREPLY=()
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
-
+    
     commands="run repl new build wasm analyze db config man completion ctf diff_fuzz taint_analysis auto_rop heap_exploit kernel_exploit scan_cve find_similar_to chain safety help version"
     template_types="buffer-overflow rop format-string heap kernel ret2libc use-after-free race-condition shellcode web-sqli smart-contract basic"
     db_commands="search list show type platform"
     config_commands="init show edit"
     ctf_commands="new_session add_challenge set_connection add_note set_status submit_flag save_session load_session show_stats list_challenges"
-
+    
     case "${prev}" in
         talon)
             COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
@@ -89,7 +89,7 @@ _talon_completions() {
             return 0
             ;;
     esac
-
+    
     COMPREPLY=( $(compgen -W "${commands}" -- ${cur}) )
     return 0
 }
@@ -101,7 +101,7 @@ const ZSH_COMPLETION: &str = r#"#compdef talon
 
 _talon() {
     local -a commands template_types db_cmds config_cmds
-
+    
     commands=(
         'run:Execute a Talon script'
         'repl:Start interactive REPL'
@@ -126,7 +126,7 @@ _talon() {
         'help:Show help information'
         'version:Display version'
     )
-
+    
     template_types=(
         'buffer-overflow:Stack buffer overflow'
         'rop:Return-Oriented Programming'
@@ -141,7 +141,7 @@ _talon() {
         'smart-contract:Smart contract audit'
         'basic:Basic script'
     )
-
+    
     db_cmds=(
         'search:Search exploits'
         'list:List all exploits'
@@ -149,13 +149,13 @@ _talon() {
         'type:Filter by type'
         'platform:Filter by platform'
     )
-
+    
     config_cmds=(
         'init:Create default config'
         'show:Display config'
         'edit:Edit config file'
     )
-
+    
     ctf_cmds=(
         'new_session:Create new CTF session'
         'add_challenge:Add challenge to session'
@@ -168,7 +168,7 @@ _talon() {
         'show_stats:Show session statistics'
         'list_challenges:List all challenges'
     )
-
+    
     case $words[2] in
         new)
             _describe 'template type' template_types
@@ -281,7 +281,7 @@ const POWERSHELL_COMPLETION: &str = r#"# PowerShell completion for talon
 
 Register-ArgumentCompleter -Native -CommandName talon -ScriptBlock {
     param($wordToComplete, $commandAst, $cursorPosition)
-
+    
     $commands = @{
         'run' = 'Execute a Talon script'
         'repl' = 'Start interactive REPL'
@@ -304,7 +304,7 @@ Register-ArgumentCompleter -Native -CommandName talon -ScriptBlock {
         'help' = 'Show help information'
         'version' = 'Display version'
     }
-
+    
     $templateTypes = @{
         'buffer-overflow' = 'Stack buffer overflow'
         'rop' = 'Return-Oriented Programming'
@@ -319,9 +319,9 @@ Register-ArgumentCompleter -Native -CommandName talon -ScriptBlock {
         'smart-contract' = 'Smart contract audit'
         'basic' = 'Basic script structure'
     }
-
+    
     $parts = $commandAst.ToString().Split(' ')
-
+    
     if ($parts.Length -eq 2) {
         $commands.Keys | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
             [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $commands[$_])

@@ -179,7 +179,7 @@ impl TarTools {
             .map_err(|e| format!("Failed to create output dir: {}", e))?;
 
         let output = Command::new("tar")
-            .args(["-xf", tar_path, "-C", output_dir])
+            .args(&["-xf", tar_path, "-C", output_dir])
             .output();
 
         match output {
@@ -224,7 +224,7 @@ impl TarTools {
         println!("[TAR] Listing contents of {}", tar_path);
 
         let output = Command::new("tar")
-            .args(["-tf", tar_path])
+            .args(&["-tf", tar_path])
             .output()
             .map_err(|e| format!("tar execution failed: {}", e))?;
 
@@ -307,7 +307,7 @@ impl RarTools {
         println!("[RAR] Extracting {} to {}", rar_path, output_dir);
 
         let output = Command::new("unrar")
-            .args(["x", rar_path, output_dir])
+            .args(&["x", rar_path, output_dir])
             .output();
 
         match output {
@@ -332,7 +332,7 @@ impl RarTools {
         println!("[RAR] Listing contents of {}", rar_path);
 
         let output = Command::new("unrar")
-            .args(["l", rar_path])
+            .args(&["l", rar_path])
             .output()
             .map_err(|e| format!("unrar execution failed: {}", e))?;
 
@@ -369,7 +369,7 @@ impl SevenZipTools {
         println!("[7Z] Extracting {} to {}", archive_path, output_dir);
 
         let output = Command::new("7z")
-            .args(["x", archive_path, &format!("-o{}", output_dir), "-y"])
+            .args(&["x", archive_path, &format!("-o{}", output_dir), "-y"])
             .output();
 
         match output {
@@ -416,7 +416,7 @@ impl SevenZipTools {
         println!("[7Z] Listing contents of {}", archive_path);
 
         let output = Command::new("7z")
-            .args(["l", archive_path])
+            .args(&["l", archive_path])
             .output()
             .map_err(|e| format!("7z execution failed: {}", e))?;
 

@@ -1,5 +1,3 @@
-#![allow(clippy::borrowed_box)]
-
 use crate::interpreter::Value;
 use std::collections::HashMap;
 use std::fs;
@@ -311,7 +309,7 @@ define function plugin_init() {
 
 define function custom_scan(target: string) {
     print("Scanning target: " + target)
-
+    
     return {
         "status": "success",
         "results": ["finding1", "finding2"]
@@ -321,7 +319,7 @@ define function custom_scan(target: string) {
 define function custom_exploit(target: string, payload: string) {
     print("Exploiting target: " + target)
     print("Using payload: " + payload)
-
+    
     return {
         "exploited": true,
         "shell": "interactive"

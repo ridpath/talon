@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::ast::Command;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -263,7 +265,7 @@ impl DefenseSimulator {
         }
 
         let success = !blocked;
-        log::info!("Attack simulation: {} suspicious syscalls, {} dangerous operations, blocked={}, detected={}",
+        log::info!("Attack simulation: {} suspicious syscalls, {} dangerous operations, blocked={}, detected={}", 
                   suspicious_syscalls, dangerous_operations, blocked, detected);
         (success, detected, blocked)
     }

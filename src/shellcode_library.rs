@@ -1,8 +1,6 @@
 // Shellcode library with common payloads for multiple architectures
 // No external assembler required - pure Rust implementation
 
-#![allow(clippy::upper_case_acronyms)]
-
 use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -27,12 +25,6 @@ pub enum Payload {
 
 pub struct ShellcodeLibrary {
     shellcodes: HashMap<(Architecture, Payload), Vec<u8>>,
-}
-
-impl Default for ShellcodeLibrary {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl ShellcodeLibrary {
@@ -538,7 +530,7 @@ mod tests {
 
         let sh = lib.get(Architecture::X64, Payload::ExecveShBin);
         assert!(sh.is_some());
-        assert!(!sh.unwrap().is_empty());
+        assert!(sh.unwrap().len() > 0);
 
         let exit = lib.get(Architecture::X64, Payload::Exit);
         assert!(exit.is_some());
@@ -553,7 +545,7 @@ mod tests {
 
         let result = lib.get_with_params(Architecture::X64, Payload::ShellReverseTcp, &params);
         assert!(result.is_ok());
-        assert!(!result.unwrap().is_empty());
+        assert!(result.unwrap().len() > 0);
     }
 
     #[test]
@@ -564,7 +556,7 @@ mod tests {
 
         let result = lib.get_with_params(Architecture::X64, Payload::ShellBindTcp, &params);
         assert!(result.is_ok());
-        assert!(!result.unwrap().is_empty());
+        assert!(result.unwrap().len() > 0);
     }
 
     #[test]

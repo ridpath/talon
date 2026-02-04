@@ -222,7 +222,7 @@ for payload in payloads
         username: payload,
         password: "anything"
     }
-
+    
     if response | contains "Welcome"
         print "SQLi successful with: " + payload
         break
@@ -333,7 +333,7 @@ print "Root shell obtained"
         for example in self.examples.values() {
             by_category
                 .entry(example.category.clone())
-                .or_default()
+                .or_insert_with(Vec::new)
                 .push(example);
         }
 
@@ -381,9 +381,7 @@ print "Root shell obtained"
             let cmds = crate::parser::parse_script(&example.code)
                 .map_err(|e| format!("Parse error: {}", e))?;
 
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            rt.block_on(crate::interpreter::interpret(&cmds))
-                .map_err(|e| format!("Execution error: {}", e))?;
+            crate::interpreter::interpret(&cmds).map_err(|e| format!("Execution error: {}", e))?;
 
             Ok(())
         } else {

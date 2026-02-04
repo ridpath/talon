@@ -103,7 +103,7 @@ impl Notebook {
             for (name, value) in &self.variables {
                 markdown.push_str(&format!("| {} | {} |\n", name, value));
             }
-            markdown.push('\n');
+            markdown.push_str("\n");
         }
 
         fs::write(filename, markdown)
@@ -144,9 +144,7 @@ impl NotebookManager {
 
         let cmds = crate::parser::parse_script(code).map_err(|e| format!("Parse error: {}", e))?;
 
-        let rt = tokio::runtime::Runtime::new().unwrap();
-        rt.block_on(crate::interpreter::interpret(&cmds))
-            .map_err(|e| format!("Execution error: {}", e))?;
+        crate::interpreter::interpret(&cmds).map_err(|e| format!("Execution error: {}", e))?;
 
         let result = "Executed successfully";
         notebook.add_result(result);

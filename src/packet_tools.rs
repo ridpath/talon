@@ -350,7 +350,7 @@ impl SYNScanner {
                 open_ports.push(port);
             }
 
-            if (port - start_port).is_multiple_of(100) {
+            if (port - start_port) % 100 == 0 {
                 println!(
                     "[SYN-SCAN] Progress: {} ports scanned...",
                     port - start_port + 1

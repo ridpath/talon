@@ -60,7 +60,7 @@ impl FormatStringPayload {
 
         for (idx, (_, value)) in self.writes.iter().enumerate() {
             for byte_idx in 0..8 {
-                let byte_value = (value >> (byte_idx * 8)) & 0xFF;
+                let byte_value = ((value >> (byte_idx * 8)) & 0xFF) as u64;
 
                 if byte_value < current_written {
                     return Err(format!(
@@ -105,7 +105,7 @@ impl FormatStringPayload {
 
         for (idx, (_, value)) in self.writes.iter().enumerate() {
             for byte_idx in 0..4 {
-                let byte_value = (value >> (byte_idx * 8)) & 0xFF;
+                let byte_value = ((value >> (byte_idx * 8)) & 0xFF) as u64;
 
                 if byte_value < current_written {
                     return Err(format!(
@@ -192,19 +192,17 @@ mod tests {
     #[test]
     fn test_format_string_payload_x64() {
         let mut payload = FormatStringPayload::new(6, Architecture::X64);
-        // Use a value with all 8 bytes ascending in little-endian
-        // 0x0807060504030201 = bytes: 01, 02, 03, 04, 05, 06, 07, 08
+        // Use ascending byte values to avoid format string byte ordering limitation
+        // 0x0807060504030201 = bytes [01, 02, 03, 04, 05, 06, 07, 08] (fully ascending for 64-bit)
         payload.add_write(0x601020, 0x0807060504030201);
 
         let result = payload.generate();
-        assert!(
-            result.is_ok(),
-            "Failed to generate payload: {:?}",
-            result.err()
-        );
+        if let Err(e) = &result {
+            panic!("Generation failed: {}", e);
+        }
 
         let data = result.unwrap();
-        assert!(!data.is_empty());
+        assert!(data.len() > 0);
     }
 
     #[test]

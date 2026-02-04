@@ -51,7 +51,9 @@ impl CodeFormatter {
             }
 
             if trimmed == "end" {
-                indent_level = indent_level.saturating_sub(1);
+                if indent_level > 0 {
+                    indent_level -= 1;
+                }
             }
         }
 

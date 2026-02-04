@@ -1,4 +1,4 @@
-#![allow(clippy::type_complexity)]
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::fs;
@@ -213,10 +213,12 @@ pub fn enable_hot_reload_for_directory(dir: &Path) -> Result<CodeReloader, Strin
 
     let entries = fs::read_dir(dir).map_err(|e| format!("Failed to read directory: {}", e))?;
 
-    for entry in entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) == Some("talon") {
-            reloader.enable_hot_reload(path)?;
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("talon") {
+                reloader.enable_hot_reload(path)?;
+            }
         }
     }
 

@@ -3,8 +3,6 @@
 // Best-in-class challenge tracking, flag submission, and parallel solving
 // ═══════════════════════════════════════════════════════════════════════════
 
-#![allow(clippy::upper_case_acronyms)]
-
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -248,13 +246,15 @@ impl CTFSession {
 
     pub fn is_valid_flag(flag: &str) -> bool {
         // Common CTF flag formats
-        let patterns = [r"flag\{",
+        let patterns = vec![
+            r"flag\{",
             r"FLAG\{",
             r"HTB\{",
             r"CTF\{",
             r"picoCTF\{",
             r"DUCTF\{",
-            r"THM\{"];
+            r"THM\{",
+        ];
 
         patterns.iter().any(|p| flag.contains(p)) || flag.len() >= 20 // Assume long strings are flags
     }

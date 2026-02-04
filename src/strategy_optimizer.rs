@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::ast::Command;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -195,7 +197,7 @@ impl StrategyOptimizer {
                     if recent_success_rate > 0.7 {
                         param.learning_rate *= 0.9;
                     } else if recent_success_rate < 0.3 {
-                        if !(0.3..=0.7).contains(&normalized_position) {
+                        if normalized_position > 0.7 || normalized_position < 0.3 {
                             param.current_value = (param.min_value + param.max_value) / 2;
                         }
                         param.learning_rate = param.learning_rate.max(0.05);

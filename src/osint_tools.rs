@@ -258,7 +258,7 @@ impl EXIFExtractor {
         if let (Some(lat), Some(lon)) = (lat, lon) {
             println!("[EXIF] GPS Coordinates: {}, {}", lat, lon);
             println!(
-                "[EXIF]  Google Maps: https://www.google.com/maps?q={},{}",
+                "[EXIF] 🌍 Google Maps: https://www.google.com/maps?q={},{}",
                 lat, lon
             );
             Ok(Some((lat, lon)))
@@ -515,8 +515,8 @@ impl PhoneOSINT {
 
         info.insert("Cleaned".to_string(), cleaned.clone());
 
-        if let Some(stripped) = cleaned.strip_prefix('+') {
-            let country_code = &stripped.chars().take(2).collect::<String>();
+        if cleaned.starts_with('+') {
+            let country_code = &cleaned[1..].chars().take(2).collect::<String>();
             info.insert("Country Code".to_string(), format!("+{}", country_code));
         }
 
@@ -581,7 +581,7 @@ impl OSINTReport {
         println!("╚════════════════════════════════════════════════════════╝\n");
         println!("Target: {}\n", target);
 
-        if target.contains('.') && target.parse::<std::net::IpAddr>().is_err() {
+        if target.contains('.') && !target.parse::<std::net::IpAddr>().is_ok() {
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             println!("WHOIS Information");
             println!("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");

@@ -17,17 +17,17 @@ impl OutputUtils {
 
     pub fn success(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[+]".green().bold(), message);
+            println!("{} {}", "[OK]".green().bold(), message);
         } else {
-            println!("[+] {}", message);
+            println!("[OK] {}", message);
         }
     }
 
     pub fn error(&self, message: &str) {
         if self.colors_enabled {
-            eprintln!("{} {}", "[-]".red().bold(), message);
+            eprintln!("{} {}", "[ERROR]".red().bold(), message);
         } else {
-            eprintln!("[-] {}", message);
+            eprintln!("[ERROR] {}", message);
         }
     }
 
@@ -41,25 +41,25 @@ impl OutputUtils {
 
     pub fn info(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[*]".blue().bold(), message);
+            println!("{} {}", "[i]".blue().bold(), message);
         } else {
-            println!("[*] {}", message);
+            println!("[i] {}", message);
         }
     }
 
     pub fn exploit(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[*]".red().bold(), message);
+            println!("{} {}", "[X]".red().bold(), message);
         } else {
-            println!("[*] {}", message);
+            println!("[X] {}", message);
         }
     }
 
     pub fn shell(&self, message: &str) {
         if self.colors_enabled {
-            println!("{} {}", "[*]".cyan().bold(), message);
+            println!("{} {}", "[$]".cyan().bold(), message);
         } else {
-            println!("[*] {}", message);
+            println!("[$] {}", message);
         }
     }
 

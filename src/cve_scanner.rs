@@ -68,12 +68,6 @@ pub struct CVEScanner {
     offline_mode: bool,
 }
 
-impl Default for CVEScanner {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CVEScanner {
     pub fn new() -> Self {
         println!("╔═══════════════════════════════════════════════════════════════╗");
@@ -93,7 +87,7 @@ impl CVEScanner {
     }
 
     fn init_local_database(&mut self) {
-        println!("[CVE]  Initializing local CVE database...");
+        println!("[CVE] 📚 Initializing local CVE database...");
 
         self.cve_db.insert(
             "CVE-2021-3156".to_string(),
@@ -292,7 +286,7 @@ impl CVEScanner {
         #[cfg(target_os = "windows")]
         {
             if let Ok(output) = Command::new("ping")
-                .args(["-n", "1", "-w", "1000", "exploit-db.com"])
+                .args(&["-n", "1", "-w", "1000", "exploit-db.com"])
                 .output()
             {
                 self.exploit_db_available = output.status.success();
@@ -325,9 +319,9 @@ impl CVEScanner {
         generate_poc: bool,
     ) -> Result<CVEScanResult, String> {
         println!("[SCAN] Scanning target: {}", target);
-        println!("[SCAN]  Checking {} CVEs...", cve_list.len());
+        println!("[SCAN] 📋 Checking {} CVEs...", cve_list.len());
 
-        if fs::metadata(target).is_err() {
+        if !fs::metadata(target).is_ok() {
             return Err(format!("Target not found: {}", target));
         }
 
@@ -355,7 +349,7 @@ impl CVEScanner {
                     }
 
                     for evidence in &status.evidence {
-                        println!("[SCAN]     * {}", evidence);
+                        println!("[SCAN]     📌 {}", evidence);
                     }
                 } else {
                     println!(
@@ -551,7 +545,7 @@ impl CVEScanner {
 
         #[cfg(target_os = "windows")]
         {
-            if let Ok(output) = Command::new("dumpbin").args(["/exports", target]).output() {
+            if let Ok(output) = Command::new("dumpbin").args(&["/exports", target]).output() {
                 let symbols_str = String::from_utf8_lossy(&output.stdout);
 
                 for func in vulnerable_functions {
@@ -605,10 +599,10 @@ def exploit():
     print("[*] {} PoC")
     print("[*] Target: {}")
     print("[*] Exploit Complexity: {:?}")
-
+    
     # TODO: Implement exploitation logic
     # Vulnerable functions: {}
-
+    
     print("[+] Exploit successful!")
 
 if __name__ == "__main__":
@@ -663,7 +657,8 @@ if __name__ == "__main__":
             .sum::<f64>()
             / vulnerable_count.max(1) as f64;
 
-        (base_score * exploit_multiplier * (confidence_avg / 100.0)).min(10.0)
+        let risk = (base_score * exploit_multiplier * (confidence_avg / 100.0)).min(10.0);
+        risk
     }
 
     fn generate_recommendations(&self, vulnerabilities: &[VulnerabilityStatus]) -> Vec<String> {

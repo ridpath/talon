@@ -34,12 +34,6 @@ pub struct SymbolicExecutor {
     pub target_address: Option<u64>,
 }
 
-impl Default for SymbolicExecutor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl SymbolicExecutor {
     pub fn new() -> Self {
         log::info!("Initializing symbolic execution engine");

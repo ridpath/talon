@@ -3,51 +3,17 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // Provides pwntools-style pack/unpack primitives for exploit development
 
-/// Pack a 64-bit value to little-endian bytes.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::pack64;
-///
-/// let packed = pack64(0xdeadbeef);
-/// assert_eq!(packed, vec![0xef, 0xbe, 0xad, 0xde, 0x00, 0x00, 0x00, 0x00]);
-///
-/// let addr = pack64(0x00007ffff7a0d000);
-/// assert_eq!(addr.len(), 8);
-/// ```
+/// Pack a 64-bit value to little-endian bytes
 pub fn pack64(value: u64) -> Vec<u8> {
     value.to_le_bytes().to_vec()
 }
 
-/// Pack a 64-bit value to big-endian bytes.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::pack64_be;
-///
-/// let packed = pack64_be(0xdeadbeef);
-/// assert_eq!(packed, vec![0x00, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef]);
-/// ```
+/// Pack a 64-bit value to big-endian bytes
 pub fn pack64_be(value: u64) -> Vec<u8> {
     value.to_be_bytes().to_vec()
 }
 
-/// Unpack little-endian bytes to 64-bit value.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::unpack64;
-///
-/// let bytes = vec![0xef, 0xbe, 0xad, 0xde, 0x00, 0x00, 0x00, 0x00];
-/// let value = unpack64(&bytes).unwrap();
-/// assert_eq!(value, 0xdeadbeef);
-///
-/// let short_bytes = vec![0x01, 0x02];
-/// assert!(unpack64(&short_bytes).is_err());
-/// ```
+/// Unpack little-endian bytes to 64-bit value
 pub fn unpack64(bytes: &[u8]) -> Result<u64, String> {
     if bytes.len() < 8 {
         return Err(format!("Need 8 bytes for u64, got {}", bytes.len()));
@@ -58,17 +24,7 @@ pub fn unpack64(bytes: &[u8]) -> Result<u64, String> {
     Ok(u64::from_le_bytes(arr))
 }
 
-/// Unpack big-endian bytes to 64-bit value.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::unpack64_be;
-///
-/// let bytes = vec![0x00, 0x00, 0x00, 0x00, 0xde, 0xad, 0xbe, 0xef];
-/// let value = unpack64_be(&bytes).unwrap();
-/// assert_eq!(value, 0xdeadbeef);
-/// ```
+/// Unpack big-endian bytes to 64-bit value
 pub fn unpack64_be(bytes: &[u8]) -> Result<u64, String> {
     if bytes.len() < 8 {
         return Err(format!("Need 8 bytes for u64, got {}", bytes.len()));
@@ -79,45 +35,17 @@ pub fn unpack64_be(bytes: &[u8]) -> Result<u64, String> {
     Ok(u64::from_be_bytes(arr))
 }
 
-/// Pack a 32-bit value to little-endian bytes.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::pack32;
-///
-/// let packed = pack32(0x12345678);
-/// assert_eq!(packed, vec![0x78, 0x56, 0x34, 0x12]);
-/// ```
+/// Pack a 32-bit value to little-endian bytes
 pub fn pack32(value: u32) -> Vec<u8> {
     value.to_le_bytes().to_vec()
 }
 
-/// Pack a 32-bit value to big-endian bytes.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::pack32_be;
-///
-/// let packed = pack32_be(0x12345678);
-/// assert_eq!(packed, vec![0x12, 0x34, 0x56, 0x78]);
-/// ```
+/// Pack a 32-bit value to big-endian bytes
 pub fn pack32_be(value: u32) -> Vec<u8> {
     value.to_be_bytes().to_vec()
 }
 
-/// Unpack little-endian bytes to 32-bit value.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::unpack32;
-///
-/// let bytes = vec![0x78, 0x56, 0x34, 0x12];
-/// let value = unpack32(&bytes).unwrap();
-/// assert_eq!(value, 0x12345678);
-/// ```
+/// Unpack little-endian bytes to 32-bit value
 pub fn unpack32(bytes: &[u8]) -> Result<u32, String> {
     if bytes.len() < 4 {
         return Err(format!("Need 4 bytes for u32, got {}", bytes.len()));
@@ -128,17 +56,7 @@ pub fn unpack32(bytes: &[u8]) -> Result<u32, String> {
     Ok(u32::from_le_bytes(arr))
 }
 
-/// Unpack big-endian bytes to 32-bit value.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::unpack32_be;
-///
-/// let bytes = vec![0x12, 0x34, 0x56, 0x78];
-/// let value = unpack32_be(&bytes).unwrap();
-/// assert_eq!(value, 0x12345678);
-/// ```
+/// Unpack big-endian bytes to 32-bit value
 pub fn unpack32_be(bytes: &[u8]) -> Result<u32, String> {
     if bytes.len() < 4 {
         return Err(format!("Need 4 bytes for u32, got {}", bytes.len()));
@@ -149,45 +67,17 @@ pub fn unpack32_be(bytes: &[u8]) -> Result<u32, String> {
     Ok(u32::from_be_bytes(arr))
 }
 
-/// Pack a 16-bit value to little-endian bytes.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::pack16;
-///
-/// let packed = pack16(0x1234);
-/// assert_eq!(packed, vec![0x34, 0x12]);
-/// ```
+/// Pack a 16-bit value to little-endian bytes
 pub fn pack16(value: u16) -> Vec<u8> {
     value.to_le_bytes().to_vec()
 }
 
-/// Pack a 16-bit value to big-endian bytes.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::pack16_be;
-///
-/// let packed = pack16_be(0x1234);
-/// assert_eq!(packed, vec![0x12, 0x34]);
-/// ```
+/// Pack a 16-bit value to big-endian bytes
 pub fn pack16_be(value: u16) -> Vec<u8> {
     value.to_be_bytes().to_vec()
 }
 
-/// Unpack little-endian bytes to 16-bit value.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::unpack16;
-///
-/// let bytes = vec![0x34, 0x12];
-/// let value = unpack16(&bytes).unwrap();
-/// assert_eq!(value, 0x1234);
-/// ```
+/// Unpack little-endian bytes to 16-bit value
 pub fn unpack16(bytes: &[u8]) -> Result<u16, String> {
     if bytes.len() < 2 {
         return Err(format!("Need 2 bytes for u16, got {}", bytes.len()));
@@ -198,17 +88,7 @@ pub fn unpack16(bytes: &[u8]) -> Result<u16, String> {
     Ok(u16::from_le_bytes(arr))
 }
 
-/// Unpack big-endian bytes to 16-bit value.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::unpack16_be;
-///
-/// let bytes = vec![0x12, 0x34];
-/// let value = unpack16_be(&bytes).unwrap();
-/// assert_eq!(value, 0x1234);
-/// ```
+/// Unpack big-endian bytes to 16-bit value
 pub fn unpack16_be(bytes: &[u8]) -> Result<u16, String> {
     if bytes.len() < 2 {
         return Err(format!("Need 2 bytes for u16, got {}", bytes.len()));
@@ -219,16 +99,7 @@ pub fn unpack16_be(bytes: &[u8]) -> Result<u16, String> {
     Ok(u16::from_be_bytes(arr))
 }
 
-/// Pack a single byte.
-///
-/// # Examples
-///
-/// ```
-/// use talon::packing_tools::pack8;
-///
-/// let packed = pack8(0x42);
-/// assert_eq!(packed, vec![0x42]);
-/// ```
+/// Pack a single byte
 pub fn pack8(value: u8) -> Vec<u8> {
     vec![value]
 }
@@ -239,30 +110,6 @@ pub fn unpack8(bytes: &[u8]) -> Result<u8, String> {
         return Err("Need 1 byte for u8".to_string());
     }
     Ok(bytes[0])
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// PWNTOOLS-STYLE ALIASES
-// ────────────────────────────────────────────────────────────────────────────
-
-/// Pwntools-style alias for pack64
-pub fn p64(value: u64) -> Vec<u8> {
-    pack64(value)
-}
-
-/// Pwntools-style alias for unpack64
-pub fn u64(bytes: &[u8]) -> Result<u64, String> {
-    unpack64(bytes)
-}
-
-/// Pwntools-style alias for pack32
-pub fn p32(value: u32) -> Vec<u8> {
-    pack32(value)
-}
-
-/// Pwntools-style alias for unpack32
-pub fn u32(bytes: &[u8]) -> Result<u32, String> {
-    unpack32(bytes)
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -339,127 +186,6 @@ pub fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, String> {
 /// Convert bytes to hex string
 pub fn bytes_to_hex(bytes: &[u8]) -> String {
     format!("0x{}", hex::encode(bytes))
-}
-
-/// Assemble code to bytes
-pub fn assemble(code: &str, arch: &str) -> Result<Vec<u8>, String> {
-    match arch {
-        "x64" | "x86_64" => {
-            let mut result = Vec::new();
-            for line in code.lines() {
-                let line = line.trim();
-                if line.is_empty() || line.starts_with('#') || line.starts_with(';') {
-                    continue;
-                }
-
-                let instr = line.split_whitespace().next().unwrap_or("");
-                match instr {
-                    "nop" => result.push(0x90),
-                    "ret" => result.push(0xc3),
-                    "syscall" => result.extend_from_slice(&[0x0f, 0x05]),
-                    "int3" => result.push(0xcc),
-                    "push" => {
-                        let operand = line.split_whitespace().nth(1).ok_or("Missing operand")?;
-                        match operand {
-                            "rax" => result.push(0x50),
-                            "rcx" => result.push(0x51),
-                            "rdx" => result.push(0x52),
-                            "rbx" => result.push(0x53),
-                            "rsp" => result.push(0x54),
-                            "rbp" => result.push(0x55),
-                            "rsi" => result.push(0x56),
-                            "rdi" => result.push(0x57),
-                            _ => {
-                                if let Ok(val) = operand.trim_start_matches("0x").parse::<u8>() {
-                                    result.extend_from_slice(&[0x6a, val]);
-                                } else {
-                                    return Err(format!("Unknown push operand: {}", operand));
-                                }
-                            }
-                        }
-                    }
-                    "pop" => {
-                        let operand = line.split_whitespace().nth(1).ok_or("Missing operand")?;
-                        match operand {
-                            "rax" => result.push(0x58),
-                            "rcx" => result.push(0x59),
-                            "rdx" => result.push(0x5a),
-                            "rbx" => result.push(0x5b),
-                            "rsp" => result.push(0x5c),
-                            "rbp" => result.push(0x5d),
-                            "rsi" => result.push(0x5e),
-                            "rdi" => result.push(0x5f),
-                            _ => return Err(format!("Unknown pop operand: {}", operand)),
-                        }
-                    }
-                    "xor" => {
-                        let parts: Vec<&str> = line.split_whitespace().collect();
-                        if parts.len() >= 3 {
-                            let dst = parts[1].trim_end_matches(',');
-                            let src = parts[2];
-                            if dst == "eax" && src == "eax" {
-                                result.extend_from_slice(&[0x31, 0xc0]);
-                            } else if dst == "ecx" && src == "ecx" {
-                                result.extend_from_slice(&[0x31, 0xc9]);
-                            } else if dst == "edx" && src == "edx" {
-                                result.extend_from_slice(&[0x31, 0xd2]);
-                            } else if dst == "rax" && src == "rax" {
-                                result.extend_from_slice(&[0x48, 0x31, 0xc0]);
-                            } else if dst == "rcx" && src == "rcx" {
-                                result.extend_from_slice(&[0x48, 0x31, 0xc9]);
-                            } else if dst == "rdx" && src == "rdx" {
-                                result.extend_from_slice(&[0x48, 0x31, 0xd2]);
-                            } else {
-                                return Err(format!("Unsupported xor: {} {}", dst, src));
-                            }
-                        }
-                    }
-                    _ => return Err(format!("Unsupported instruction: {}", instr)),
-                }
-            }
-            Ok(result)
-        }
-        _ => Err(format!("Unsupported architecture: {}", arch)),
-    }
-}
-
-/// Disassemble bytes to assembly
-pub fn disassemble(bytes: &[u8], arch: &str, addr: u64) -> Result<String, String> {
-    use capstone::prelude::*;
-
-    let cs = match arch {
-        "x64" | "x86_64" => Capstone::new()
-            .x86()
-            .mode(arch::x86::ArchMode::Mode64)
-            .syntax(arch::x86::ArchSyntax::Intel)
-            .detail(true)
-            .build()
-            .map_err(|e| format!("Capstone init error: {:?}", e))?,
-        "x86" | "i386" => Capstone::new()
-            .x86()
-            .mode(arch::x86::ArchMode::Mode32)
-            .syntax(arch::x86::ArchSyntax::Intel)
-            .detail(true)
-            .build()
-            .map_err(|e| format!("Capstone init error: {:?}", e))?,
-        _ => return Err(format!("Unsupported architecture: {}", arch)),
-    };
-
-    let insns = cs
-        .disasm_all(bytes, addr)
-        .map_err(|e| format!("Disassembly error: {:?}", e))?;
-
-    let mut result = String::new();
-    for insn in insns.iter() {
-        result.push_str(&format!(
-            "0x{:x}: {} {}\n",
-            insn.address(),
-            insn.mnemonic().unwrap_or(""),
-            insn.op_str().unwrap_or("")
-        ));
-    }
-
-    Ok(result)
 }
 
 #[cfg(test)]

@@ -1,5 +1,3 @@
-#![allow(clippy::upper_case_acronyms)]
-
 use crate::helpers::{DocGenerator, ErrorHelper, ScriptHelper};
 use crate::interpreter::interpret;
 use crate::parser::parse_script;
@@ -152,12 +150,6 @@ pub struct REPL {
     debug_mode: bool,
 }
 
-impl Default for REPL {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl REPL {
     pub fn new() -> Self {
         let mut repl = REPL {
@@ -173,7 +165,11 @@ impl REPL {
 
     fn get_history_file() -> Option<std::path::PathBuf> {
         use directories::BaseDirs;
-        BaseDirs::new().map(|base_dirs| base_dirs.home_dir().join(".talon_history"))
+        if let Some(base_dirs) = BaseDirs::new() {
+            Some(base_dirs.home_dir().join(".talon_history"))
+        } else {
+            None
+        }
     }
 
     fn load_history(&mut self) {
@@ -197,7 +193,7 @@ impl REPL {
     }
 
     fn auto_save_history(&self) {
-        if self.history.len().is_multiple_of(10) && !self.history.is_empty() {
+        if self.history.len() % 10 == 0 && !self.history.is_empty() {
             self.save_history();
         }
     }
@@ -480,18 +476,15 @@ impl REPL {
 
     fn execute(&mut self, code: &str) {
         match parse_script(code) {
-            Ok(commands) => {
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                match rt.block_on(interpret(&commands)) {
-                    Ok(_) => {
-                        println!("[OK] Success");
-                    }
-                    Err(e) => {
-                        let enhanced_error = ErrorHelper::suggest_fix(&e);
-                        println!("[ERROR] Execution Error:\n{}", enhanced_error);
-                    }
+            Ok(commands) => match interpret(&commands) {
+                Ok(_) => {
+                    println!("[OK] Success");
                 }
-            }
+                Err(e) => {
+                    let enhanced_error = ErrorHelper::suggest_fix(&e);
+                    println!("[ERROR] Execution Error:\n{}", enhanced_error);
+                }
+            },
             Err(e) => {
                 let enhanced_error = ErrorHelper::suggest_fix(&e);
                 println!("[ERROR] Parse Error:\n{}", enhanced_error);

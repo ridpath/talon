@@ -130,7 +130,7 @@ catch err
 end
 
 # ═══════════════════════════════════════════════════════════════
-#  CONGRATULATIONS!
+# 🎓 CONGRATULATIONS!
 # You've completed Tutorial 1: Basics
 # 
 # Next steps:

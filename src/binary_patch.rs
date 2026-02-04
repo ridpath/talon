@@ -166,7 +166,9 @@ impl BinaryPatcher {
                 data[i..i + new_bytes.len()].copy_from_slice(new_bytes);
 
                 if new_bytes.len() < old_bytes.len() {
-                    data[i + new_bytes.len()..i + old_bytes.len()].fill(0);
+                    for j in i + new_bytes.len()..i + old_bytes.len() {
+                        data[j] = 0;
+                    }
                 }
 
                 patches += 1;
@@ -238,7 +240,7 @@ impl HexEditor {
     pub fn search_hex(file_path: &str, hex_pattern: &str) -> Result<Vec<usize>, String> {
         let data = fs::read(file_path).map_err(|e| format!("Failed to read file: {}", e))?;
 
-        let pattern = hex::decode(hex_pattern.replace(" ", ""))
+        let pattern = hex::decode(&hex_pattern.replace(" ", ""))
             .map_err(|e| format!("Invalid hex pattern: {}", e))?;
 
         let mut offsets = Vec::new();

@@ -24,11 +24,11 @@ struct Backend {
 impl Backend {
     fn new() -> Self {
         let mut functions = HashMap::new();
-
+        
         let builtin_functions = vec![
-            ("process_attach", "process_attach(pid_or_name)",
-             "Attach to a running process by PID (number) or name (string)\n\n**Mini-Tutorial:**\nProcess attachment is the first step in exploit development. You can attach by:\n1. PID (numeric process ID)\n2. Process name (searches running processes)\n\n**Common Pitfalls:**\n- Requires admin/root privileges\n- Process name is case-sensitive\n- Some processes have anti-debug protections\n\n**Best Practice:** Always check if process_attach succeeded by examining the returned map.",
-             vec!["pid_or_name: number|string"], "map",
+            ("process_attach", "process_attach(pid_or_name)", 
+             "Attach to a running process by PID (number) or name (string)\n\n**Mini-Tutorial:**\nProcess attachment is the first step in exploit development. You can attach by:\n1. PID (numeric process ID)\n2. Process name (searches running processes)\n\n**Common Pitfalls:**\n- Requires admin/root privileges\n- Process name is case-sensitive\n- Some processes have anti-debug protections\n\n**Best Practice:** Always check if process_attach succeeded by examining the returned map.", 
+             vec!["pid_or_name: number|string"], "map", 
              vec!["let proc = process_attach(1234)", "let proc = process_attach(\"game.exe\")", "if proc[\"attached\"] == \"true\"\n    print(\"Successfully attached!\")\nend"],
              "Process Control"),
             ("process_detach", "process_detach(pid)", "Detach from an attached process",
@@ -83,8 +83,8 @@ impl Backend {
              vec!["pid: number", "address: number", "asm_code: string"], "string",
              vec!["inject_asm(1234, 0x600000, \"nop; ret\")"],
              "Memory"),
-            ("cyclic", "cyclic(length)",
-             "Generate cyclic de Bruijn pattern for finding offsets\n\n**Mini-Tutorial:**\nCyclic patterns help find buffer overflow offsets:\n1. Generate pattern longer than buffer\n2. Send to vulnerable program\n3. Note crash address (e.g., 0x61616162)\n4. Use cyclic_find() to get exact offset\n\n**Why it works:** Every 4-byte sequence is unique, so the crash address tells you exactly where you control memory.\n\n**Common Pitfalls:**\n- Pattern must be longer than buffer\n- Big-endian systems reverse byte order\n- Some chars may be filtered (null bytes, newlines)",
+            ("cyclic", "cyclic(length)", 
+             "Generate cyclic de Bruijn pattern for finding offsets\n\n**Mini-Tutorial:**\nCyclic patterns help find buffer overflow offsets:\n1. Generate pattern longer than buffer\n2. Send to vulnerable program\n3. Note crash address (e.g., 0x61616162)\n4. Use cyclic_find() to get exact offset\n\n**Why it works:** Every 4-byte sequence is unique, so the crash address tells you exactly where you control memory.\n\n**Common Pitfalls:**\n- Pattern must be longer than buffer\n- Big-endian systems reverse byte order\n- Some chars may be filtered (null bytes, newlines)", 
              vec!["length: number"], "bytes",
              vec!["let pattern = cyclic(264)", "send(conn, pattern)  // Program crashes at 0x61616162", "let offset = cyclic_find(0x61616162)  // Returns 264"],
              "Exploitation"),
@@ -212,8 +212,8 @@ impl Backend {
              vec!["filename: string", "data: bytes|string"], "number",
              vec!["write(\"output.bin\", shellcode)"],
              "File I/O"),
-            ("unity_find_objects", "unity_find_objects(class_name)",
-             "Find Unity GameObjects by class name\n\n**Mini-Tutorial:**\nUnity stores all game objects in the Mono heap. This function:\n1. Scans the Mono runtime\n2. Finds all instances of the specified class\n3. Returns their memory addresses\n\n**Common Class Names:**\n- PlayerController, Player, Character\n- Enemy, EnemyController\n- GameManager, LevelManager\n- HealthComponent, WeaponController\n\n**Pro Tip:** Use unity_mono_dump() first to see all available classes.\n\n**Common Pitfalls:**\n- Class name must match exactly (case-sensitive)\n- IL2CPP games use different structure\n- Some objects may be temporarily inactive",
+            ("unity_find_objects", "unity_find_objects(class_name)", 
+             "Find Unity GameObjects by class name\n\n**Mini-Tutorial:**\nUnity stores all game objects in the Mono heap. This function:\n1. Scans the Mono runtime\n2. Finds all instances of the specified class\n3. Returns their memory addresses\n\n**Common Class Names:**\n- PlayerController, Player, Character\n- Enemy, EnemyController\n- GameManager, LevelManager\n- HealthComponent, WeaponController\n\n**Pro Tip:** Use unity_mono_dump() first to see all available classes.\n\n**Common Pitfalls:**\n- Class name must match exactly (case-sensitive)\n- IL2CPP games use different structure\n- Some objects may be temporarily inactive", 
              vec!["class_name: string"], "list",
              vec!["let players = unity_find_objects(\"PlayerController\")", "for p in players\n    print(\"Found at:\", hex(p[\"address\"]))\nend"],
              "Unity Engine"),
@@ -540,9 +540,9 @@ impl LanguageServer for Backend {
     async fn hover(&self, params: HoverParams) -> Result<Option<Hover>> {
         let uri = params.text_document_position_params.text_document.uri;
         let position = params.text_document_position_params.position;
-
+        
         debug!("Hover request at {}:{}:{}", uri, position.line, position.character);
-
+        
         Ok(Some(Hover {
             contents: HoverContents::Markup(MarkupContent {
                 kind: MarkupKind::Markdown,
@@ -563,7 +563,7 @@ impl LanguageServer for Backend {
 
     async fn signature_help(&self, params: SignatureHelpParams) -> Result<Option<SignatureHelp>> {
         debug!("Signature help request");
-
+        
         Ok(Some(SignatureHelp {
             signatures: vec![SignatureInformation {
                 label: "Example function signature".to_string(),
@@ -595,9 +595,9 @@ async fn main() {
 
     let stdin = tokio::io::stdin();
     let stdout = tokio::io::stdout();
-
+    
     let (service, socket) = LspService::build(|_client| Backend::new()).finish();
-
+    
     info!("TALON Language Server starting...");
     Server::new(stdin, stdout, socket).serve(service).await;
 }

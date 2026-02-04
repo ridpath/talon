@@ -3,8 +3,6 @@
 // Coverage-guided + Taint tracking + Crash deduplication + Energy scheduling
 // ═══════════════════════════════════════════════════════════════════════════
 
-#![allow(clippy::enum_variant_names)]
-
 use rand::prelude::SliceRandom;
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -130,12 +128,6 @@ pub struct TaintTracker {
     taint_map: HashMap<u64, TaintedByte>,
 }
 
-impl Default for TaintTracker {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl TaintTracker {
     pub fn new() -> Self {
         TaintTracker {
@@ -153,7 +145,10 @@ impl TaintTracker {
     }
 
     pub fn mark_tainted(&mut self, offset: usize, source: String) {
-        self.tainted_bytes.entry(offset).or_default().push(source);
+        self.tainted_bytes
+            .entry(offset)
+            .or_insert_with(Vec::new)
+            .push(source);
     }
 
     pub fn get_taint_info(&self, offset: usize) -> Vec<TaintInfo> {
@@ -221,53 +216,55 @@ impl TaintTracker {
         for (i, window) in output.windows(8).enumerate() {
             let value = u64::from_le_bytes(window.try_into().unwrap());
 
-            if self.is_stack_address(value)
-                && self.alert_patterns.contains(&LeakType::StackAddressLeak)
-            {
-                leaks.push(TaintLeak {
-                    leak_type: LeakType::StackAddressLeak,
-                    sink: sink.clone(),
-                    tainted_bytes: (i..i + 8).collect(),
-                    leaked_value: window.to_vec(),
-                    severity: LeakSeverity::Critical,
-                    exploitability: 95.0,
-                });
-                println!(
-                    "[TAINT] WARNING: STACK ADDRESS LEAK: 0x{:016x} at offset {}",
-                    value, i
-                );
+            if self.is_stack_address(value) {
+                if self.alert_patterns.contains(&LeakType::StackAddressLeak) {
+                    leaks.push(TaintLeak {
+                        leak_type: LeakType::StackAddressLeak,
+                        sink: sink.clone(),
+                        tainted_bytes: (i..i + 8).collect(),
+                        leaked_value: window.to_vec(),
+                        severity: LeakSeverity::Critical,
+                        exploitability: 95.0,
+                    });
+                    println!(
+                        "[TAINT] WARNING: STACK ADDRESS LEAK: 0x{:016x} at offset {}",
+                        value, i
+                    );
+                }
             }
 
-            if self.is_heap_address(value)
-                && self.alert_patterns.contains(&LeakType::HeapAddressLeak)
-            {
-                leaks.push(TaintLeak {
-                    leak_type: LeakType::HeapAddressLeak,
-                    sink: sink.clone(),
-                    tainted_bytes: (i..i + 8).collect(),
-                    leaked_value: window.to_vec(),
-                    severity: LeakSeverity::High,
-                    exploitability: 85.0,
-                });
-                println!(
-                    "[TAINT] WARNING: HEAP ADDRESS LEAK: 0x{:016x} at offset {}",
-                    value, i
-                );
+            if self.is_heap_address(value) {
+                if self.alert_patterns.contains(&LeakType::HeapAddressLeak) {
+                    leaks.push(TaintLeak {
+                        leak_type: LeakType::HeapAddressLeak,
+                        sink: sink.clone(),
+                        tainted_bytes: (i..i + 8).collect(),
+                        leaked_value: window.to_vec(),
+                        severity: LeakSeverity::High,
+                        exploitability: 85.0,
+                    });
+                    println!(
+                        "[TAINT] WARNING: HEAP ADDRESS LEAK: 0x{:016x} at offset {}",
+                        value, i
+                    );
+                }
             }
 
-            if self.is_canary(value) && self.alert_patterns.contains(&LeakType::CanaryLeak) {
-                leaks.push(TaintLeak {
-                    leak_type: LeakType::CanaryLeak,
-                    sink: sink.clone(),
-                    tainted_bytes: (i..i + 8).collect(),
-                    leaked_value: window.to_vec(),
-                    severity: LeakSeverity::Critical,
-                    exploitability: 100.0,
-                });
-                println!(
-                    "[TAINT] WARNING: STACK CANARY LEAK: 0x{:016x} at offset {}",
-                    value, i
-                );
+            if self.is_canary(value) {
+                if self.alert_patterns.contains(&LeakType::CanaryLeak) {
+                    leaks.push(TaintLeak {
+                        leak_type: LeakType::CanaryLeak,
+                        sink: sink.clone(),
+                        tainted_bytes: (i..i + 8).collect(),
+                        leaked_value: window.to_vec(),
+                        severity: LeakSeverity::Critical,
+                        exploitability: 100.0,
+                    });
+                    println!(
+                        "[TAINT] WARNING: STACK CANARY LEAK: 0x{:016x} at offset {}",
+                        value, i
+                    );
+                }
             }
 
             if self.is_pie_base(value) {
@@ -309,13 +306,14 @@ impl TaintTracker {
     }
 
     fn is_stack_address(&self, addr: u64) -> bool {
-        (addr & 0xffff000000000000) == 0x7fff000000000000
-            || (0x7ffffffde000..=0x7ffffffff000).contains(&addr)
+        (addr & 0xffff000000000000) == 0x7fff00000000000
+            || (addr >= 0x7ffffffde000 && addr <= 0x7ffffffff000)
     }
 
     fn is_heap_address(&self, addr: u64) -> bool {
         (addr & 0xffff000000000000) == 0x0000000000000000
-            && (0x0000555555554000..=0x0000555556000000).contains(&addr)
+            && addr >= 0x0000555555554000
+            && addr <= 0x0000555556000000
     }
 
     fn is_canary(&self, value: u64) -> bool {
@@ -323,12 +321,12 @@ impl TaintTracker {
     }
 
     fn is_pie_base(&self, addr: u64) -> bool {
-        (addr & 0xfff) == 0 && (0x555555554000..=0x555555556000).contains(&addr)
+        (addr & 0xfff) == 0 && addr >= 0x555555554000 && addr <= 0x555555556000
     }
 
     fn is_libc_address(&self, addr: u64) -> bool {
-        (addr & 0xffff000000000000) == 0x7f00000000000000
-            || (0x7ffff7a00000..=0x7ffff7e00000).contains(&addr)
+        (addr & 0xffff000000000000) == 0x7f0000000000
+            || (addr >= 0x7ffff7a00000 && addr <= 0x7ffff7e00000)
     }
 
     pub fn analyze_binary(&mut self, binary_path: &str) -> Result<TaintAnalysisResult, String> {
@@ -381,14 +379,14 @@ impl TaintTracker {
     }
 
     fn generate_test_inputs(&self) -> Vec<Vec<u8>> {
-        let mut inputs = vec![
-            b"AAAA".to_vec(),
-            b"A".repeat(100),
-            b"A".repeat(1000),
-            b"%p%p%p%p%p%p%p%p".to_vec(),
-            b"\x00".repeat(8),
-            vec![0x41; 256],
-        ];
+        let mut inputs = Vec::new();
+
+        inputs.push(b"AAAA".to_vec());
+        inputs.push(b"A".repeat(100));
+        inputs.push(b"A".repeat(1000));
+        inputs.push(b"%p%p%p%p%p%p%p%p".to_vec());
+        inputs.push(b"\x00".repeat(8));
+        inputs.push(vec![0x41; 256]);
 
         let mut pattern = Vec::new();
         for i in 0..256 {
@@ -440,13 +438,13 @@ impl TaintTracker {
         );
         let mut report = String::new();
 
-        report.push_str(
-            "═══════════════════════════════════════════════════════════════════════════\n",
-        );
-        report.push_str("TAINT ANALYSIS LEAK REPORT\n");
-        report.push_str(
-            "═══════════════════════════════════════════════════════════════════════════\n\n",
-        );
+        report.push_str(&format!(
+            "═══════════════════════════════════════════════════════════════════════════\n"
+        ));
+        report.push_str(&format!("TAINT ANALYSIS LEAK REPORT\n"));
+        report.push_str(&format!(
+            "═══════════════════════════════════════════════════════════════════════════\n\n"
+        ));
         report.push_str(&format!("Binary: {}\n", binary));
         report.push_str(&format!("Test ID: {}\n", test_id));
         report.push_str(&format!("Leaks Found: {}\n\n", leaks.len()));
@@ -485,12 +483,6 @@ pub struct CoverageMap {
     virgin_bits: [u8; 65536],
 }
 
-impl Default for CoverageMap {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl CoverageMap {
     pub fn new() -> Self {
         CoverageMap {
@@ -515,7 +507,7 @@ impl CoverageMap {
     pub fn get_coverage_hash(&self) -> u64 {
         let mut hasher = Sha256::new();
         for bit in &self.virgin_bits {
-            hasher.update([*bit]);
+            hasher.update(&[*bit]);
         }
         let result = hasher.finalize();
         u64::from_le_bytes(result[0..8].try_into().unwrap())
@@ -528,12 +520,6 @@ impl CoverageMap {
 
 pub struct EnergyScheduler {
     power_schedules: HashMap<usize, f64>,
-}
-
-impl Default for EnergyScheduler {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl EnergyScheduler {
@@ -585,12 +571,6 @@ impl EnergyScheduler {
 
 pub struct CorpusMinimizer {
     seen_coverage: HashSet<u64>,
-}
-
-impl Default for CorpusMinimizer {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl CorpusMinimizer {
@@ -645,7 +625,7 @@ impl ProtocolFuzzer {
         let mut unique_crashes = 0;
 
         if self.corpus.is_empty() {
-            log::info!(" Generating initial corpus from grammar...");
+            log::info!("📋 Generating initial corpus from grammar...");
             let initial_input = self.generate_from_grammar()?;
             self.corpus.push(TestCase {
                 data: initial_input,
@@ -693,7 +673,7 @@ impl ProtocolFuzzer {
                 });
 
                 log::debug!(
-                    " New coverage path found! Total edges: {}",
+                    "✨ New coverage path found! Total edges: {}",
                     self.coverage_map.total_edges()
                 );
             }
@@ -868,7 +848,8 @@ impl ProtocolFuzzer {
             let exploitability_score = self.compute_exploitability(test_case);
 
             let taint_info = (0..test_case.len().min(10))
-                .flat_map(|i| self.taint_tracker.get_taint_info(i))
+                .map(|i| self.taint_tracker.get_taint_info(i))
+                .flatten()
                 .collect();
 
             return Ok(Some(Crash {

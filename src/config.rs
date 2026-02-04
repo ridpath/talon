@@ -104,7 +104,11 @@ impl TalonConfig {
     }
 
     pub fn get_config_path() -> Option<PathBuf> {
-        ProjectDirs::from("", "", "talon").map(|proj_dirs| proj_dirs.config_dir().join("config.toml"))
+        if let Some(proj_dirs) = ProjectDirs::from("", "", "talon") {
+            Some(proj_dirs.config_dir().join("config.toml"))
+        } else {
+            None
+        }
     }
 
     pub fn print_config_location() {

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::ast::Command;
 use crate::interpreter::Value;
 use serde::{Deserialize, Serialize};
@@ -166,9 +168,11 @@ impl SpeculativeExecutor {
         {
             log::warn!("Fork-based speculation not available on this platform");
             for cmd in commands {
-                if let Command::Expr(crate::ast::Expr::Call { name, .. }) = cmd {
-                    if name.contains("crash") || name.contains("segfault") {
-                        return Ok(ExecutionOutcome::Crash);
+                if let Command::Expr(expr) = cmd {
+                    if let crate::ast::Expr::Call { name, .. } = expr {
+                        if name.contains("crash") || name.contains("segfault") {
+                            return Ok(ExecutionOutcome::Crash);
+                        }
                     }
                 }
             }

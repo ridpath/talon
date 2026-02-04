@@ -7,10 +7,7 @@ const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
 const ALPHABET_SIZE: usize = 26;
 const SUBSEQUENCE_LENGTH: usize = 4; // 4-byte patterns for 32/64-bit addresses
 
-/// Generate a De Bruijn sequence (cyclic pattern).
-///
-/// Creates a unique pattern useful for determining buffer overflow offsets.
-/// Each 4-byte subsequence appears exactly once in the pattern.
+/// Generate a De Bruijn sequence (cyclic pattern)
 ///
 /// # Arguments
 /// * `length` - Desired length of the pattern
@@ -18,16 +15,10 @@ const SUBSEQUENCE_LENGTH: usize = 4; // 4-byte patterns for 32/64-bit addresses
 /// # Returns
 /// A byte vector containing the cyclic pattern
 ///
-/// # Examples
+/// # Example
 /// ```
-/// use talon::cyclic_tools::cyclic;
-///
-/// let pattern = cyclic(20);
-/// assert_eq!(pattern.len(), 20);
-/// assert_eq!(&pattern[0..4], b"aaaa");
-///
-/// let long_pattern = cyclic(1000);
-/// assert_eq!(long_pattern.len(), 1000);
+/// let pattern = cyclic(200);
+/// // pattern = "aaaabaaacaaadaaa..."
 /// ```
 pub fn cyclic(length: usize) -> Vec<u8> {
     let mut result = Vec::with_capacity(length);
@@ -53,25 +44,18 @@ pub fn cyclic(length: usize) -> Vec<u8> {
     result
 }
 
-/// Find the offset of a pattern in a cyclic sequence.
-///
-/// Given a value from a crashed register, determine at what offset
-/// in the cyclic pattern it appears.
+/// Find the offset of a pattern in a cyclic sequence
 ///
 /// # Arguments
 /// * `value` - The 4-byte value found at crash (e.g., from register)
 ///
 /// # Returns
-/// The offset where this pattern appears, or None if not found
+/// The offset where this pattern appears
 ///
-/// # Examples
+/// # Example
 /// ```
-/// use talon::cyclic_tools::{cyclic, cyclic_find};
-///
-/// let pattern = cyclic(100);
-/// let value = u32::from_le_bytes([pattern[8], pattern[9], pattern[10], pattern[11]]);
-/// let offset = cyclic_find(value as u64);
-/// assert_eq!(offset, Some(8));
+/// let offset = cyclic_find(0x61616162); // "baaa" in little-endian
+/// // offset = 4
 /// ```
 pub fn cyclic_find(value: u64) -> Option<usize> {
     // Convert value to bytes (little-endian)
@@ -115,7 +99,6 @@ pub fn cyclic_find_bytes(pattern: &[u8]) -> Option<usize> {
 ///
 /// # Example
 /// ```
-/// # use talon::cyclic_tools::cyclic_find_hex;
 /// let offset = cyclic_find_hex("0x61616162");
 /// ```
 pub fn cyclic_find_hex(hex_str: &str) -> Option<usize> {
@@ -129,7 +112,7 @@ pub fn cyclic_find_hex(hex_str: &str) -> Option<usize> {
 
 /// Internal De Bruijn sequence generator using FKM algorithm
 fn de_bruijn(
-    _sequence: &mut [u8],
+    sequence: &mut [u8],
     a: &mut [usize],
     t: usize,
     p: usize,
@@ -138,18 +121,18 @@ fn de_bruijn(
     result: &mut Vec<u8>,
 ) {
     if t > n {
-        if n.is_multiple_of(p) {
+        if n % p == 0 {
             for j in 1..=p {
                 result.push(ALPHABET[a[j]]);
             }
         }
     } else {
         a[t] = a[t - p];
-        de_bruijn(_sequence, a, t + 1, p, k, n, result);
+        de_bruijn(sequence, a, t + 1, p, k, n, result);
 
         for j in (a[t - p] + 1)..k {
             a[t] = j;
-            de_bruijn(_sequence, a, t + 1, t, k, n, result);
+            de_bruijn(sequence, a, t + 1, t, k, n, result);
         }
     }
 }

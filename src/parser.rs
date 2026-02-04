@@ -6,7 +6,7 @@ use crate::ast::{
     SolidityAuditSpec, SymbolicSpec, TimeTravelAction, TimeTravelSpec, TranslationSpec, TryCatch,
     TypeHint, TypedVar, WasmAnalysisSpec,
 };
- // For decoding byte arrays
+use hex; // For decoding byte arrays
 use pest::iterators::Pair;
 use pest::Parser;
 use pest_derive::Parser;
@@ -60,7 +60,7 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
     match pair.as_rule() {
         Rule::include_stmt => {
             let path = pair.into_inner().next()
-                .ok_or_else(|| format!("[ERROR] Missing include path at line {}:{}\n\nUsage: include \"path/to/file.talon\"",
+                .ok_or_else(|| format!("[ERROR] Missing include path at line {}:{}\n\nUsage: include \"path/to/file.talon\"", 
                     span.start_pos().line_col().0, span.start_pos().line_col().1))?
                 .as_str().trim_matches('"').to_string();
             Ok(vec![Command::Include { path }])
@@ -1117,12 +1117,7 @@ fn parse_expr(pair: Pair<Rule>) -> Expr {
             let mut map = HashMap::new();
             for pair in pair.into_inner() {
                 let mut parts = pair.into_inner();
-                let key_pair = parts.next().unwrap();
-                let key = if key_pair.as_rule() == Rule::quoted_string {
-                    key_pair.as_str().trim_matches('"').to_string()
-                } else {
-                    key_pair.as_str().to_string()
-                };
+                let key = parts.next().unwrap().as_str().to_string();
                 let value = parse_expr(parts.next().unwrap());
                 map.insert(key, value);
             }
@@ -1269,7 +1264,7 @@ fn parse_pipe(pair: Pair<Rule>) -> Expr {
 fn parse_logical_or(pair: Pair<Rule>) -> Expr {
     let mut parts = pair.into_inner();
     let mut left = parse_logical_and(parts.next().unwrap());
-    for next in parts {
+    while let Some(next) = parts.next() {
         let right = parse_logical_and(next);
         left = Expr::BinaryOp {
             op: "or".to_string(),
@@ -1283,7 +1278,7 @@ fn parse_logical_or(pair: Pair<Rule>) -> Expr {
 fn parse_logical_and(pair: Pair<Rule>) -> Expr {
     let mut parts = pair.into_inner();
     let mut left = parse_comparison(parts.next().unwrap());
-    for next in parts {
+    while let Some(next) = parts.next() {
         let right = parse_comparison(next);
         left = Expr::BinaryOp {
             op: "and".to_string(),
@@ -1296,31 +1291,17 @@ fn parse_logical_and(pair: Pair<Rule>) -> Expr {
 
 fn parse_comparison(pair: Pair<Rule>) -> Expr {
     let mut parts = pair.into_inner();
-    let mut left = parse_bitwise(parts.next().unwrap());
+    let mut left = parse_term(parts.next().unwrap());
     while let Some(op_pair) = parts.next() {
         if op_pair.as_rule() == Rule::comp_op {
-            let right = parse_bitwise(parts.next().unwrap());
+            let right = parse_term(parts.next().unwrap());
             left = Expr::ComparisonOp {
                 op: op_pair.as_str().to_string(),
                 left: Box::new(left),
                 right: Box::new(right),
             };
-        }
-    }
-    left
-}
-
-fn parse_bitwise(pair: Pair<Rule>) -> Expr {
-    let mut parts = pair.into_inner();
-    let mut left = parse_term(parts.next().unwrap());
-    while let Some(op_pair) = parts.next() {
-        if op_pair.as_rule() == Rule::bitwise_op {
-            let right = parse_term(parts.next().unwrap());
-            left = Expr::BitwiseOp {
-                op: op_pair.as_str().to_string(),
-                left: Box::new(left),
-                right: Box::new(right),
-            };
+        } else {
+            left = parse_term(op_pair);
         }
     }
     left
@@ -1337,116 +1318,82 @@ fn parse_term(pair: Pair<Rule>) -> Expr {
                 left: Box::new(left),
                 right: Box::new(right),
             };
+        } else {
+            left = parse_factor(op_pair);
         }
     }
     left
 }
 
 fn parse_factor(pair: Pair<Rule>) -> Expr {
-    match pair.as_rule() {
-        Rule::factor => {
-            let mut parts = pair.into_inner();
-            let first = parts.next().unwrap();
-            let mut left = parse_unary(first);
-            while let Some(op_pair) = parts.next() {
-                if op_pair.as_rule() == Rule::mul_op {
-                    let right_pair = parts.next().unwrap();
-                    let right = parse_unary(right_pair);
-                    left = Expr::BinaryOp {
-                        op: op_pair.as_str().to_string(),
-                        left: Box::new(left),
-                        right: Box::new(right),
-                    };
-                }
-            }
-            left
+    let mut parts = pair.into_inner();
+    let mut left = parse_unary(parts.next().unwrap());
+    while let Some(op_pair) = parts.next() {
+        if op_pair.as_rule() == Rule::mul_op {
+            let right = parse_unary(parts.next().unwrap());
+            left = Expr::BinaryOp {
+                op: op_pair.as_str().to_string(),
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        } else {
+            left = parse_unary(op_pair);
         }
-        Rule::unary => parse_unary(pair),
-        _ => parse_unary(pair),
     }
+    left
 }
 
 fn parse_unary(pair: Pair<Rule>) -> Expr {
-    match pair.as_rule() {
-        Rule::unary => {
-            let mut parts = pair.into_inner();
-            let first = parts.next().unwrap();
+    let mut parts = pair.into_inner();
+    let mut base = parse_primary(parts.next().unwrap());
 
-            let (unary_op, primary_pair) = if first.as_rule() == Rule::unary_op {
-                (Some(first.as_str().to_string()), parts.next().unwrap())
+    for postfix in parts {
+        if postfix.as_rule() == Rule::postfix {
+            let mut post_parts = postfix.into_inner();
+            let first = post_parts.next().unwrap();
+
+            if first.as_rule() == Rule::ident {
+                let method = first.as_str().to_string();
+                base = Expr::MethodChain {
+                    base: Box::new(base),
+                    calls: vec![method],
+                };
+            } else if first.as_rule() == Rule::slice_range {
+                let mut range_parts = first.into_inner();
+                let start = Box::new(parse_expr(range_parts.next().unwrap()));
+                let end = Box::new(parse_expr(range_parts.next().unwrap()));
+                base = Expr::Slice {
+                    base: Box::new(base),
+                    start,
+                    end,
+                };
+            } else if first.as_rule() == Rule::expr {
+                base = Expr::Index {
+                    base: Box::new(base),
+                    index: Box::new(parse_expr(first)),
+                };
             } else {
-                (None, first)
-            };
-
-            let mut base = parse_primary(primary_pair);
-
-            for postfix in parts {
-                if postfix.as_rule() == Rule::postfix {
-                    let mut post_parts = postfix.into_inner();
-                    let first = post_parts.next().unwrap();
-
-                    if first.as_rule() == Rule::ident {
-                        let field = first.as_str().to_string();
-                        base = Expr::Index {
-                            base: Box::new(base),
-                            index: Box::new(Expr::Literal(Literal::String(field))),
-                        };
-                    } else if first.as_rule() == Rule::slice_range {
-                        let mut range_parts = first.into_inner();
-                        let start = Box::new(parse_expr(range_parts.next().unwrap()));
-                        let end = Box::new(parse_expr(range_parts.next().unwrap()));
-                        base = Expr::Slice {
-                            base: Box::new(base),
-                            start,
-                            end,
-                        };
-                    } else if first.as_rule() == Rule::expr {
-                        base = Expr::Index {
-                            base: Box::new(base),
-                            index: Box::new(parse_expr(first)),
-                        };
-                    } else {
-                        let args = post_parts
-                            .map(|p| {
-                                if p.as_rule() == Rule::named_arg {
-                                    let mut arg_parts = p.into_inner();
-                                    let key = arg_parts.next().unwrap().as_str().to_string();
-                                    let value = parse_expr(arg_parts.next().unwrap());
-                                    (Some(key), value)
-                                } else {
-                                    (None, parse_expr(p))
-                                }
-                            })
-                            .collect();
-
-                        if let Expr::Ident(name) = base {
-                            base = Expr::Call { name, args };
+                let args = post_parts
+                    .map(|p| {
+                        if p.as_rule() == Rule::named_arg {
+                            let mut arg_parts = p.into_inner();
+                            let key = arg_parts.next().unwrap().as_str().to_string();
+                            let value = parse_expr(arg_parts.next().unwrap());
+                            (Some(key), value)
+                        } else {
+                            (None, parse_expr(p))
                         }
-                    }
-                }
-            }
+                    })
+                    .collect();
 
-            if let Some(op) = unary_op {
-                match op.as_str() {
-                    "-" => Expr::BinaryOp {
-                        op: "-".to_string(),
-                        left: Box::new(Expr::Literal(Literal::Number(0))),
-                        right: Box::new(base),
-                    },
-                    "!" | "not" => Expr::BinaryOp {
-                        op: "==".to_string(),
-                        left: Box::new(base),
-                        right: Box::new(Expr::Literal(Literal::Boolean(false))),
-                    },
-                    _ => base,
+                if let Expr::Ident(name) = base {
+                    base = Expr::Call { name, args };
                 }
-            } else {
-                base
             }
         }
-        Rule::primary => parse_primary(pair),
-        _ => parse_expr(pair),
     }
+
+    base
 }
 
 fn parse_primary(pair: Pair<Rule>) -> Expr {

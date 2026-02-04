@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::process::Command;
@@ -147,7 +149,7 @@ impl Radare2Integration {
         let output = Command::new("r2")
             .arg("-q")
             .arg("-c")
-            .arg(format!("s {}; pdf", function_addr))
+            .arg(&format!("s {}; pdf", function_addr))
             .arg(binary_path)
             .output();
 

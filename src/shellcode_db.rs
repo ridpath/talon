@@ -35,7 +35,12 @@ pub struct ShellcodeDatabase {
 impl ShellcodeDatabase {
     /// Create a new shellcode database with pre-loaded shellcodes
     pub fn new() -> Self {
-        Self::default()
+        let mut db = ShellcodeDatabase {
+            shellcodes: HashMap::new(),
+        };
+
+        db.load_builtin_shellcodes();
+        db
     }
 
     /// Load all built-in shellcodes
@@ -328,17 +333,6 @@ impl ShellcodeDatabase {
     }
 }
 
-impl Default for ShellcodeDatabase {
-    fn default() -> Self {
-        let mut db = ShellcodeDatabase {
-            shellcodes: HashMap::new(),
-        };
-
-        db.load_builtin_shellcodes();
-        db
-    }
-}
-
 // ────────────────────────────────────────────────────────────────────────────
 // HELPER FUNCTIONS
 // ────────────────────────────────────────────────────────────────────────────
@@ -349,11 +343,9 @@ pub fn get_shellcode_db() -> ShellcodeDatabase {
 }
 
 /// Quick lookup for shellcode by name
-pub fn get_shellcode(name: &str) -> Result<ShellcodeEntry, String> {
+pub fn get_shellcode(name: &str) -> Option<Vec<u8>> {
     let db = get_shellcode_db();
-    db.get(name)
-        .cloned()
-        .ok_or_else(|| format!("Shellcode '{}' not found in database", name))
+    db.get(name).map(|entry| entry.bytes.clone())
 }
 
 /// List all available shellcodes
@@ -377,7 +369,7 @@ mod tests {
     #[test]
     fn test_shellcode_db_creation() {
         let db = ShellcodeDatabase::new();
-        assert!(!db.shellcodes.is_empty());
+        assert!(db.shellcodes.len() > 0);
     }
 
     #[test]
@@ -392,16 +384,13 @@ mod tests {
     fn test_list_by_arch() {
         let db = ShellcodeDatabase::new();
         let x64_scs = db.list_by_arch("x86-64");
-        assert!(!x64_scs.is_empty());
+        assert!(x64_scs.len() > 0);
     }
 
     #[test]
     fn test_shellcode_size() {
         let shellcode = get_shellcode("x64_execve_sh");
-        assert!(shellcode.is_ok());
-        let entry = shellcode.unwrap();
-        assert!(!entry.bytes.is_empty());
-        assert_eq!(entry.name, "x64_execve_sh");
-        assert_eq!(entry.arch, "x86-64");
+        assert!(shellcode.is_some());
+        assert!(shellcode.unwrap().len() > 0);
     }
 }

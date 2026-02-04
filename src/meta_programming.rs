@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::ast::Command;
 use crate::parser::parse_script;
 use serde::{Deserialize, Serialize};

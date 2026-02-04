@@ -1,5 +1,7 @@
 use crate::ast::BlockchainCommand;
 use ethabi::Contract;
+use hex;
+use reqwest;
 use serde_json::Value;
 use std::fs;
 use web3::transports::Http;

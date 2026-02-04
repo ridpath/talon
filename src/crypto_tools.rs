@@ -68,8 +68,10 @@ impl HashIdentifier {
 
         if hash.contains(":") {
             let parts: Vec<&str> = hash.split(':').collect();
-            if parts.len() == 2 && parts[0].len() == 32 && parts[1].len() == 32 {
-                possible_types.push("MD5(pass:salt)".to_string());
+            if parts.len() == 2 {
+                if parts[0].len() == 32 && parts[1].len() == 32 {
+                    possible_types.push("MD5(pass:salt)".to_string());
+                }
             }
         }
 
@@ -120,7 +122,7 @@ impl HashCracker {
         fs::write(hash_file, hash).map_err(|e| format!("Failed to write hash file: {}", e))?;
 
         let output = Command::new("hashcat")
-            .args([
+            .args(&[
                 "-m",
                 &mode.to_string(),
                 "-a",
@@ -154,7 +156,7 @@ impl HashCracker {
         println!("[JOHN] Wordlist: {}", wordlist);
 
         let output = Command::new("john")
-            .args(["--wordlist", wordlist, hash_file])
+            .args(&["--wordlist", wordlist, hash_file])
             .output()
             .map_err(|e| format!("John execution failed: {}. Is john installed?", e))?;
 
@@ -162,7 +164,7 @@ impl HashCracker {
         println!("[JOHN] Output:\n{}", result);
 
         let show_output = Command::new("john")
-            .args(["--show", hash_file])
+            .args(&["--show", hash_file])
             .output()
             .map_err(|e| format!("John show failed: {}", e))?;
 
@@ -233,7 +235,7 @@ impl WordlistGenerator {
         println!("[WORDLIST] Generating wordlist from {}", url);
 
         let output_result = Command::new("cewl")
-            .args(["-w", output, "-d", "2", "-m", "5", url])
+            .args(&["-w", output, "-d", "2", "-m", "5", url])
             .output()
             .map_err(|e| format!("CeWL execution failed: {}. Is cewl installed?", e))?;
 
@@ -473,12 +475,6 @@ impl HashGenerator {
 
 pub struct RainbowTable {
     table: HashMap<String, String>,
-}
-
-impl Default for RainbowTable {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl RainbowTable {

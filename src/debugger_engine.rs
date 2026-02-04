@@ -1,4 +1,4 @@
-#![allow(clippy::upper_case_acronyms)]
+#![allow(dead_code)]
 
 use std::collections::HashMap;
 use std::process::{Command, Stdio};

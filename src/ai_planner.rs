@@ -46,13 +46,13 @@ impl AIPlanner {
 
             if !paths.is_empty() {
                 let best_path = &paths[0];
-                let actions = self.path_to_actions(best_path).await?;
+                let actions = self.path_to_actions(&best_path).await?;
 
                 let strategy = Strategy {
                     name: format!("Strategy_{}", index + 1),
                     priority: (10 - index as i32).max(1),
                     probability: best_path.success_probability,
-                    prerequisites: self.extract_prerequisites(best_path).await,
+                    prerequisites: self.extract_prerequisites(&best_path).await,
                     actions,
                     fallback: None,
                     timeout: Some(best_path.estimated_time),

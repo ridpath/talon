@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::session_state::{ExploitSession, SessionState};
 use std::collections::VecDeque;
 use std::sync::Arc;

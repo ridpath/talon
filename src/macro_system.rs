@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 
 #[derive(Debug, Clone)]
@@ -90,10 +92,10 @@ if len(players) > 0
     let player = players[0]
     let health = unity_get_component(player["address"], "Health")
     mem_write(pid, health["address"] + 0x10, p32(99999))
-
+    
     let ammo = unity_get_component(player["address"], "Ammo")
     mem_write(pid, ammo["address"] + 0x14, p32(99999))
-
+    
     print("God mode activated!")
 end
 "#
@@ -258,11 +260,11 @@ pub fn parse_macro_definition(source: &str) -> Option<Macro> {
             }
 
             let mut template = String::new();
-            for line in lines.iter().skip(i + 1) {
-                if line.trim() == "end" || line.trim().starts_with("end ") {
+            for j in (i + 1)..lines.len() {
+                if lines[j].trim() == "end" || lines[j].trim().starts_with("end ") {
                     break;
                 }
-                template.push_str(line);
+                template.push_str(lines[j]);
                 template.push('\n');
             }
 

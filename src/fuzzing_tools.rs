@@ -36,7 +36,6 @@ pub fn mutate_input(seed: &[u8]) -> Vec<u8> {
 
 // ======== BASIC MUTATORS ========
 
-#[allow(clippy::ptr_arg)]
 fn flip_random_bit(buf: &mut Vec<u8>, rng: &mut impl Rng) {
     if buf.is_empty() {
         return;
@@ -69,7 +68,6 @@ fn duplicate_random_byte(buf: &mut Vec<u8>, rng: &mut impl Rng) {
     buf.insert(idx, val);
 }
 
-#[allow(clippy::ptr_arg)]
 fn shuffle_bytes(buf: &mut Vec<u8>, rng: &mut impl Rng) {
     buf.shuffle(rng);
 }
@@ -77,8 +75,7 @@ fn shuffle_bytes(buf: &mut Vec<u8>, rng: &mut impl Rng) {
 // ======== GRAMMAR-AWARE / TOKEN MUTATOR ========
 
 fn inject_talon_token(buf: &mut Vec<u8>, rng: &mut impl Rng) {
-    #[allow(clippy::useless_vec)]
-    let patterns = [
+    let patterns = vec![
         b"connect to \"127.0.0.1\" on port 9999".to_vec(),
         b"generate shellcode for linux with payload \"reverse shell\"".to_vec(),
         b"%s%s%s%s".to_vec(),
@@ -101,7 +98,6 @@ pub fn write_to_temp_file(input: &[u8]) -> PathBuf {
 }
 
 /// Run binary with mutated input and detect crash
-#[allow(clippy::ptr_arg)]
 pub fn run_target(binary: &str, input_path: &PathBuf, input_data: &[u8]) -> Result<String, String> {
     let start = Instant::now();
 
@@ -120,7 +116,7 @@ pub fn run_target(binary: &str, input_path: &PathBuf, input_data: &[u8]) -> Resu
     );
 
     if !output.status.success() {
-        println!("[CRASH]  Potential crash detected!");
+        println!("[CRASH] 🚨 Potential crash detected!");
         save_crash_input(input_data);
     }
 
@@ -319,7 +315,7 @@ impl AFLFuzzer {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  SNAPSHOT/RESTORE FUZZING
+// 📸 SNAPSHOT/RESTORE FUZZING
 // ════════════════════════════════════════════════════════════════════════════
 
 #[derive(Clone)]
@@ -464,7 +460,7 @@ impl SnapshotFuzzer {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  SYMBOLIC EXECUTION INTEGRATION
+// 🧮 SYMBOLIC EXECUTION INTEGRATION
 // ════════════════════════════════════════════════════════════════════════════
 
 pub struct AngrWrapper {
@@ -590,7 +586,7 @@ impl KLEEWrapper {
         );
 
         let _output = Command::new("klee")
-            .args([
+            .args(&[
                 "--max-time",
                 &format!("{}s", max_time),
                 "--output-dir=/tmp/klee-output",
@@ -603,12 +599,14 @@ impl KLEEWrapper {
         let output_dir = PathBuf::from("/tmp/klee-output");
 
         if output_dir.exists() {
-            for entry in (fs::read_dir(output_dir)
-                .map_err(|e| format!("Failed to read KLEE output: {}", e))?).flatten()
+            for entry in fs::read_dir(output_dir)
+                .map_err(|e| format!("Failed to read KLEE output: {}", e))?
             {
-                let path = entry.path();
-                if path.extension().and_then(|s| s.to_str()) == Some("ktest") {
-                    test_cases.push(path);
+                if let Ok(entry) = entry {
+                    let path = entry.path();
+                    if path.extension().and_then(|s| s.to_str()) == Some("ktest") {
+                        test_cases.push(path);
+                    }
                 }
             }
         }
@@ -619,7 +617,7 @@ impl KLEEWrapper {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-//  STRUCTURE-AWARE FUZZING (PROTOBUF, ASN.1)
+// 📋 STRUCTURE-AWARE FUZZING (PROTOBUF, ASN.1)
 // ════════════════════════════════════════════════════════════════════════════
 
 pub struct ProtobufFuzzer {
@@ -635,7 +633,8 @@ impl ProtobufFuzzer {
     }
 
     pub fn generate_valid_message(&self) -> Result<Vec<u8>, String> {
-        let script = r#"
+        let script = format!(
+            r#"
 import sys
 from google.protobuf import descriptor_pb2
 from google.protobuf import message_factory
@@ -660,7 +659,8 @@ msg.extend(bytes([5]))  # length
 msg.extend(b"hello")
 
 sys.stdout.buffer.write(msg)
-"#.to_string();
+"#
+        );
 
         let script_path = "/tmp/protobuf_gen.py";
         fs::write(script_path, script).map_err(|e| format!("Failed to write script: {}", e))?;
@@ -685,7 +685,7 @@ sys.stdout.buffer.write(msg)
 
         match mutation_type {
             0 => {
-                if !mutated.is_empty() {
+                if mutated.len() > 0 {
                     let idx = rng.gen_range(0..mutated.len());
                     mutated[idx] = rng.gen::<u8>();
                 }
@@ -765,7 +765,7 @@ impl ASN1Fuzzer {
 
         match mutation {
             0 => {
-                if !mutated.is_empty() {
+                if mutated.len() > 0 {
                     mutated[0] = rng.gen_range(0..0x20);
                 }
             }

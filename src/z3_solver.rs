@@ -126,7 +126,7 @@ impl Z3Solver {
         log::info!("Getting model");
 
         let mut model = HashMap::new();
-        for name in self.variables.keys() {
+        for (name, _var) in &self.variables {
             model.insert(name.clone(), 0x41414141);
         }
 

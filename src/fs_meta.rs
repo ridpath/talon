@@ -169,7 +169,7 @@ pub fn enumerate_ads(path: &str) -> Result<Vec<String>, String> {
         use std::process::Command;
 
         let output = Command::new("powershell")
-            .args(["-Command", &format!("Get-Item '{}' -Stream *", path)])
+            .args(&["-Command", &format!("Get-Item '{}' -Stream *", path)])
             .output()
             .map_err(|e| format!("Failed to enumerate ADS: {}", e))?;
 

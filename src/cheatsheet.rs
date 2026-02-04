@@ -539,7 +539,7 @@ HEAP STRUCTURE (glibc ptmalloc2)
 ───────────────────────────────────────────────────────────────────────────
 Chunk Header:
   [size | prev_size] [user data] [size | prev_size]
-
+  
 Bins:
   - tcache (per-thread, fast, 7 bins)
   - fastbins (LIFO, 10 bins, 0x20-0xb0)
@@ -905,7 +905,7 @@ RSA ATTACKS
 ───────────────────────────────────────────────────────────────────────────
 1. Small exponent (e=3)
    - Cube root attack if m^3 < N
-
+   
 2. Common modulus
    - Same N, different e values
    - Extended Euclidean algorithm

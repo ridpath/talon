@@ -156,7 +156,10 @@ impl SuggestionEngine {
                 constraints: suggestion.prerequisites.clone(),
             };
 
-            if let Ok(response) = ai_gen.generate_exploit(&request) { return Ok(response.exploit_code) }
+            match ai_gen.generate_exploit(&request) {
+                Ok(response) => return Ok(response.exploit_code),
+                Err(_) => {}
+            }
         }
 
         Ok(suggestion.talon_template.clone())

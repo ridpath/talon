@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::memory_tools;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

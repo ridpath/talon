@@ -46,7 +46,7 @@ impl Linter {
         let mut defined_vars = HashSet::new();
         let mut used_vars = HashSet::new();
 
-        for line in code.lines() {
+        for (_line_num, line) in code.lines().enumerate() {
             if line.trim().starts_with("let ") {
                 if let Some(var_name) = line.trim().strip_prefix("let ") {
                     if let Some(name) = var_name.split('=').next() {
@@ -197,7 +197,7 @@ impl Linter {
         for issue in &self.issues {
             let severity_icon = match issue.severity.as_str() {
                 "error" => "[ERROR]",
-                "warning" => "",
+                "warning" => "⚠",
                 "info" => "ℹ",
                 _ => "·",
             };

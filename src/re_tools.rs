@@ -430,7 +430,7 @@ impl PDBParser {
 
     pub fn parse_pdb_cli(&mut self, pdb_path: &str) -> Result<(), String> {
         let output = Command::new("llvm-pdbutil")
-            .args(["dump", "-symbols", pdb_path])
+            .args(&["dump", "-symbols", pdb_path])
             .output()
             .map_err(|e| format!("Failed to run llvm-pdbutil: {}", e))?;
 
@@ -686,7 +686,7 @@ import ghidra.program.model.address.AddressSet
 def decompile_at(addr):
     decompiler = DecompInterface()
     decompiler.openProgram(currentProgram)
-
+    
     func = getFunctionAt(toAddr(addr))
     if func:
         result = decompiler.decompileFunction(func, 30, None)
@@ -702,7 +702,7 @@ print(decompile_at(0x{:x}))
         fs::write(script_path, script).map_err(|e| format!("Failed to write script: {}", e))?;
 
         let output = Command::new("analyzeHeadless")
-            .args([
+            .args(&[
                 &self.project_path,
                 "TempProject",
                 "-import",
@@ -731,7 +731,7 @@ print(decompile_at(0x{:x}))
         );
 
         let output = Command::new("analyzeHeadless")
-            .args([
+            .args(&[
                 &self.project_path,
                 "Analysis",
                 "-import",

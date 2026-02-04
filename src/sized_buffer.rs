@@ -1,5 +1,3 @@
-#![allow(clippy::wrong_self_convention)]
-
 use std::fmt;
 use std::ops::{Add, Index};
 

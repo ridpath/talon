@@ -16,7 +16,7 @@ pub struct Observable<T: Clone + Send + Sync> {
 
 pub struct Subscriber<T> {
     id: SubscriberId,
-    callback: Arc<dyn Fn(&T) + Send + Sync>,
+    callback: Arc<dyn Fn(&T) -> () + Send + Sync>,
 }
 
 pub struct ObservableManager {
@@ -104,7 +104,7 @@ impl<T: Clone + Send + Sync + 'static> Observable<T> {
 
     pub async fn subscribe<F>(&self, callback: F) -> SubscriberId
     where
-        F: Fn(&T) + Send + Sync + 'static,
+        F: Fn(&T) -> () + Send + Sync + 'static,
     {
         let id = self.manager.allocate_subscriber_id().await;
         let subscriber = Subscriber {
@@ -404,8 +404,8 @@ mod tests {
         let received_clone = Arc::clone(&received);
 
         obs.subscribe(move |value| {
-            let value_copy = *value;
             let received = Arc::clone(&received_clone);
+            let value_copy = *value; // Copy the value before spawning
             tokio::spawn(async move {
                 let mut r = received.write().await;
                 r.push(value_copy);

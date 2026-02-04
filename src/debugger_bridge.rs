@@ -1,8 +1,6 @@
 // LIVE DEBUGGING BRIDGE
 // GDB/LLDB/WinDbg integration for unified debugging
 
-#![allow(clippy::upper_case_acronyms)]
-
 use std::collections::HashMap;
 use std::process::{Child, Command, Stdio};
 
@@ -307,7 +305,11 @@ impl TimeTravelDebugger {
 
         // Find nearest checkpoint before target
         let target_instr =
-            self.checkpoints[self.current_position].instruction_count.saturating_sub(instructions);
+            if instructions > self.checkpoints[self.current_position].instruction_count {
+                0
+            } else {
+                self.checkpoints[self.current_position].instruction_count - instructions
+            };
 
         for (idx, checkpoint) in self.checkpoints.iter().enumerate().rev() {
             if checkpoint.instruction_count <= target_instr {
@@ -418,7 +420,7 @@ impl TimeTravelDebugger {
         }
 
         println!(
-            "[TIME-TRAVEL]  Comparing checkpoints {} and {}",
+            "[TIME-TRAVEL] 🔀 Comparing checkpoints {} and {}",
             checkpoint_a, checkpoint_b
         );
 

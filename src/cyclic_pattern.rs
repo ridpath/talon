@@ -2,18 +2,12 @@
 // De Bruijn sequence implementation for precise offset calculation
 
 const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
-const _ALPHABET_SIZE: usize = 26;
+const ALPHABET_SIZE: usize = 26;
 const SUBSEQUENCE_LENGTH: usize = 4;
 
 pub struct CyclicPattern {
     alphabet: Vec<u8>,
     n: usize,
-}
-
-impl Default for CyclicPattern {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl CyclicPattern {
@@ -31,7 +25,6 @@ impl CyclicPattern {
 
         let mut a = vec![0; self.n * alphabet_len];
 
-        #[allow(clippy::too_many_arguments)]
         fn db(
             t: usize,
             p: usize,
@@ -48,7 +41,7 @@ impl CyclicPattern {
             }
 
             if t > n {
-                if n.is_multiple_of(p) {
+                if n % p == 0 {
                     for j in 1..=p {
                         if result.len() >= max_len {
                             return;
@@ -58,38 +51,40 @@ impl CyclicPattern {
                         }
                     }
                 }
-            } else if t < a.len() && (t - p) < a.len() {
-                a[t] = a[t - p];
-                db(
-                    t + 1,
-                    p,
-                    sequence,
-                    a,
-                    alphabet_len,
-                    n,
-                    result,
-                    alphabet,
-                    max_len,
-                );
+            } else {
+                if t < a.len() && (t - p) < a.len() {
+                    a[t] = a[t - p];
+                    db(
+                        t + 1,
+                        p,
+                        sequence,
+                        a,
+                        alphabet_len,
+                        n,
+                        result,
+                        alphabet,
+                        max_len,
+                    );
 
-                for j in (a[t - p] + 1)..alphabet_len {
-                    if result.len() >= max_len {
-                        return;
-                    }
-                    if t < a.len() && t < sequence.len() {
-                        a[t] = j;
-                        sequence[t] = j;
-                        db(
-                            t + 1,
-                            t,
-                            sequence,
-                            a,
-                            alphabet_len,
-                            n,
-                            result,
-                            alphabet,
-                            max_len,
-                        );
+                    for j in (a[t - p] + 1)..alphabet_len {
+                        if result.len() >= max_len {
+                            return;
+                        }
+                        if t < a.len() && t < sequence.len() {
+                            a[t] = j;
+                            sequence[t] = j;
+                            db(
+                                t + 1,
+                                t,
+                                sequence,
+                                a,
+                                alphabet_len,
+                                n,
+                                result,
+                                alphabet,
+                                max_len,
+                            );
+                        }
                     }
                 }
             }
@@ -200,8 +195,8 @@ pub fn cyclic_find(pattern_bytes: &[u8], search_value: &str) -> Option<usize> {
 
     let generator = CyclicPattern::new();
 
-    if let Some(hex_str) = search_value.strip_prefix("0x") {
-        if let Ok(value) = u64::from_str_radix(hex_str, 16) {
+    if search_value.starts_with("0x") {
+        if let Ok(value) = u64::from_str_radix(&search_value[2..], 16) {
             let result = generator.find_offset_from_u64(pattern_bytes, value);
             if result.is_none() {
                 eprintln!(

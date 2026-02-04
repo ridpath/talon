@@ -4,7 +4,7 @@
 # This template shows you how to write a basic exploit in TALON
 # Follow the numbered steps and replace the values with your target info
 
-print(" TALON CTF Exploit Template")
+print("🎯 TALON CTF Exploit Template")
 print("════════════════════════════════════════")
 
 # ┌─────────────────────────────────────────────────────────────────────────┐
@@ -23,18 +23,18 @@ print("Binary:", binary_name)
 # Generate a pattern to find where the crash happens
 # NOTE: Pattern generation works best with smaller sizes
 let pattern_size = 100
-print("\n Pattern size:", pattern_size, "(use cyclic() with this)")
+print("\n📏 Pattern size:", pattern_size, "(use cyclic() with this)")
 
 # TODO: Send pattern to target, check crash
 # When you find the crash value, use cyclic_find() to get offset
 let crash_offset = 72
-print(" Crash offset found:", crash_offset)
+print("✅ Crash offset found:", crash_offset)
 
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ STEP 3: Build your payload                                              │
 # └─────────────────────────────────────────────────────────────────────────┘
 # Create padding to reach the return address
-print("\n Building payload...")
+print("\n🔧 Building payload...")
 
 # Set your return address (replace with actual address)
 let ret_address = 0x08048abc
@@ -53,18 +53,18 @@ let system_addr = 0x401120
 
 let rop_chain = [pop_rdi, bin_sh, system_addr]
 
-print("\n️  ROP chain created with 3 gadgets")
+print("\n⚙️  ROP chain created with 3 gadgets")
 
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ STEP 5: Choose your payload                                             │
 # └─────────────────────────────────────────────────────────────────────────┘
 # Choose your attack method
-print("\n Payload strategy: ROP chain exploitation")
+print("\n📦 Payload strategy: ROP chain exploitation")
 
 # ┌─────────────────────────────────────────────────────────────────────────┐
 # │ STEP 6: Test locally first!                                             │
 # └─────────────────────────────────────────────────────────────────────────┘
-print("\n TIP: Always test locally first!")
+print("\n💡 TIP: Always test locally first!")
 print("   1. Run binary in debugger")
 print("   2. Verify crash at correct offset")
 print("   3. Check RIP/EIP control")
@@ -77,5 +77,5 @@ print("   4. Then send to remote target")
 # send final_payload
 # interactive
 
-print("\n Template complete! Replace TODOs with your values.")
+print("\n✨ Template complete! Replace TODOs with your values.")
 print("════════════════════════════════════════")

@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use crate::ast::Command;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -43,7 +45,7 @@ impl ProbabilisticExecutor {
         }
 
         let result = match timeout(duration, async {
-            for handle in handles.into_iter() {
+            for (_idx, handle) in handles.into_iter().enumerate() {
                 if let Ok((strategy_idx, _strategy)) = handle.await {
                     return Ok((strategy_idx, "Strategy succeeded".to_string()));
                 }

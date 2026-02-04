@@ -221,7 +221,11 @@ pub fn detect_sleep_acceleration() -> bool {
     std::thread::sleep(sleep_duration);
     let elapsed = start.elapsed();
 
-    let diff = elapsed.abs_diff(sleep_duration);
+    let diff = if elapsed > sleep_duration {
+        elapsed - sleep_duration
+    } else {
+        sleep_duration - elapsed
+    };
 
     if diff > Duration::from_millis(500) {
         println!(

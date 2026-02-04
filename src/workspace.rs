@@ -136,10 +136,12 @@ impl WorkspaceManager {
                     .map_err(|e| format!("Failed to read challenge directory: {}", e))?;
 
                 let mut files = Vec::new();
-                for entry in entries.flatten() {
-                    if let Some(filename) = entry.file_name().to_str() {
-                        if !filename.starts_with('.') {
-                            files.push(filename.to_string());
+                for entry in entries {
+                    if let Ok(entry) = entry {
+                        if let Some(filename) = entry.file_name().to_str() {
+                            if !filename.starts_with('.') {
+                                files.push(filename.to_string());
+                            }
                         }
                     }
                 }
@@ -263,18 +265,20 @@ impl WorkspaceManager {
                 .map_err(|e| format!("Failed to read workspaces directory: {}", e))?;
 
             println!("\nAvailable workspaces:");
-            for entry in entries.flatten() {
-                if entry.path().is_dir() {
-                    if let Some(name) = entry.file_name().to_str() {
-                        if let Ok(workspace) = Self::load_workspace(name) {
-                            let solved = workspace
-                                .challenges
-                                .values()
-                                .filter(|c| c.status == "solved")
-                                .count();
-                            let total = workspace.challenges.len();
+            for entry in entries {
+                if let Ok(entry) = entry {
+                    if entry.path().is_dir() {
+                        if let Some(name) = entry.file_name().to_str() {
+                            if let Ok(workspace) = Self::load_workspace(name) {
+                                let solved = workspace
+                                    .challenges
+                                    .values()
+                                    .filter(|c| c.status == "solved")
+                                    .count();
+                                let total = workspace.challenges.len();
 
-                            println!("  {} - {}/{} solved", name, solved, total);
+                                println!("  {} - {}/{} solved", name, solved, total);
+                            }
                         }
                     }
                 }

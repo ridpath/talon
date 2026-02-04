@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::fs;
 
@@ -79,7 +81,7 @@ impl ReportGenerator {
         for (name, addr) in &report.target_info.interesting_addresses {
             md.push_str(&format!("- **{}**: `0x{:x}`\n", name, addr));
         }
-        md.push('\n');
+        md.push_str("\n");
 
         md.push_str("## Vulnerability Details\n\n");
         md.push_str(&format!("- **Type**: {}\n", report.vulnerability.vuln_type));
@@ -122,21 +124,21 @@ impl ReportGenerator {
             for ioc in &report.iocs {
                 md.push_str(&format!("- {}\n", ioc));
             }
-            md.push('\n');
+            md.push_str("\n");
         }
 
         md.push_str("## Recommended Mitigations\n\n");
         for (idx, mitigation) in report.mitigation.iter().enumerate() {
             md.push_str(&format!("{}. {}\n", idx + 1, mitigation));
         }
-        md.push('\n');
+        md.push_str("\n");
 
         if !report.references.is_empty() {
             md.push_str("## References\n\n");
             for reference in &report.references {
                 md.push_str(&format!("- {}\n", reference));
             }
-            md.push('\n');
+            md.push_str("\n");
         }
 
         md.push_str("---\n");

@@ -4,7 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 
 const LIBC_RIP_API: &str = "https://libc.rip/api";
-const _LIBC_BLUKAT_API: &str = "https://libc.blukat.me/d";
+const LIBC_BLUKAT_API: &str = "https://libc.blukat.me/d";
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LibcMatch {

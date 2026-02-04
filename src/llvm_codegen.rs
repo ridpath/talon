@@ -78,19 +78,19 @@ fn compile_commands(
             }
 
             Command::Connect { ip, port } => {
-                let msg = format!(" Connecting to {}:{}\\n", ip, port);
+                let msg = format!("🔌 Connecting to {}:{}\\n", ip, port);
                 let ptr = builder.build_global_string_ptr(&msg, "connect_msg");
                 builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
             }
 
             Command::Download { url, path } => {
-                let msg = format!(" Download: {} → {}\\n", url, path);
+                let msg = format!("📥 Download: {} → {}\\n", url, path);
                 let ptr = builder.build_global_string_ptr(&msg, "download_msg");
                 builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
             }
 
             Command::Beacon { url, interval } => {
-                let msg = format!(" Beacon to {} every {}s\\n", url, interval);
+                let msg = format!("📡 Beacon to {} every {}s\\n", url, interval);
                 let str_ptr = builder.build_global_string_ptr(&msg, "beacon_msg");
 
                 let func = builder.get_insert_block().unwrap().get_parent().unwrap();
@@ -118,7 +118,7 @@ fn compile_commands(
                     else_body,
                 } => {
                     // NOTE: This is a stub. You may compile `condition` expressions later.
-                    let msg = format!(" IF CONDITION: {}\\n", condition);
+                    let msg = format!("🔀 IF CONDITION: {}\\n", condition);
                     let ptr = builder.build_global_string_ptr(&msg, "if_msg");
                     builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
 
@@ -170,7 +170,7 @@ fn compile_commands(
             },
 
             _ => {
-                let stub = format!("WARNING LLVM: Unhandled command: {:?}\\n", cmd);
+                let stub = format!("⚠️ LLVM: Unhandled command: {:?}\\n", cmd);
                 let ptr = builder.build_global_string_ptr(&stub, "stub");
                 builder.build_call(printf, &[ptr.as_pointer_value().into()], "printf");
             }

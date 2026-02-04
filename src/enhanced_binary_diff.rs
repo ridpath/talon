@@ -178,7 +178,7 @@ impl EnhancedBinaryDiffer {
                     .filter_map(|sym| {
                         elf1.strtab
                             .get_at(sym.st_name)
-                            .map(|name| (name.to_string(), sym))
+                            .map(|name| (name.to_string(), sym.clone()))
                     })
                     .collect();
 
@@ -188,7 +188,7 @@ impl EnhancedBinaryDiffer {
                     .filter_map(|sym| {
                         elf2.strtab
                             .get_at(sym.st_name)
-                            .map(|name| (name.to_string(), sym))
+                            .map(|name| (name.to_string(), sym.clone()))
                     })
                     .collect();
 
@@ -921,34 +921,37 @@ interactive
         let mut removed_mitigations = Vec::new();
         let mut added_mitigations = Vec::new();
 
-        if let (Object::Elf(elf1), Object::Elf(elf2)) = (obj1, obj2) {
-            let syms1: HashSet<&str> = elf1
-                .syms
-                .iter()
-                .filter_map(|sym| elf1.strtab.get_at(sym.st_name))
-                .collect();
+        match (obj1, obj2) {
+            (Object::Elf(elf1), Object::Elf(elf2)) => {
+                let syms1: HashSet<&str> = elf1
+                    .syms
+                    .iter()
+                    .filter_map(|sym| elf1.strtab.get_at(sym.st_name))
+                    .collect();
 
-            let syms2: HashSet<&str> = elf2
-                .syms
-                .iter()
-                .filter_map(|sym| elf2.strtab.get_at(sym.st_name))
-                .collect();
+                let syms2: HashSet<&str> = elf2
+                    .syms
+                    .iter()
+                    .filter_map(|sym| elf2.strtab.get_at(sym.st_name))
+                    .collect();
 
-            for sym in syms2.difference(&syms1) {
-                if sym.contains("main") || sym.contains("init") || sym.contains("handler") {
-                    new_entry_points.push(sym.to_string());
+                for sym in syms2.difference(&syms1) {
+                    if sym.contains("main") || sym.contains("init") || sym.contains("handler") {
+                        new_entry_points.push(sym.to_string());
+                    }
+
+                    if sym.contains("strcpy") || sym.contains("sprintf") || sym.contains("gets") {
+                        new_dangerous_functions.push(sym.to_string());
+                    }
                 }
 
-                if sym.contains("strcpy") || sym.contains("sprintf") || sym.contains("gets") {
-                    new_dangerous_functions.push(sym.to_string());
+                for sym in syms1.difference(&syms2) {
+                    if sym.contains("main") || sym.contains("init") || sym.contains("handler") {
+                        removed_entry_points.push(sym.to_string());
+                    }
                 }
             }
-
-            for sym in syms1.difference(&syms2) {
-                if sym.contains("main") || sym.contains("init") || sym.contains("handler") {
-                    removed_entry_points.push(sym.to_string());
-                }
-            }
+            _ => {}
         }
 
         for func_diff in changes {
@@ -994,7 +997,7 @@ interactive
 
         println!(
             "\n{} {}",
-            " Function Changes:".bold().yellow(),
+            "📁 Function Changes:".bold().yellow(),
             result.function_changes.len()
         );
         for func in &result.function_changes {

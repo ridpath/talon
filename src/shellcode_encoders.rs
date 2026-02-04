@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// SHELLCODE ENCODERS - BYPASS FILTERS & BAD CHARS
+// 🔒 SHELLCODE ENCODERS - BYPASS FILTERS & BAD CHARS
 // ═══════════════════════════════════════════════════════════════════════════
 
 /// Shellcode encoder with multiple encoding schemes
@@ -13,13 +13,8 @@ impl ShellcodeEncoder {
     ///
     /// # Example
     /// ```
-    /// # use talon::shellcode_encoders::ShellcodeEncoder;
-    /// # fn main() -> Result<(), String> {
-    /// let shellcode = vec![0x90, 0x90, 0xcc];
     /// let encoder = ShellcodeEncoder::new(shellcode);
     /// let encoded = encoder.xor_encode(0x42)?;
-    /// # Ok(())
-    /// # }
     /// ```
     pub fn new(shellcode: Vec<u8>) -> Self {
         ShellcodeEncoder {
@@ -165,7 +160,7 @@ pub fn polymorphic_encode(shellcode: &[u8], nop_density: f32) -> Vec<u8> {
     let mut result = Vec::new();
 
     // NOP equivalents on x86
-    let nops = [
+    let nops = vec![
         vec![0x90],       // nop
         vec![0x87, 0xC0], // xchg eax, eax
         vec![0x97],       // xchg eax, edi
@@ -204,12 +199,6 @@ pub fn xor_decode(shellcode: &[u8], key: u8) -> Vec<u8> {
     xor_encode(shellcode, key)
 }
 
-/// Quick alphanumeric encode
-pub fn alphanumeric_encode(shellcode: &[u8]) -> Result<Vec<u8>, String> {
-    let encoder = ShellcodeEncoder::new(shellcode.to_vec());
-    encoder.alphanumeric_encode()
-}
-
 /// Check if shellcode contains bad characters
 pub fn contains_bad_chars(shellcode: &[u8], bad_chars: &[u8]) -> bool {
     for &byte in shellcode {
@@ -243,7 +232,7 @@ pub fn polymorphic_nop_sled(length: usize) -> Vec<u8> {
     let mut rng = rand::thread_rng();
     let mut sled = Vec::with_capacity(length);
 
-    let nop_variants = [
+    let nop_variants = vec![
         0x90, // nop
         0x41, // inc ecx
         0x4A, // dec edx

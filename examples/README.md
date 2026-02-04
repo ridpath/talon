@@ -24,56 +24,21 @@ This directory contains comprehensive examples demonstrating TALON's capabilitie
    - Use-after-free exploitation
    - Arbitrary allocation attacks
 
-### Exploit Chaining Framework
-
-4. **exploit_chain_buffer_overflow.talon** - Multi-stage buffer overflow
-   - Stage 1: Offset discovery with cyclic patterns
-   - Stage 2: Libc address leak via ROP
-   - Stage 3: Base address calculation
-   - Stage 4: Shell execution with system()
-   - Demonstrates state persistence across stages
-
-5. **exploit_chain_format_string.talon** - Format string chain exploitation
-   - Stage 1: Format string offset discovery
-   - Stage 2: Stack canary leak
-   - Stage 3: Libc leak via GOT
-   - Stage 4: GOT overwrite with system()
-   - Stage 5: Shell trigger
-   - Shows progressive information disclosure
-
-6. **exploit_chain_heap_uaf.talon** - Heap UAF exploitation chain
-   - Stage 1: Heap spray and object allocation
-   - Stage 2: UAF condition creation
-   - Stage 3: Chunk reclamation with fake data
-   - Stage 4: Heap and libc pointer leaks
-   - Stage 5: Fake vtable construction
-   - Stage 6: Vtable pointer overwrite
-   - Stage 7: Virtual function call hijacking
-   - Demonstrates complex heap manipulation
-
-7. **exploit_chain_with_recovery.talon** - Robust exploit with error recovery
-   - Checkpoint/rewind state management
-   - Automatic retry on failure
-   - Leak validation and verification
-   - Error handling with graceful fallback
-   - State persistence for debugging
-   - Production-grade exploit reliability
-
 ### Advanced Features
 
-8. **03_ai_powered_exploitation.talon** - AI-driven exploit generation
+4. **03_ai_powered_exploitation.talon** - AI-driven exploit generation
    - Automated vulnerability analysis
    - AI exploit suggestion system
    - Code generation workflow
    - Integration with OpenAI/Anthropic
 
-9. **04_symbolic_execution.talon** - Automated path finding
+5. **04_symbolic_execution.talon** - Automated path finding
    - Z3 constraint solving
    - Automatic input generation
    - Path exploration strategies
    - CrackMe solving
 
-10. **06_ctf_automation.talon** - Full CTF challenge automation
+6. **06_ctf_automation.talon** - Full CTF challenge automation
    - Binary download and analysis
    - Local testing workflow
    - Remote exploitation
@@ -165,4 +130,14 @@ These examples are for educational and authorized security testing only. Always:
 - Follow responsible disclosure practices
 - Comply with applicable laws and regulations
 
+## Additional Resources
 
+- [TALON Documentation](../docs/)
+- [API Reference](../docs/API.md)
+- [Tutorial Series](../docs/tutorials/)
+- [Community Discord](https://discord.gg/talon-framework)
+
+---
+
+*Last updated: January 2026*
+*Examples compatible with TALON Phase 19+*
