@@ -21,6 +21,7 @@ mod fs_meta;
 mod memory_tools;
 mod pty;
 mod socket_tools;
+mod ssh_bridge;
 
 // User-Friendly Enhancements
 mod helpers;

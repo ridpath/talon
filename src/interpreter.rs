@@ -23,6 +23,7 @@ use crate::ctf_helpers::FlagFinder;
 use crate::interactive_io::{Process, Socket};
 use crate::parser::parse_script;
 use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
+use crate::ssh_bridge::{SshConnection, SshConnectionId, SshRegistry};
 
 // Global connection storage
 type ConnectionId = u64;
@@ -30,6 +31,7 @@ type ConnectionId = u64;
 enum Connection {
     Socket(Socket),
     Process(Process),
+    Ssh(SshConnectionId),
 }
 
 struct ConnectionRegistry {
@@ -66,6 +68,7 @@ impl ConnectionRegistry {
 
 lazy_static::lazy_static! {
     static ref CONNECTIONS: Arc<Mutex<ConnectionRegistry>> = Arc::new(Mutex::new(ConnectionRegistry::new()));
+    static ref SSH_CONNECTIONS: Arc<Mutex<SshRegistry>> = Arc::new(Mutex::new(SshRegistry::new()));
 }
 
 pub fn run_repl() {
@@ -105,6 +108,7 @@ pub enum Value {
     Map(HashMap<String, Value>),
     Set(HashSet<String>),
     Bytes(Vec<u8>),
+    SshConnection(SshConnectionId),
     Null,
 }
 
@@ -135,6 +139,7 @@ impl std::fmt::Display for Value {
                 s.iter().map(|x| x.as_str()).collect::<Vec<_>>().join(", ")
             ),
             Value::Bytes(b) => write!(f, "0x{}", hex::encode(b)),
+            Value::SshConnection(id) => write!(f, "SSH({})", id),
             Value::Null => write!(f, "null"),
         }
     }
@@ -219,6 +224,9 @@ fn print_map_pretty(map: &HashMap<String, Value>, indent: usize) {
             Value::Set(s) => {
                 let items: Vec<_> = s.iter().map(|x| x.as_str()).collect();
                 println!("#{{ {} }}", items.join(", "));
+            }
+            Value::SshConnection(id) => {
+                println!("SSH({})", id);
             }
             Value::Null => {
                 print!("null");
@@ -3153,6 +3161,367 @@ fn eval_expr<'a>(
 
                         Ok(Value::Map(conn_map))
                     }
+                    "connect_ssh" => {
+                        let host = arg_map
+                            .get("host")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("connect_ssh() requires 'host' parameter")?
+                            .to_string();
+
+                        let port = if let Some(Value::Number(p)) =
+                            arg_map.get("port").or_else(|| arg_values.get(1))
+                        {
+                            *p as u16
+                        } else {
+                            return Err("connect_ssh() requires 'port' parameter".to_string());
+                        };
+
+                        let user = arg_map
+                            .get("user")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("connect_ssh() requires 'user' parameter")?
+                            .to_string();
+
+                        let password = arg_map
+                            .get("password")
+                            .or_else(|| arg_values.get(3))
+                            .ok_or("connect_ssh() requires 'password' parameter")?
+                            .to_string();
+
+                        use colored::Colorize;
+
+                        println!(
+                            "{} Connecting to {}@{}:{}",
+                            "[SSH]".cyan(),
+                            user.yellow(),
+                            host.yellow(),
+                            port.to_string().yellow()
+                        );
+
+                        let connection =
+                            SshConnection::connect(&host, port, &user, &password)
+                                .map_err(|e| format!("SSH connection failed: {}", e))?;
+
+                        println!("{} SSH connection established", "[SSH]".green());
+
+                        let conn_id = SSH_CONNECTIONS.lock().await.add(connection);
+
+                        Ok(Value::SshConnection(conn_id))
+                    }
+                    "connect_ssh_pty" => {
+                        let host = arg_map
+                            .get("host")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("connect_ssh_pty() requires 'host' parameter")?
+                            .to_string();
+
+                        let port = if let Some(Value::Number(p)) =
+                            arg_map.get("port").or_else(|| arg_values.get(1))
+                        {
+                            *p as u16
+                        } else {
+                            return Err("connect_ssh_pty() requires 'port' parameter".to_string());
+                        };
+
+                        let user = arg_map
+                            .get("user")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("connect_ssh_pty() requires 'user' parameter")?
+                            .to_string();
+
+                        let password = arg_map
+                            .get("password")
+                            .or_else(|| arg_values.get(3))
+                            .ok_or("connect_ssh_pty() requires 'password' parameter")?
+                            .to_string();
+
+                        let rows = if let Some(Value::Number(r)) =
+                            arg_map.get("rows").or_else(|| arg_values.get(4))
+                        {
+                            *r as u32
+                        } else {
+                            return Err("connect_ssh_pty() requires 'rows' parameter".to_string());
+                        };
+
+                        let cols = if let Some(Value::Number(c)) =
+                            arg_map.get("cols").or_else(|| arg_values.get(5))
+                        {
+                            *c as u32
+                        } else {
+                            return Err("connect_ssh_pty() requires 'cols' parameter".to_string());
+                        };
+
+                        use colored::Colorize;
+
+                        println!(
+                            "{} Connecting to {}@{}:{} with PTY ({}x{})",
+                            "[SSH]".cyan(),
+                            user.yellow(),
+                            host.yellow(),
+                            port.to_string().yellow(),
+                            rows,
+                            cols
+                        );
+
+                        let connection = SshConnection::connect_pty(&host, port, &user, &password, rows, cols)
+                            .map_err(|e| format!("SSH PTY connection failed: {}", e))?;
+
+                        println!("{} SSH PTY connection established", "[SSH]".green());
+
+                        let conn_id = SSH_CONNECTIONS.lock().await.add(connection);
+
+                        Ok(Value::SshConnection(conn_id))
+                    }
+                    "ssh_run" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_run() requires SSH connection")?;
+
+                        let command = arg_map
+                            .get("command")
+                            .or_else(|| arg_values.get(1))
+                            .ok_or("ssh_run() requires 'command' parameter")?
+                            .to_string();
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err("ssh_run() requires SSH connection object".to_string());
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        let output = connection
+                            .execute(&command)
+                            .map_err(|e| format!("Command execution failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Command executed: {}", "[SSH]".cyan(), command.yellow());
+
+                        Ok(Value::String(output))
+                    }
+                    "ssh_upload" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_upload() requires SSH connection")?;
+
+                        let local_path = arg_map
+                            .get("local_path")
+                            .or_else(|| arg_values.get(1))
+                            .ok_or("ssh_upload() requires 'local_path' parameter")?
+                            .to_string();
+
+                        let remote_path = arg_map
+                            .get("remote_path")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("ssh_upload() requires 'remote_path' parameter")?
+                            .to_string();
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err("ssh_upload() requires SSH connection object".to_string());
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        connection
+                            .upload(&local_path, &remote_path)
+                            .map_err(|e| format!("File upload failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!(
+                            "{} Uploaded {} -> {}",
+                            "[SSH]".green(),
+                            local_path.yellow(),
+                            remote_path.yellow()
+                        );
+
+                        Ok(Value::Null)
+                    }
+                    "ssh_download" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_download() requires SSH connection")?;
+
+                        let remote_path = arg_map
+                            .get("remote_path")
+                            .or_else(|| arg_values.get(1))
+                            .ok_or("ssh_download() requires 'remote_path' parameter")?
+                            .to_string();
+
+                        let local_path = arg_map
+                            .get("local_path")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("ssh_download() requires 'local_path' parameter")?
+                            .to_string();
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err("ssh_download() requires SSH connection object".to_string());
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        connection
+                            .download(&remote_path, &local_path)
+                            .map_err(|e| format!("File download failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!(
+                            "{} Downloaded {} -> {}",
+                            "[SSH]".green(),
+                            remote_path.yellow(),
+                            local_path.yellow()
+                        );
+
+                        Ok(Value::Null)
+                    }
+                    "ssh_interactive_start" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_interactive_start() requires SSH connection")?;
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err(
+                                "ssh_interactive_start() requires SSH connection object".to_string()
+                            );
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        connection
+                            .interactive_start()
+                            .map_err(|e| format!("Failed to start interactive session: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Interactive session started", "[SSH]".green());
+
+                        Ok(Value::Null)
+                    }
+                    "ssh_interactive_send" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_interactive_send() requires SSH connection")?;
+
+                        let data_val = arg_map
+                            .get("data")
+                            .or_else(|| arg_values.get(1))
+                            .ok_or("ssh_interactive_send() requires 'data' parameter")?;
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err(
+                                "ssh_interactive_send() requires SSH connection object".to_string()
+                            );
+                        };
+
+                        let data = match data_val {
+                            Value::Bytes(b) => b.clone(),
+                            Value::String(s) => s.as_bytes().to_vec(),
+                            _ => {
+                                return Err(format!(
+                                    "ssh_interactive_send() data must be bytes or string, got {:?}",
+                                    data_val
+                                ))
+                            }
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        connection
+                            .interactive_send(&data)
+                            .map_err(|e| format!("Failed to send data: {}", e))?;
+
+                        Ok(Value::Null)
+                    }
+                    "ssh_interactive_recv" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_interactive_recv() requires SSH connection")?;
+
+                        let timeout_ms = if let Some(Value::Number(t)) =
+                            arg_map.get("timeout_ms").or_else(|| arg_values.get(1))
+                        {
+                            *t as u64
+                        } else {
+                            return Err(
+                                "ssh_interactive_recv() requires 'timeout_ms' parameter".to_string()
+                            );
+                        };
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err(
+                                "ssh_interactive_recv() requires SSH connection object".to_string()
+                            );
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        let output = connection
+                            .interactive_recv(timeout_ms)
+                            .map_err(|e| format!("Failed to receive data: {}", e))?;
+
+                        Ok(Value::String(output))
+                    }
+                    "ssh_interactive_close" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_interactive_close() requires SSH connection")?;
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err(
+                                "ssh_interactive_close() requires SSH connection object".to_string()
+                            );
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        connection
+                            .interactive_close()
+                            .map_err(|e| format!("Failed to close interactive session: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Interactive session closed", "[SSH]".yellow());
+
+                        Ok(Value::Null)
+                    }
                     "send" => {
                         let conn = arg_map
                             .get("conn")
@@ -3194,6 +3563,9 @@ fn eval_expr<'a>(
                             Some(Connection::Process(process)) => {
                                 process.send(&data)?;
                                 println!("[SEND] Sent {} bytes to process", data.len());
+                            }
+                            Some(Connection::Ssh(_)) => {
+                                return Err("send() is not supported for SSH connections. Use ssh_interactive_send() instead.".to_string());
                             }
                             None => return Err(format!("Connection {} not found", conn_id)),
                         }
@@ -3245,6 +3617,9 @@ fn eval_expr<'a>(
                                     data.len()
                                 );
                             }
+                            Some(Connection::Ssh(_)) => {
+                                return Err("sendline() is not supported for SSH connections. Use ssh_interactive_send() instead.".to_string());
+                            }
                             None => return Err(format!("Connection {} not found", conn_id)),
                         }
 
@@ -3280,6 +3655,9 @@ fn eval_expr<'a>(
                         let data = match registry.get_mut(conn_id) {
                             Some(Connection::Socket(socket)) => socket.recv(n)?,
                             Some(Connection::Process(process)) => process.recv(n)?,
+                            Some(Connection::Ssh(_)) => {
+                                return Err("recv() is not supported for SSH connections. Use ssh_interactive_recv() instead.".to_string());
+                            }
                             None => return Err(format!("Connection {} not found", conn_id)),
                         };
 
@@ -3306,6 +3684,9 @@ fn eval_expr<'a>(
                         let data = match registry.get_mut(conn_id) {
                             Some(Connection::Socket(socket)) => socket.recvline()?,
                             Some(Connection::Process(process)) => process.recvline()?,
+                            Some(Connection::Ssh(_)) => {
+                                return Err("recvline() is not supported for SSH connections. Use ssh_interactive_recv() instead.".to_string());
+                            }
                             None => return Err(format!("Connection {} not found", conn_id)),
                         };
 
@@ -3330,6 +3711,7 @@ fn eval_expr<'a>(
                                     print_map_pretty(m, 0);
                                 }
                                 Value::Set(s) => print!("{:?}", s),
+                                Value::SshConnection(id) => print!("SSH({})", id),
                                 Value::Null => print!("null"),
                             }
                         }

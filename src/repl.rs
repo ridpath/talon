@@ -300,6 +300,7 @@ fn format_value(value: &Value) -> String {
             let items: Vec<_> = s.iter().map(|x| x.as_str()).collect();
             format!("#{{{}}}", items.join(", "))
         }
+        Value::SshConnection(id) => format!("SSH({})", id),
     }
 }
 

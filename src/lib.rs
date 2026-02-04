@@ -54,6 +54,7 @@ pub mod repl;
 pub mod runtime_safety;
 pub mod shellcode_db;
 pub mod socket_tools;
+pub mod ssh_bridge;
 pub mod symbolic_engine;
 pub mod web_tools;
 
