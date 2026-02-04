@@ -32,6 +32,7 @@ pbkdf2 = "0.11"
 
 # Binary Analysis
 capstone = "0.12"
+keystone-engine = { version = "0.1", optional = true }
 yara = { version = "0.25", optional = true }
 pelite = "0.10"
 goblin = "0.7"
@@ -99,6 +100,7 @@ retour = { version = "0.3", optional = true }
 default = []
 llvm = ["inkwell"]
 malware-analysis = ["yara"]
+binary-patching = ["keystone-engine"]
 game-hacking = ["retour"]
 game-hacking-windows = ["windows", "game-hacking"]
 game-hacking-linux = ["procfs", "game-hacking"]

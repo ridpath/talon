@@ -1,13 +1,399 @@
 use std::fs;
 use std::fs::File;
 use std::io::{Read, Seek, SeekFrom};
+use sha2::{Sha256, Digest};
+use goblin::elf::Elf;
+use goblin::pe::PE;
+
+#[cfg(feature = "binary-patching")]
+use keystone_engine::{Keystone, Arch, Mode, OptionType, OptionValue};
 
 // ═══════════════════════════════════════════════════════════════════════════
 // BINARY PATCHING TOOLKIT - PRODUCTION READY
 // ═══════════════════════════════════════════════════════════════════════════
 
 // ────────────────────────────────────────────────────────────────────────────
-// BINARY PATCHER
+// HIGH-LEVEL PATCH INTERFACE (Semantic API)
+// ────────────────────────────────────────────────────────────────────────────
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Architecture {
+    X86,
+    X64,
+    ARM,
+    ARM64,
+    MIPS,
+    MIPS64,
+}
+
+#[derive(Debug, Clone)]
+struct PatchOperation {
+    offset: usize,
+    original_bytes: Vec<u8>,
+    new_bytes: Vec<u8>,
+    description: String,
+}
+
+pub struct Patch {
+    binary_path: String,
+    binary_data: Vec<u8>,
+    original_checksum: String,
+    architecture: Architecture,
+    is_elf: bool,
+    is_pe: bool,
+    operations: Vec<PatchOperation>,
+    dry_run: bool,
+}
+
+impl Patch {
+    pub fn new(binary_path: &str) -> Result<Self, String> {
+        let binary_data = fs::read(binary_path)
+            .map_err(|e| format!("Failed to read binary: {}", e))?;
+        
+        let original_checksum = Self::compute_checksum(&binary_data);
+        
+        let is_elf = binary_data.starts_with(b"\x7fELF");
+        let is_pe = binary_data.starts_with(b"MZ");
+        
+        if !is_elf && !is_pe {
+            return Err("Binary must be ELF or PE format".to_string());
+        }
+        
+        let architecture = Self::detect_architecture(&binary_data, is_elf, is_pe)?;
+        
+        println!("[PATCH] Loaded binary: {}", binary_path);
+        println!("[PATCH] Format: {}", if is_elf { "ELF" } else { "PE" });
+        println!("[PATCH] Architecture: {:?}", architecture);
+        println!("[PATCH] Original checksum: {}", original_checksum);
+        
+        Ok(Patch {
+            binary_path: binary_path.to_string(),
+            binary_data,
+            original_checksum,
+            architecture,
+            is_elf,
+            is_pe,
+            operations: Vec::new(),
+            dry_run: false,
+        })
+    }
+    
+    pub fn set_dry_run(&mut self, enabled: bool) {
+        self.dry_run = enabled;
+        if enabled {
+            println!("[PATCH] Dry-run mode enabled - no files will be modified");
+        }
+    }
+    
+    fn compute_checksum(data: &[u8]) -> String {
+        let mut hasher = Sha256::new();
+        hasher.update(data);
+        format!("{:x}", hasher.finalize())
+    }
+    
+    fn detect_architecture(data: &[u8], is_elf: bool, is_pe: bool) -> Result<Architecture, String> {
+        if is_elf {
+            let elf = Elf::parse(data)
+                .map_err(|e| format!("Failed to parse ELF: {}", e))?;
+            
+            match elf.header.e_machine {
+                3 => Ok(Architecture::X86),
+                62 => Ok(Architecture::X64),
+                40 => Ok(Architecture::ARM),
+                183 => Ok(Architecture::ARM64),
+                8 => Ok(Architecture::MIPS),
+                _ => Err(format!("Unsupported ELF architecture: {}", elf.header.e_machine)),
+            }
+        } else if is_pe {
+            let pe = PE::parse(data)
+                .map_err(|e| format!("Failed to parse PE: {}", e))?;
+            
+            match pe.header.coff_header.machine {
+                0x14c => Ok(Architecture::X86),
+                0x8664 => Ok(Architecture::X64),
+                0x1c0 | 0x1c2 | 0x1c4 => Ok(Architecture::ARM),
+                0xaa64 => Ok(Architecture::ARM64),
+                _ => Err(format!("Unsupported PE architecture: 0x{:x}", pe.header.coff_header.machine)),
+            }
+        } else {
+            Err("Unknown binary format".to_string())
+        }
+    }
+    
+    pub fn nop_out(&mut self, offset: usize, length: usize) -> Result<(), String> {
+        if offset + length > self.binary_data.len() {
+            return Err(format!("NOP range extends beyond binary size"));
+        }
+        
+        let nop_byte = match self.architecture {
+            Architecture::X86 | Architecture::X64 => 0x90,
+            Architecture::ARM => 0x00,
+            Architecture::ARM64 => 0x1f,
+            Architecture::MIPS | Architecture::MIPS64 => 0x00,
+        };
+        
+        let original_bytes = self.binary_data[offset..offset + length].to_vec();
+        let new_bytes = vec![nop_byte; length];
+        
+        self.operations.push(PatchOperation {
+            offset,
+            original_bytes: original_bytes.clone(),
+            new_bytes: new_bytes.clone(),
+            description: format!("NOP {} bytes at 0x{:x}", length, offset),
+        });
+        
+        if !self.dry_run {
+            self.binary_data[offset..offset + length].copy_from_slice(&new_bytes);
+        }
+        
+        println!("[PATCH] {} bytes at 0x{:x}", 
+                 if self.dry_run { "Would NOP" } else { "NOPed" }, offset);
+        
+        Ok(())
+    }
+    
+    pub fn replace_call(&mut self, call_offset: usize, new_function_name: &str) -> Result<(), String> {
+        if call_offset >= self.binary_data.len() {
+            return Err("Call offset beyond binary size".to_string());
+        }
+        
+        let call_opcode = self.binary_data[call_offset];
+        
+        if call_opcode != 0xE8 && call_opcode != 0x9A {
+            return Err(format!("No CALL instruction at 0x{:x} (found 0x{:02x})", 
+                             call_offset, call_opcode));
+        }
+        
+        let original_bytes = self.binary_data[call_offset..call_offset + 5].to_vec();
+        
+        println!("[PATCH] {} CALL at 0x{:x} to target '{}'",
+                 if self.dry_run { "Would replace" } else { "Replacing" },
+                 call_offset, new_function_name);
+        
+        println!("[PATCH] Note: Actual function address resolution requires symbol table lookup");
+        println!("[PATCH] Using placeholder - implement full symbol resolution in integration");
+        
+        self.operations.push(PatchOperation {
+            offset: call_offset,
+            original_bytes,
+            new_bytes: vec![0xE8, 0x00, 0x00, 0x00, 0x00],
+            description: format!("Replace CALL at 0x{:x} -> {}", call_offset, new_function_name),
+        });
+        
+        Ok(())
+    }
+    
+    pub fn insert_asm(&mut self, offset: usize, assembly: &str) -> Result<(), String> {
+        if offset > self.binary_data.len() {
+            return Err("Offset beyond binary size".to_string());
+        }
+        
+        #[cfg(feature = "binary-patching")]
+        {
+            let (arch, mode) = match self.architecture {
+                Architecture::X86 => (Arch::X86, Mode::MODE_32),
+                Architecture::X64 => (Arch::X86, Mode::MODE_64),
+                Architecture::ARM => (Arch::ARM, Mode::ARM),
+                Architecture::ARM64 => (Arch::ARM64, Mode::LITTLE_ENDIAN),
+                Architecture::MIPS => (Arch::MIPS, Mode::MIPS32),
+                Architecture::MIPS64 => (Arch::MIPS, Mode::MIPS64),
+            };
+            
+            let engine = Keystone::new(arch, mode)
+                .map_err(|e| format!("Failed to initialize Keystone: {:?}", e))?;
+            
+            engine.option(OptionType::SYNTAX, OptionValue::SYNTAX_NASM)
+                .map_err(|e| format!("Failed to set syntax: {:?}", e))?;
+            
+            let encoding = engine.asm(assembly.to_string(), offset as u64)
+                .map_err(|e| format!("Failed to assemble '{}': {:?}", assembly, e))?;
+            
+            if encoding.bytes.is_empty() {
+                return Err("Assembly produced no bytes".to_string());
+            }
+            
+            println!("[PATCH] {} assembly at 0x{:x}: {}",
+                     if self.dry_run { "Would insert" } else { "Inserting" },
+                     offset, assembly);
+            println!("[PATCH] Machine code ({} bytes): {:02x?}", encoding.bytes.len(), encoding.bytes);
+            
+            let original_bytes = if offset + encoding.bytes.len() <= self.binary_data.len() {
+                self.binary_data[offset..offset + encoding.bytes.len()].to_vec()
+            } else {
+                vec![]
+            };
+            
+            self.operations.push(PatchOperation {
+                offset,
+                original_bytes,
+                new_bytes: encoding.bytes.clone(),
+                description: format!("Insert assembly at 0x{:x}: {}", offset, assembly),
+            });
+            
+            if !self.dry_run {
+                if offset + encoding.bytes.len() <= self.binary_data.len() {
+                    self.binary_data[offset..offset + encoding.bytes.len()]
+                        .copy_from_slice(&encoding.bytes);
+                } else {
+                    self.binary_data.extend_from_slice(&encoding.bytes);
+                }
+            }
+            
+            Ok(())
+        }
+        
+        #[cfg(not(feature = "binary-patching"))]
+        {
+            Err(format!(
+                "Assembly insertion requires keystone-engine feature. \
+                 Please rebuild with: cargo build --features binary-patching\n\
+                 Or use manual byte patching with patch_bytes() method.\n\
+                 Assembly requested: '{}'", assembly
+            ))
+        }
+    }
+    
+    pub fn preview_diff(&self) -> String {
+        if self.operations.is_empty() {
+            return "No patch operations recorded".to_string();
+        }
+        
+        let mut diff = String::new();
+        diff.push_str(&format!("=== PATCH PREVIEW for {} ===\n", self.binary_path));
+        diff.push_str(&format!("Total operations: {}\n\n", self.operations.len()));
+        
+        for (idx, op) in self.operations.iter().enumerate() {
+            diff.push_str(&format!("Operation {}: {}\n", idx + 1, op.description));
+            diff.push_str(&format!("  Offset: 0x{:x}\n", op.offset));
+            diff.push_str(&format!("  Original ({} bytes): {:02x?}\n", 
+                                 op.original_bytes.len(), op.original_bytes));
+            diff.push_str(&format!("  New      ({} bytes): {:02x?}\n", 
+                                 op.new_bytes.len(), op.new_bytes));
+            diff.push_str("\n");
+        }
+        
+        diff
+    }
+    
+    pub fn save(&self, output_path: &str) -> Result<(), String> {
+        if self.dry_run {
+            println!("[PATCH] Dry-run mode: would save to {}", output_path);
+            println!("{}", self.preview_diff());
+            return Ok(());
+        }
+        
+        let new_checksum = Self::compute_checksum(&self.binary_data);
+        
+        println!("[PATCH] Saving patched binary to: {}", output_path);
+        println!("[PATCH] Original checksum: {}", self.original_checksum);
+        println!("[PATCH] New checksum:      {}", new_checksum);
+        
+        if self.original_checksum == new_checksum && !self.operations.is_empty() {
+            return Err("Checksum unchanged despite operations - patch may have failed".to_string());
+        }
+        
+        fs::write(output_path, &self.binary_data)
+            .map_err(|e| format!("Failed to write patched binary: {}", e))?;
+        
+        self.save_backup_info(output_path)?;
+        
+        println!("[PATCH] Successfully saved patched binary");
+        println!("[PATCH] Applied {} operations", self.operations.len());
+        
+        Ok(())
+    }
+    
+    fn save_backup_info(&self, output_path: &str) -> Result<(), String> {
+        let backup_path = format!("{}.patch_info", output_path);
+        
+        let mut backup_data = String::new();
+        backup_data.push_str(&format!("Original binary: {}\n", self.binary_path));
+        backup_data.push_str(&format!("Original checksum: {}\n", self.original_checksum));
+        backup_data.push_str(&format!("Architecture: {:?}\n", self.architecture));
+        backup_data.push_str(&format!("Operations count: {}\n\n", self.operations.len()));
+        
+        for (idx, op) in self.operations.iter().enumerate() {
+            backup_data.push_str(&format!("Operation {}:\n", idx + 1));
+            backup_data.push_str(&format!("  Description: {}\n", op.description));
+            backup_data.push_str(&format!("  Offset: 0x{:x}\n", op.offset));
+            backup_data.push_str(&format!("  Original: {:02x?}\n", op.original_bytes));
+            backup_data.push_str(&format!("  New: {:02x?}\n", op.new_bytes));
+            backup_data.push_str("\n");
+        }
+        
+        fs::write(&backup_path, backup_data)
+            .map_err(|e| format!("Failed to write backup info: {}", e))?;
+        
+        println!("[PATCH] Backup info saved to: {}", backup_path);
+        
+        Ok(())
+    }
+    
+    pub fn undo(&mut self) -> Result<(), String> {
+        if self.operations.is_empty() {
+            return Err("No operations to undo".to_string());
+        }
+        
+        let op = self.operations.pop().unwrap();
+        
+        if self.dry_run {
+            println!("[PATCH] Dry-run: would undo '{}'", op.description);
+            return Ok(());
+        }
+        
+        if op.offset + op.original_bytes.len() <= self.binary_data.len() {
+            self.binary_data[op.offset..op.offset + op.original_bytes.len()]
+                .copy_from_slice(&op.original_bytes);
+            println!("[PATCH] Undone: {}", op.description);
+        } else {
+            return Err(format!("Cannot undo operation - original offset invalid"));
+        }
+        
+        Ok(())
+    }
+    
+    pub fn rollback_all(&mut self) -> Result<(), String> {
+        let count = self.operations.len();
+        
+        if count == 0 {
+            return Err("No operations to rollback".to_string());
+        }
+        
+        println!("[PATCH] Rolling back {} operations...", count);
+        
+        while !self.operations.is_empty() {
+            self.undo()?;
+        }
+        
+        let current_checksum = Self::compute_checksum(&self.binary_data);
+        
+        if current_checksum != self.original_checksum {
+            return Err("Rollback completed but checksum mismatch detected".to_string());
+        }
+        
+        println!("[PATCH] Successfully rolled back all operations");
+        println!("[PATCH] Checksum verified: {}", current_checksum);
+        
+        Ok(())
+    }
+    
+    pub fn verify_integrity(&self) -> Result<bool, String> {
+        let current_checksum = Self::compute_checksum(&self.binary_data);
+        
+        println!("[PATCH] Integrity check:");
+        println!("[PATCH]   Original: {}", self.original_checksum);
+        println!("[PATCH]   Current:  {}", current_checksum);
+        
+        if self.operations.is_empty() {
+            Ok(current_checksum == self.original_checksum)
+        } else {
+            Ok(current_checksum != self.original_checksum)
+        }
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// BINARY PATCHER (Legacy low-level API)
 // ────────────────────────────────────────────────────────────────────────────
 
 pub struct BinaryPatcher;
@@ -492,5 +878,324 @@ impl SignatureBreaker {
         );
 
         Ok(())
+    }
+}
+
+// ────────────────────────────────────────────────────────────────────────────
+// UNIT TESTS
+// ────────────────────────────────────────────────────────────────────────────
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+    use tempfile::NamedTempFile;
+
+    fn create_test_elf() -> NamedTempFile {
+        let mut file = NamedTempFile::new().unwrap();
+        
+        let mut elf_header = vec![0u8; 64];
+        elf_header[0..4].copy_from_slice(&[0x7f, 0x45, 0x4c, 0x46]);
+        elf_header[4] = 2;
+        elf_header[5] = 1;
+        elf_header[6] = 1;
+        elf_header[16..18].copy_from_slice(&[0x02, 0x00]);
+        elf_header[18..20].copy_from_slice(&[0x3e, 0x00]);
+        elf_header[20..24].copy_from_slice(&[0x01, 0x00, 0x00, 0x00]);
+        elf_header[24..32].copy_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        elf_header[32..40].copy_from_slice(&[0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        elf_header[40..48].copy_from_slice(&[0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        elf_header[52..54].copy_from_slice(&[0x40, 0x00]);
+        elf_header[54..56].copy_from_slice(&[0x38, 0x00]);
+        elf_header[56..58].copy_from_slice(&[0x00, 0x00]);
+        
+        file.write_all(&elf_header).unwrap();
+        
+        let mut padding = vec![0x90; 1024];
+        padding[100] = 0xE8;
+        padding[101..105].copy_from_slice(&[0x00, 0x00, 0x00, 0x00]);
+        
+        file.write_all(&padding).unwrap();
+        file.flush().unwrap();
+        
+        file
+    }
+
+    fn create_test_pe() -> NamedTempFile {
+        let mut file = NamedTempFile::new().unwrap();
+        
+        let mut pe_header = vec![0u8; 512];
+        pe_header[0] = b'M';
+        pe_header[1] = b'Z';
+        pe_header[0x3C] = 0x80;
+        
+        let pe_offset = 0x80;
+        pe_header[pe_offset..pe_offset + 4].copy_from_slice(b"PE\0\0");
+        
+        pe_header[pe_offset + 4] = 0x64;
+        pe_header[pe_offset + 5] = 0x86;
+        
+        file.write_all(&pe_header).unwrap();
+        file.write_all(&vec![0x90; 512]).unwrap();
+        file.flush().unwrap();
+        
+        file
+    }
+
+    #[test]
+    fn test_patch_new_elf() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let patch = Patch::new(path);
+        assert!(patch.is_ok());
+        
+        let patch = patch.unwrap();
+        assert_eq!(patch.is_elf, true);
+        assert_eq!(patch.is_pe, false);
+        assert_eq!(patch.architecture, Architecture::X64);
+    }
+
+    #[test]
+    fn test_patch_new_pe() {
+        let test_file = create_test_pe();
+        let path = test_file.path().to_str().unwrap();
+        
+        let patch = Patch::new(path);
+        assert!(patch.is_ok());
+        
+        let patch = patch.unwrap();
+        assert_eq!(patch.is_elf, false);
+        assert_eq!(patch.is_pe, true);
+        assert_eq!(patch.architecture, Architecture::X64);
+    }
+
+    #[test]
+    fn test_nop_out() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.nop_out(50, 10);
+        assert!(result.is_ok());
+        assert_eq!(patch.operations.len(), 1);
+        assert_eq!(patch.operations[0].description, "NOP 10 bytes at 0x32");
+        
+        for i in 50..60 {
+            assert_eq!(patch.binary_data[i], 0x90);
+        }
+    }
+
+    #[test]
+    fn test_nop_out_bounds_check() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.nop_out(10000, 10);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("extends beyond"));
+    }
+
+    #[test]
+    #[cfg(feature = "binary-patching")]
+    fn test_insert_asm_x64() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.insert_asm(100, "xor eax, eax; ret");
+        assert!(result.is_ok());
+        assert_eq!(patch.operations.len(), 1);
+        
+        let expected_bytes = vec![0x31, 0xc0, 0xc3];
+        assert_eq!(patch.binary_data[100..103], expected_bytes[..]);
+    }
+    
+    #[test]
+    #[cfg(not(feature = "binary-patching"))]
+    fn test_insert_asm_requires_feature() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.insert_asm(100, "xor eax, eax; ret");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("keystone-engine feature"));
+    }
+
+    #[test]
+    fn test_replace_call() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.replace_call(164, "hacked_function");
+        assert!(result.is_ok());
+        assert_eq!(patch.operations.len(), 1);
+    }
+
+    #[test]
+    fn test_replace_call_invalid_instruction() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.replace_call(50, "test");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("No CALL instruction"));
+    }
+
+    #[test]
+    fn test_dry_run_mode() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        patch.set_dry_run(true);
+        
+        let original_data = patch.binary_data.clone();
+        
+        let result = patch.nop_out(50, 10);
+        assert!(result.is_ok());
+        
+        assert_eq!(patch.binary_data, original_data);
+        assert_eq!(patch.operations.len(), 1);
+    }
+
+    #[test]
+    fn test_preview_diff() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        patch.set_dry_run(true);
+        
+        patch.nop_out(50, 5).unwrap();
+        
+        let diff = patch.preview_diff();
+        assert!(diff.contains("PATCH PREVIEW"));
+        assert!(diff.contains("Total operations: 1"));
+        assert!(diff.contains("0x32"));
+    }
+
+    #[test]
+    fn test_undo_operation() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let original_byte = patch.binary_data[50];
+        
+        patch.nop_out(50, 5).unwrap();
+        assert_eq!(patch.binary_data[50], 0x90);
+        
+        let result = patch.undo();
+        assert!(result.is_ok());
+        assert_eq!(patch.binary_data[50], original_byte);
+        assert_eq!(patch.operations.len(), 0);
+    }
+
+    #[test]
+    fn test_rollback_all() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        let original_checksum = patch.original_checksum.clone();
+        
+        patch.nop_out(50, 5).unwrap();
+        patch.nop_out(100, 10).unwrap();
+        patch.nop_out(200, 3).unwrap();
+        
+        assert_eq!(patch.operations.len(), 3);
+        
+        let result = patch.rollback_all();
+        assert!(result.is_ok());
+        assert_eq!(patch.operations.len(), 0);
+        
+        let current_checksum = Patch::compute_checksum(&patch.binary_data);
+        assert_eq!(current_checksum, original_checksum);
+    }
+
+    #[test]
+    fn test_verify_integrity() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.verify_integrity();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true);
+        
+        patch.nop_out(50, 5).unwrap();
+        
+        let result = patch.verify_integrity();
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), true);
+    }
+
+    #[test]
+    fn test_checksum_computation() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let patch = Patch::new(path).unwrap();
+        let checksum1 = patch.original_checksum.clone();
+        
+        let patch2 = Patch::new(path).unwrap();
+        let checksum2 = patch2.original_checksum;
+        
+        assert_eq!(checksum1, checksum2);
+    }
+
+    #[test]
+    fn test_save_with_backup_info() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        patch.nop_out(50, 5).unwrap();
+        
+        let output = NamedTempFile::new().unwrap();
+        let output_path = output.path().to_str().unwrap();
+        
+        let result = patch.save(output_path);
+        assert!(result.is_ok());
+        
+        let backup_info_path = format!("{}.patch_info", output_path);
+        let backup_exists = std::path::Path::new(&backup_info_path).exists();
+        assert!(backup_exists);
+        
+        let backup_content = fs::read_to_string(&backup_info_path).unwrap();
+        assert!(backup_content.contains("Original binary:"));
+        assert!(backup_content.contains("Original checksum:"));
+        assert!(backup_content.contains("Architecture:"));
+        
+        fs::remove_file(&backup_info_path).ok();
+    }
+
+    #[test]
+    fn test_multiple_operations_sequence() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        patch.nop_out(50, 5).unwrap();
+        patch.nop_out(100, 3).unwrap();
+        
+        assert_eq!(patch.operations.len(), 2);
+        
+        let diff = patch.preview_diff();
+        assert!(diff.contains("Total operations: 2"));
     }
 }
