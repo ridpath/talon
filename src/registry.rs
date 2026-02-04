@@ -1701,6 +1701,74 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
     );
 
     registry.insert(
+        "mitigation_analyze".to_string(),
+        BuiltinFunction::new(
+            "mitigation_analyze",
+            "mitigation_analyze(binary: string) -> map",
+            "Analyzes binary mitigations (NX, PIE, Canary, ASLR, RELRO) and generates adaptive exploit strategy. Auto-pivots from shellcode to ROP when NX detected, recommends leak strategies for PIE/Canary.",
+            "Exploitation",
+            vec![
+                "let strategy = mitigation_analyze(\"./vuln\")",
+                "print(strategy.technique)",
+                "print(strategy.requires_leak)",
+                "if strategy.technique == \"ROP Chain\" { let rop = ROP(elf) }",
+            ],
+        )
+        .with_related(vec!["mitigation_auto_pivot", "mitigation_validate", "oracle_analyze"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "mitigation_generate_leak".to_string(),
+        BuiltinFunction::new(
+            "mitigation_generate_leak",
+            "mitigation_generate_leak(binary: string, leak_type: string) -> string",
+            "Generates code template for information leak based on detected mitigations. Leak types: canary, pie, libc, stack, heap.",
+            "Exploitation",
+            vec![
+                "let leak_code = mitigation_generate_leak(\"./vuln\", \"canary\")",
+                "let pie_leak = mitigation_generate_leak(\"./target\", \"pie\")",
+                "let libc_leak = mitigation_generate_leak(\"./binary\", \"libc\")",
+            ],
+        )
+        .with_related(vec!["mitigation_analyze", "fmtstr_payload"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "mitigation_auto_pivot".to_string(),
+        BuiltinFunction::new(
+            "mitigation_auto_pivot",
+            "mitigation_auto_pivot(binary: string) -> string",
+            "Automatically pivots exploit strategy from shellcode to ROP/ret2libc based on NX detection. Returns complete payload template with leak strategies.",
+            "Exploitation",
+            vec![
+                "let payload_template = mitigation_auto_pivot(\"./vuln\")",
+                "print(payload_template)",
+            ],
+        )
+        .with_related(vec!["mitigation_analyze", "rop_find", "rop_chain"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "mitigation_validate".to_string(),
+        BuiltinFunction::new(
+            "mitigation_validate",
+            "mitigation_validate(binary: string) -> map",
+            "Validates exploit strategy viability against binary. Checks for missing gadgets, analyzes complexity, provides suggestions for bypass techniques.",
+            "Exploitation",
+            vec![
+                "let validation = mitigation_validate(\"./vuln\")",
+                "if validation.viable == 1 { print(\"Strategy viable\") }",
+                "for warning in validation.warnings { print(warning) }",
+            ],
+        )
+        .with_related(vec!["mitigation_analyze", "rop_find"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
         "oracle_report".to_string(),
         BuiltinFunction::new(
             "oracle_report",

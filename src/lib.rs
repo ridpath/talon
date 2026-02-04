@@ -61,6 +61,7 @@ pub mod web_tools;
 pub mod ctf_helpers;
 pub mod ctf_quick_helpers;
 pub mod helpers;
+pub mod mitigation_detector;
 pub mod oracle;
 pub mod output_utils;
 pub mod registry;

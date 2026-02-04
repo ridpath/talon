@@ -3933,6 +3933,167 @@ fn eval_expr<'a>(
                         println!("[CLIPBOARD] Copied {} bytes to clipboard", data.len());
                         Ok(Value::Null)
                     }
+                    "mitigation_analyze" => {
+                        use crate::mitigation_detector::MitigationDetector;
+                        use colored::Colorize;
+                        
+                        if arg_values.is_empty() {
+                            return Err("mitigation_analyze() requires binary path argument".to_string());
+                        }
+                        
+                        let binary_path = arg_values[0].to_string();
+                        
+                        println!("{} Analyzing binary: {}", "[MITIGATION]".cyan(), binary_path.yellow());
+                        
+                        let detector = MitigationDetector::new(&binary_path)
+                            .map_err(|e| format!("Failed to initialize mitigation detector: {}", e))?;
+                        
+                        let strategy = detector.analyze_strategy()
+                            .map_err(|e| format!("Failed to analyze strategy: {}", e))?;
+                        
+                        println!("{}", strategy);
+                        
+                        let mut strategy_map = HashMap::new();
+                        strategy_map.insert("technique".to_string(), Value::String(strategy.primary_technique.to_string()));
+                        strategy_map.insert("complexity".to_string(), Value::String(strategy.estimated_complexity.to_string()));
+                        
+                        if let Some(align) = strategy.alignment_required {
+                            strategy_map.insert("alignment".to_string(), Value::Number(align as i64));
+                        }
+                        
+                        let leaks: Vec<Value> = strategy.requires_leak.iter()
+                            .map(|leak| Value::String(leak.to_string()))
+                            .collect();
+                        strategy_map.insert("requires_leak".to_string(), Value::List(leaks));
+                        
+                        let gadgets: Vec<Value> = strategy.gadgets_needed.iter()
+                            .map(|g| Value::String(g.clone()))
+                            .collect();
+                        strategy_map.insert("gadgets_needed".to_string(), Value::List(gadgets));
+                        
+                        let constraints: Vec<Value> = strategy.constraints.iter()
+                            .map(|c| Value::String(c.clone()))
+                            .collect();
+                        strategy_map.insert("constraints".to_string(), Value::List(constraints));
+                        
+                        Ok(Value::Map(strategy_map))
+                    }
+                    "mitigation_generate_leak" => {
+                        use crate::mitigation_detector::{MitigationDetector, LeakRequirement};
+                        
+                        if arg_values.len() < 2 {
+                            return Err("mitigation_generate_leak() requires binary path and leak type".to_string());
+                        }
+                        
+                        let binary_path = arg_values[0].to_string();
+                        let leak_type_str = arg_values[1].to_string().to_lowercase();
+                        
+                        let leak_type = match leak_type_str.as_str() {
+                            "canary" => LeakRequirement::CanaryLeak,
+                            "pie" | "pie_base" => LeakRequirement::PIEBaseLeak,
+                            "libc" | "libc_base" => LeakRequirement::LibcBaseLeak,
+                            "stack" => LeakRequirement::StackAddressLeak,
+                            "heap" => LeakRequirement::HeapAddressLeak,
+                            _ => return Err(format!("Unknown leak type: {}. Use: canary, pie, libc, stack, heap", leak_type_str)),
+                        };
+                        
+                        let detector = MitigationDetector::new(&binary_path)
+                            .map_err(|e| format!("Failed to initialize mitigation detector: {}", e))?;
+                        
+                        let leak_strategy = detector.generate_leak_strategy(&leak_type);
+                        
+                        println!("[LEAK STRATEGY] {}", leak_strategy.leak_type);
+                        println!("[LEAK STRATEGY] Method: {}", leak_strategy.method);
+                        if !leak_strategy.gadgets_needed.is_empty() {
+                            println!("[LEAK STRATEGY] Gadgets needed:");
+                            for gadget in &leak_strategy.gadgets_needed {
+                                println!("[LEAK STRATEGY]   - {}", gadget);
+                            }
+                        }
+                        println!("[LEAK STRATEGY] Example code:{}", leak_strategy.example_code);
+                        
+                        Ok(Value::String(leak_strategy.example_code))
+                    }
+                    "mitigation_auto_pivot" => {
+                        use crate::mitigation_detector::MitigationDetector;
+                        use crate::rop_tools::RopChain;
+                        use colored::Colorize;
+                        
+                        if arg_values.is_empty() {
+                            return Err("mitigation_auto_pivot() requires binary path argument".to_string());
+                        }
+                        
+                        let binary_path = arg_values[0].to_string();
+                        
+                        println!("{} Auto-pivoting exploit strategy for: {}", "[PIVOT]".cyan(), binary_path.yellow());
+                        
+                        let detector = MitigationDetector::new(&binary_path)
+                            .map_err(|e| format!("Failed to initialize mitigation detector: {}", e))?;
+                        
+                        let rop_chain = RopChain::new(&binary_path)
+                            .map_err(|e| format!("Failed to initialize ROP chain: {}", e))?;
+                        
+                        let strategy = detector.auto_pivot_strategy(&rop_chain)
+                            .map_err(|e| format!("Failed to generate pivot strategy: {}", e))?;
+                        
+                        println!("{} Strategy selected: {}", "[PIVOT]".green(), strategy.primary_technique);
+                        
+                        if strategy.primary_technique.to_string().contains("ROP") || 
+                           strategy.primary_technique.to_string().contains("libc") {
+                            println!("{} NX detected - pivoted from shellcode to {}", "[PIVOT]".yellow(), strategy.primary_technique);
+                        }
+                        
+                        let payload_template = detector.build_adaptive_payload(&strategy)
+                            .map_err(|e| format!("Failed to build payload template: {}", e))?;
+                        
+                        println!("\n{}", payload_template);
+                        
+                        Ok(Value::String(payload_template))
+                    }
+                    "mitigation_validate" => {
+                        use crate::mitigation_detector::MitigationDetector;
+                        use crate::rop_tools::RopChain;
+                        
+                        if arg_values.is_empty() {
+                            return Err("mitigation_validate() requires binary path argument".to_string());
+                        }
+                        
+                        let binary_path = arg_values[0].to_string();
+                        
+                        let detector = MitigationDetector::new(&binary_path)
+                            .map_err(|e| format!("Failed to initialize mitigation detector: {}", e))?;
+                        
+                        let strategy = detector.analyze_strategy()
+                            .map_err(|e| format!("Failed to analyze strategy: {}", e))?;
+                        
+                        let rop_chain = RopChain::new(&binary_path)
+                            .map_err(|e| format!("Failed to initialize ROP chain: {}", e))?;
+                        
+                        let validation = detector.validate_strategy(&strategy, &rop_chain)
+                            .map_err(|e| format!("Failed to validate strategy: {}", e))?;
+                        
+                        println!("{}", validation);
+                        
+                        let mut validation_map = HashMap::new();
+                        validation_map.insert("viable".to_string(), Value::Number(if validation.is_viable { 1 } else { 0 }));
+                        
+                        let missing: Vec<Value> = validation.missing_gadgets.iter()
+                            .map(|g| Value::String(g.clone()))
+                            .collect();
+                        validation_map.insert("missing_gadgets".to_string(), Value::List(missing));
+                        
+                        let warnings: Vec<Value> = validation.warnings.iter()
+                            .map(|w| Value::String(w.clone()))
+                            .collect();
+                        validation_map.insert("warnings".to_string(), Value::List(warnings));
+                        
+                        let suggestions: Vec<Value> = validation.suggestions.iter()
+                            .map(|s| Value::String(s.clone()))
+                            .collect();
+                        validation_map.insert("suggestions".to_string(), Value::List(suggestions));
+                        
+                        Ok(Value::Map(validation_map))
+                    }
                     "split" => {
                         if arg_values.len() < 2 {
                             return Err(
