@@ -1,8 +1,64 @@
 use portable_pty::{native_pty_system, Child, CommandBuilder, MasterPty, PtySize};
+use std::process::Command;
 
 pub struct PtySession {
     pub master: Box<dyn MasterPty + Send>,
     pub child: Box<dyn Child + Send + Sync>,
+}
+
+impl PtySession {
+    /// Get the process ID of the child process
+    pub fn get_pid(&self) -> Option<u32> {
+        self.child.process_id()
+    }
+
+    /// Resize the PTY terminal
+    pub fn resize(&self, rows: u16, cols: u16) -> Result<(), String> {
+        self.master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| format!("Failed to resize PTY: {}", e))
+    }
+
+    /// Try to send signal to child process (Unix only)
+    #[cfg(unix)]
+    pub fn send_signal(&mut self, signal: libc::c_int) -> Result<(), String> {
+        if let Some(pid) = self.get_pid() {
+            unsafe {
+                if libc::kill(pid as libc::pid_t, signal) == 0 {
+                    Ok(())
+                } else {
+                    Err(format!("Failed to send signal {} to PID {}", signal, pid))
+                }
+            }
+        } else {
+            Err("Failed to get PID".to_string())
+        }
+    }
+
+    /// Try to send signal to child process (Windows - limited support)
+    #[cfg(windows)]
+    pub fn send_signal(&mut self, _signal: i32) -> Result<(), String> {
+        log::warn!("Signal sending not fully supported on Windows");
+        Err("Signal sending not supported on Windows".to_string())
+    }
+
+    /// Check if child process is still running
+    pub fn is_running(&mut self) -> bool {
+        self.child.try_wait().ok().flatten().is_none()
+    }
+
+    /// Wait for child process to exit
+    pub fn wait(&mut self) -> Result<(), String> {
+        self.child
+            .wait()
+            .map_err(|e| format!("Failed to wait for child: {}", e))?;
+        Ok(())
+    }
 }
 
 pub fn spawn_pty(command: &str, args: &[&str], rows: u16, cols: u16) -> Result<PtySession, String> {
