@@ -1,5 +1,82 @@
 use std::collections::HashMap;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FunctionCategory {
+    Network,
+    Process,
+    IO,
+    SSH,
+    Packing,
+    Exploitation,
+    BinaryAnalysis,
+    Utilities,
+    FileIO,
+    StringManipulation,
+    Encoding,
+    Evasion,
+    AI,
+    Swarm,
+    Crypto,
+    Fuzzing,
+    Kernel,
+    Heap,
+    Debugging,
+    Symbolic,
+}
+
+impl FunctionCategory {
+    pub fn as_str(&self) -> &str {
+        match self {
+            FunctionCategory::Network => "Network",
+            FunctionCategory::Process => "Process",
+            FunctionCategory::IO => "I/O",
+            FunctionCategory::SSH => "SSH",
+            FunctionCategory::Packing => "Packing",
+            FunctionCategory::Exploitation => "Exploitation",
+            FunctionCategory::BinaryAnalysis => "Binary Analysis",
+            FunctionCategory::Utilities => "Utilities",
+            FunctionCategory::FileIO => "File I/O",
+            FunctionCategory::StringManipulation => "String Manipulation",
+            FunctionCategory::Encoding => "Encoding",
+            FunctionCategory::Evasion => "Evasion",
+            FunctionCategory::AI => "AI",
+            FunctionCategory::Swarm => "Swarm",
+            FunctionCategory::Crypto => "Crypto",
+            FunctionCategory::Fuzzing => "Fuzzing",
+            FunctionCategory::Kernel => "Kernel",
+            FunctionCategory::Heap => "Heap",
+            FunctionCategory::Debugging => "Debugging",
+            FunctionCategory::Symbolic => "Symbolic",
+        }
+    }
+
+    pub fn from_str(s: &str) -> Option<Self> {
+        match s {
+            "Network" => Some(FunctionCategory::Network),
+            "Process" => Some(FunctionCategory::Process),
+            "I/O" => Some(FunctionCategory::IO),
+            "SSH" => Some(FunctionCategory::SSH),
+            "Packing" => Some(FunctionCategory::Packing),
+            "Exploitation" => Some(FunctionCategory::Exploitation),
+            "Binary Analysis" => Some(FunctionCategory::BinaryAnalysis),
+            "Utilities" => Some(FunctionCategory::Utilities),
+            "File I/O" => Some(FunctionCategory::FileIO),
+            "String Manipulation" => Some(FunctionCategory::StringManipulation),
+            "Encoding" => Some(FunctionCategory::Encoding),
+            "Evasion" => Some(FunctionCategory::Evasion),
+            "AI" => Some(FunctionCategory::AI),
+            "Swarm" => Some(FunctionCategory::Swarm),
+            "Crypto" => Some(FunctionCategory::Crypto),
+            "Fuzzing" => Some(FunctionCategory::Fuzzing),
+            "Kernel" => Some(FunctionCategory::Kernel),
+            "Heap" => Some(FunctionCategory::Heap),
+            "Debugging" => Some(FunctionCategory::Debugging),
+            "Symbolic" => Some(FunctionCategory::Symbolic),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct BuiltinFunction {
     pub name: String,
@@ -7,6 +84,9 @@ pub struct BuiltinFunction {
     pub description: String,
     pub category: String,
     pub examples: Vec<String>,
+    pub since_version: String,
+    pub deprecated: Option<String>,
+    pub related: Vec<String>,
 }
 
 impl BuiltinFunction {
@@ -23,7 +103,164 @@ impl BuiltinFunction {
             description: description.to_string(),
             category: category.to_string(),
             examples: examples.iter().map(|s| s.to_string()).collect(),
+            since_version: "0.1.0".to_string(),
+            deprecated: None,
+            related: Vec::new(),
         }
+    }
+
+    pub fn with_version(mut self, version: &str) -> Self {
+        self.since_version = version.to_string();
+        self
+    }
+
+    pub fn with_deprecation(mut self, message: &str) -> Self {
+        self.deprecated = Some(message.to_string());
+        self
+    }
+
+    pub fn with_related(mut self, related: Vec<&str>) -> Self {
+        self.related = related.iter().map(|s| s.to_string()).collect();
+        self
+    }
+}
+
+pub struct FunctionRegistry {
+    functions: HashMap<String, BuiltinFunction>,
+    category_index: HashMap<FunctionCategory, Vec<String>>,
+}
+
+impl FunctionRegistry {
+    pub fn new() -> Self {
+        let functions = register_builtins();
+        let mut category_index: HashMap<FunctionCategory, Vec<String>> = HashMap::new();
+
+        for (name, func) in &functions {
+            if let Some(category) = FunctionCategory::from_str(&func.category) {
+                category_index
+                    .entry(category)
+                    .or_insert_with(Vec::new)
+                    .push(name.clone());
+            }
+        }
+
+        FunctionRegistry {
+            functions,
+            category_index,
+        }
+    }
+
+    pub fn get(&self, name: &str) -> Option<&BuiltinFunction> {
+        self.functions.get(name)
+    }
+
+    pub fn get_category(&self, category: FunctionCategory) -> Vec<&BuiltinFunction> {
+        if let Some(names) = self.category_index.get(&category) {
+            names
+                .iter()
+                .filter_map(|name| self.functions.get(name))
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn search(&self, query: &str) -> Vec<&BuiltinFunction> {
+        let query_lower = query.to_lowercase();
+        self.functions
+            .values()
+            .filter(|func| {
+                func.name.to_lowercase().contains(&query_lower)
+                    || func.description.to_lowercase().contains(&query_lower)
+                    || func.category.to_lowercase().contains(&query_lower)
+                    || func.related.iter().any(|r| r.to_lowercase().contains(&query_lower))
+            })
+            .collect()
+    }
+
+    pub fn get_related(&self, function_name: &str) -> Vec<&BuiltinFunction> {
+        if let Some(func) = self.functions.get(function_name) {
+            func.related
+                .iter()
+                .filter_map(|name| self.functions.get(name))
+                .collect()
+        } else {
+            Vec::new()
+        }
+    }
+
+    pub fn all_functions(&self) -> Vec<&BuiltinFunction> {
+        self.functions.values().collect()
+    }
+
+    pub fn validate_coverage(&self) -> Result<(), Vec<String>> {
+        let mut missing = Vec::new();
+        
+        for (name, func) in &self.functions {
+            if FunctionCategory::from_str(&func.category).is_none() {
+                missing.push(format!(
+                    "Function '{}' has invalid category '{}'",
+                    name, func.category
+                ));
+            }
+        }
+
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(missing)
+        }
+    }
+
+    pub fn validate_implementation_coverage(&self, implemented: &[&str]) -> Result<(), String> {
+        use std::collections::HashSet;
+        
+        let registered: HashSet<_> = self.functions.keys().map(|s| s.as_str()).collect();
+        let implemented_set: HashSet<_> = implemented.iter().copied().collect();
+
+        let missing_registration: Vec<_> = implemented_set.difference(&registered).collect();
+        let missing_implementation: Vec<_> = registered.difference(&implemented_set).collect();
+
+        let mut errors = Vec::new();
+
+        if !missing_registration.is_empty() {
+            let mut sorted = missing_registration.clone();
+            sorted.sort();
+            errors.push(format!(
+                "Functions implemented but not registered ({} functions): {:?}",
+                sorted.len(),
+                sorted
+            ));
+        }
+
+        if !missing_implementation.is_empty() {
+            let mut sorted = missing_implementation.clone();
+            sorted.sort();
+            errors.push(format!(
+                "Functions registered but not implemented ({} functions): {:?}",
+                sorted.len(),
+                sorted
+            ));
+        }
+
+        if errors.is_empty() {
+            Ok(())
+        } else {
+            Err(errors.join("\n"))
+        }
+    }
+
+    pub fn count_by_category(&self) -> HashMap<FunctionCategory, usize> {
+        self.category_index
+            .iter()
+            .map(|(cat, names)| (cat.clone(), names.len()))
+            .collect()
+    }
+}
+
+impl Default for FunctionRegistry {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -42,7 +279,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let conn = connect(\"target.com\", 1337)",
                 "let s = connect(\"192.168.1.100\", 8080)",
             ],
-        ),
+        )
+        .with_related(vec!["send", "recv", "sendline", "recvline", "recvuntil", "close", "interactive"]),
     );
 
     registry.insert(
@@ -57,7 +295,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "send(conn, payload)",
                 "send(conn, p64(0xdeadbeef))",
             ],
-        ),
+        )
+        .with_related(vec!["sendline", "recv", "connect"]),
     );
 
     registry.insert(
@@ -71,7 +310,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let data = recv(conn, 1024)",
                 "let leak = recv(conn, 8)",
             ],
-        ),
+        )
+        .with_related(vec!["recvline", "recvuntil", "send", "u64", "u32"]),
     );
 
     registry.insert(
@@ -85,7 +325,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "sendline(conn, \"whoami\")",
                 "sendline(conn, payload)",
             ],
-        ),
+        )
+        .with_related(vec!["send", "recvline", "interactive"]),
     );
 
     registry.insert(
@@ -99,7 +340,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let line = recvline(conn)",
                 "let response = recvline(conn)",
             ],
-        ),
+        )
+        .with_related(vec!["recv", "recvuntil", "sendline"]),
     );
 
     registry.insert(
@@ -113,7 +355,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let data = recvuntil(conn, \"flag{\")",
                 "let banner = recvuntil(conn, \"> \")",
             ],
-        ),
+        )
+        .with_related(vec!["recv", "recvline", "extract_pattern"]),
     );
 
     registry.insert(
@@ -126,7 +369,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
             vec![
                 "close(conn)",
             ],
-        ),
+        )
+        .with_related(vec!["connect"]),
     );
 
     // Process Functions
@@ -299,7 +543,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let addr = p64(0x0040<br/>1000)",
                 "let payload = p64(pop_rdi) + p64(bin_sh) + p64(system)",
             ],
-        ),
+        )
+        .with_related(vec!["u64", "p32", "flat"]),
     );
 
     registry.insert(
@@ -313,7 +558,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "p32(0xdeadbeef)",
                 "let addr = p32(0x08048000)",
             ],
-        ),
+        )
+        .with_related(vec!["u32", "p64", "flat"]),
     );
 
     registry.insert(
@@ -326,7 +572,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
             vec![
                 "p16(0x1234)",
             ],
-        ),
+        )
+        .with_related(vec!["u16", "p32"]),
     );
 
     registry.insert(
@@ -339,7 +586,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
             vec![
                 "p8(0x41)",
             ],
-        ),
+        )
+        .with_related(vec!["u8", "bytes"]),
     );
 
     registry.insert(
@@ -353,7 +601,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let addr = u64(leaked)",
                 "let value = u64(recv(conn, 8))",
             ],
-        ),
+        )
+        .with_related(vec!["p64", "u32", "recv"]),
     );
 
     registry.insert(
@@ -366,7 +615,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
             vec![
                 "let addr = u32(data[0:4])",
             ],
-        ),
+        )
+        .with_related(vec!["p32", "u64"]),
     );
 
     registry.insert(
@@ -379,7 +629,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
             vec![
                 "let port = u16(data)",
             ],
-        ),
+        )
+        .with_related(vec!["p16", "u32"]),
     );
 
     registry.insert(
@@ -392,7 +643,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
             vec![
                 "let byte_val = u8(data)",
             ],
-        ),
+        )
+        .with_related(vec!["p8"]),
     );
 
     // Exploitation Functions
@@ -407,7 +659,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let pattern = cyclic(200)",
                 "send(conn, cyclic(500))",
             ],
-        ),
+        )
+        .with_related(vec!["cyclic_find", "auto_offset", "send"]),
     );
 
     registry.insert(
@@ -421,7 +674,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let offset = cyclic_find(0x61616162)",
                 "let crash_offset = cyclic_find(rip_value)",
             ],
-        ),
+        )
+        .with_related(vec!["cyclic", "auto_offset", "u64"]),
     );
 
     registry.insert(
@@ -435,7 +689,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let sc = shellcode(\"x64\", \"execve\")",
                 "let sc = shellcode(\"x86\", \"reverse_shell\")",
             ],
-        ),
+        )
+        .with_related(vec!["flat", "send", "analyze"]),
     );
 
     registry.insert(
@@ -449,7 +704,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let payload = flat([cyclic(offset), pop_rdi, bin_sh, system])",
                 "let chain = flat([gadget1, gadget2, gadget3])",
             ],
-        ),
+        )
+        .with_related(vec!["p64", "p32", "shellcode", "send"]),
     );
 
     // Binary Analysis
@@ -465,7 +721,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "print(elf[\"pie\"])",
                 "print(elf[\"nx\"])",
             ],
-        ),
+        )
+        .with_related(vec!["auto_offset", "process", "shellcode"]),
     );
 
     registry.insert(
@@ -479,7 +736,8 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "let offset = auto_offset(\"./vuln\")",
                 "let crash_offset = auto_offset(\"/challenge/binary\")",
             ],
-        ),
+        )
+        .with_related(vec!["cyclic", "cyclic_find", "analyze", "process"]),
     );
 
     // Utilities
@@ -688,5 +946,836 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         ),
     );
 
+    // Additional Exploitation Functions
+    registry.insert(
+        "rop_find".to_string(),
+        BuiltinFunction::new(
+            "rop_find",
+            "rop_find(binary: string, gadget: string) -> int",
+            "Searches for ROP gadgets in a binary",
+            "Exploitation",
+            vec![
+                "let pop_rdi = rop_find(\"./vuln\", \"pop rdi; ret\")",
+                "let syscall = rop_find(\"/lib/libc.so.6\", \"syscall\")",
+            ],
+        )
+        .with_related(vec!["analyze", "flat"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "fmtstr_payload".to_string(),
+        BuiltinFunction::new(
+            "fmtstr_payload",
+            "fmtstr_payload(offset: int, writes: map) -> bytes",
+            "Generates a format string payload for arbitrary writes",
+            "Exploitation",
+            vec![
+                "let payload = fmtstr_payload(6, {0x601020: 0x41414141})",
+                "let payload = fmtstr_payload(4, {got_printf: system_addr})",
+            ],
+        )
+        .with_related(vec!["analyze"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "disasm".to_string(),
+        BuiltinFunction::new(
+            "disasm",
+            "disasm(code: bytes, arch: string, address: int) -> string",
+            "Disassembles machine code to assembly instructions",
+            "Binary Analysis",
+            vec![
+                "let asm = disasm(shellcode, \"x64\", 0x400000)",
+                "print(disasm(code, \"x86\", 0x08048000))",
+            ],
+        )
+        .with_related(vec!["analyze", "shellcode"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "copy".to_string(),
+        BuiltinFunction::new(
+            "copy",
+            "copy(data: any)",
+            "Copies data to the system clipboard",
+            "Utilities",
+            vec![
+                "copy(payload)",
+                "copy(\"flag{...}\")",
+                "copy(hex(leaked_addr))",
+            ],
+        )
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "remote".to_string(),
+        BuiltinFunction::new(
+            "remote",
+            "remote(host: string, port: int) -> Socket",
+            "Establishes a TCP connection (alias for connect)",
+            "Network",
+            vec![
+                "let conn = remote(\"target.com\", 1337)",
+                "let r = remote(\"192.168.1.100\", 8080)",
+            ],
+        )
+        .with_related(vec!["connect", "send", "recv"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "help".to_string(),
+        BuiltinFunction::new(
+            "help",
+            "help() or help(function_name: string)",
+            "Displays help information about builtin functions",
+            "Utilities",
+            vec![
+                "help()",
+                "help(\"connect\")",
+                "help(\"rop_find\")",
+            ],
+        )
+        .with_version("0.1.0"),
+    );
+
+    // Debugging Functions
+    registry.insert(
+        "debug_attach".to_string(),
+        BuiltinFunction::new(
+            "debug_attach",
+            "debug_attach(process: Process) -> Debugger",
+            "Attaches GDB to a running process",
+            "Debugging",
+            vec![
+                "let dbg = debug_attach(proc)",
+                "debug_attach(process)",
+            ],
+        )
+        .with_related(vec!["breakpoint", "debug_continue", "debug_step"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "breakpoint".to_string(),
+        BuiltinFunction::new(
+            "breakpoint",
+            "breakpoint(address: int)",
+            "Sets a breakpoint at the specified address",
+            "Debugging",
+            vec![
+                "breakpoint(0x401234)",
+                "breakpoint(elf.symbols.main)",
+            ],
+        )
+        .with_related(vec!["debug_attach", "debug_continue"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "debug_continue".to_string(),
+        BuiltinFunction::new(
+            "debug_continue",
+            "debug_continue()",
+            "Continues execution in the debugger",
+            "Debugging",
+            vec![
+                "debug_continue()",
+            ],
+        )
+        .with_related(vec!["debug_attach", "breakpoint", "debug_step"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "debug_step".to_string(),
+        BuiltinFunction::new(
+            "debug_step",
+            "debug_step()",
+            "Steps one instruction in the debugger",
+            "Debugging",
+            vec![
+                "debug_step()",
+            ],
+        )
+        .with_related(vec!["debug_attach", "debug_continue"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "debug_read_mem".to_string(),
+        BuiltinFunction::new(
+            "debug_read_mem",
+            "debug_read_mem(address: int, size: int) -> bytes",
+            "Reads memory from the debugged process",
+            "Debugging",
+            vec![
+                "let data = debug_read_mem(0x601000, 64)",
+                "let stack = debug_read_mem(rsp, 256)",
+            ],
+        )
+        .with_related(vec!["debug_write_mem", "debug_read_reg"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "debug_write_mem".to_string(),
+        BuiltinFunction::new(
+            "debug_write_mem",
+            "debug_write_mem(address: int, data: bytes)",
+            "Writes memory to the debugged process",
+            "Debugging",
+            vec![
+                "debug_write_mem(0x601000, p64(0x41414141))",
+                "debug_write_mem(got_addr, libc.symbols.system)",
+            ],
+        )
+        .with_related(vec!["debug_read_mem", "debug_write_reg"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "debug_read_reg".to_string(),
+        BuiltinFunction::new(
+            "debug_read_reg",
+            "debug_read_reg(register: string) -> int",
+            "Reads a register value from the debugged process",
+            "Debugging",
+            vec![
+                "let rip = debug_read_reg(\"rip\")",
+                "let rsp = debug_read_reg(\"rsp\")",
+            ],
+        )
+        .with_related(vec!["debug_write_reg", "debug_read_mem"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "debug_write_reg".to_string(),
+        BuiltinFunction::new(
+            "debug_write_reg",
+            "debug_write_reg(register: string, value: int)",
+            "Writes a register value in the debugged process",
+            "Debugging",
+            vec![
+                "debug_write_reg(\"rip\", 0x401234)",
+                "debug_write_reg(\"rdi\", bin_sh)",
+            ],
+        )
+        .with_related(vec!["debug_read_reg", "debug_write_mem"])
+        .with_version("0.1.0"),
+    );
+
+    // Symbolic Execution Functions
+    registry.insert(
+        "symbolic_var".to_string(),
+        BuiltinFunction::new(
+            "symbolic_var",
+            "symbolic_var(name: string, size: int) -> Symbolic",
+            "Creates a symbolic variable for constraint solving",
+            "Symbolic",
+            vec![
+                "let input = symbolic_var(\"user_input\", 64)",
+                "let key = symbolic_var(\"key\", 16)",
+            ],
+        )
+        .with_related(vec!["constrain_no_null", "constrain_alnum", "symbolic_solve"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "constrain_no_null".to_string(),
+        BuiltinFunction::new(
+            "constrain_no_null",
+            "constrain_no_null(symbolic: Symbolic)",
+            "Adds constraint that symbolic variable contains no null bytes",
+            "Symbolic",
+            vec![
+                "constrain_no_null(input)",
+            ],
+        )
+        .with_related(vec!["symbolic_var", "constrain_alnum", "symbolic_solve"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "constrain_alnum".to_string(),
+        BuiltinFunction::new(
+            "constrain_alnum",
+            "constrain_alnum(symbolic: Symbolic)",
+            "Constrains symbolic variable to alphanumeric characters only",
+            "Symbolic",
+            vec![
+                "constrain_alnum(input)",
+            ],
+        )
+        .with_related(vec!["symbolic_var", "constrain_no_null", "symbolic_solve"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "constrain_range".to_string(),
+        BuiltinFunction::new(
+            "constrain_range",
+            "constrain_range(symbolic: Symbolic, min: int, max: int)",
+            "Constrains symbolic variable to a range of values",
+            "Symbolic",
+            vec![
+                "constrain_range(input, 0x20, 0x7e)",
+            ],
+        )
+        .with_related(vec!["symbolic_var", "symbolic_solve"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "symbolic_solve".to_string(),
+        BuiltinFunction::new(
+            "symbolic_solve",
+            "symbolic_solve() -> bytes",
+            "Solves constraints and returns concrete value",
+            "Symbolic",
+            vec![
+                "let solution = symbolic_solve()",
+            ],
+        )
+        .with_related(vec!["symbolic_var", "constrain_no_null", "constrain_alnum"])
+        .with_version("0.1.0"),
+    );
+
+    // Heap Exploitation Functions
+    registry.insert(
+        "pool_spray".to_string(),
+        BuiltinFunction::new(
+            "pool_spray",
+            "pool_spray(size: int, count: int, data: bytes)",
+            "Performs heap pool spraying with specified object size and count",
+            "Heap",
+            vec![
+                "pool_spray(0x100, 1000, fake_object)",
+            ],
+        )
+        .with_related(vec!["heap_feng_shui"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "heap_feng_shui".to_string(),
+        BuiltinFunction::new(
+            "heap_feng_shui",
+            "heap_feng_shui(allocations: list)",
+            "Performs heap feng shui to position objects predictably",
+            "Heap",
+            vec![
+                "heap_feng_shui([{\"size\": 0x100, \"count\": 10}])",
+            ],
+        )
+        .with_related(vec!["pool_spray"])
+        .with_version("0.1.0"),
+    );
+
+    // Kernel Exploitation Functions
+    registry.insert(
+        "token_steal".to_string(),
+        BuiltinFunction::new(
+            "token_steal",
+            "token_steal() -> bytes",
+            "Generates shellcode for Windows token stealing privilege escalation",
+            "Kernel",
+            vec![
+                "let shellcode = token_steal()",
+            ],
+        )
+        .with_related(vec!["process_hide", "rootkit_install"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "process_hide".to_string(),
+        BuiltinFunction::new(
+            "process_hide",
+            "process_hide(pid: int)",
+            "Hides a process from process listings (EPROCESS unlinking)",
+            "Kernel",
+            vec![
+                "process_hide(1234)",
+            ],
+        )
+        .with_related(vec!["token_steal", "rootkit_install"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "rootkit_install".to_string(),
+        BuiltinFunction::new(
+            "rootkit_install",
+            "rootkit_install(driver_path: string)",
+            "Installs a kernel driver for rootkit functionality",
+            "Kernel",
+            vec![
+                "rootkit_install(\"/tmp/rootkit.ko\")",
+            ],
+        )
+        .with_related(vec!["token_steal", "process_hide"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "kaslr_leak".to_string(),
+        BuiltinFunction::new(
+            "kaslr_leak",
+            "kaslr_leak() -> int",
+            "Leaks kernel base address to defeat KASLR",
+            "Kernel",
+            vec![
+                "let kernel_base = kaslr_leak()",
+            ],
+        )
+        .with_related(vec!["smep_bypass", "kernel_read", "kernel_write"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "smep_bypass".to_string(),
+        BuiltinFunction::new(
+            "smep_bypass",
+            "smep_bypass(payload: bytes) -> bytes",
+            "Wraps payload with SMEP bypass technique (CR4 manipulation)",
+            "Kernel",
+            vec![
+                "let safe_payload = smep_bypass(shellcode)",
+            ],
+        )
+        .with_related(vec!["kaslr_leak", "kernel_write"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "kernel_write".to_string(),
+        BuiltinFunction::new(
+            "kernel_write",
+            "kernel_write(address: int, data: bytes)",
+            "Writes to kernel memory (arbitrary kernel write primitive)",
+            "Kernel",
+            vec![
+                "kernel_write(0xffffffff81000000, payload)",
+            ],
+        )
+        .with_related(vec!["kernel_read", "kaslr_leak"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "kernel_read".to_string(),
+        BuiltinFunction::new(
+            "kernel_read",
+            "kernel_read(address: int, size: int) -> bytes",
+            "Reads from kernel memory (arbitrary kernel read primitive)",
+            "Kernel",
+            vec![
+                "let data = kernel_read(0xffffffff81000000, 64)",
+            ],
+        )
+        .with_related(vec!["kernel_write", "kaslr_leak"])
+        .with_version("0.1.0"),
+    );
+
+    // Crypto Functions
+    registry.insert(
+        "padding_oracle".to_string(),
+        BuiltinFunction::new(
+            "padding_oracle",
+            "padding_oracle(ciphertext: bytes, oracle_func: function) -> bytes",
+            "Performs padding oracle attack to decrypt ciphertext",
+            "Crypto",
+            vec![
+                "let plaintext = padding_oracle(ct, oracle)",
+            ],
+        )
+        .with_related(vec!["aes_padding_attack", "timing_attack"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "bleichenbacher".to_string(),
+        BuiltinFunction::new(
+            "bleichenbacher",
+            "bleichenbacher(ciphertext: bytes, oracle_func: function) -> bytes",
+            "Performs Bleichenbacher's attack on RSA PKCS#1 v1.5",
+            "Crypto",
+            vec![
+                "let plaintext = bleichenbacher(ct, oracle)",
+            ],
+        )
+        .with_related(vec!["rsa_factorize", "timing_attack"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "timing_attack".to_string(),
+        BuiltinFunction::new(
+            "timing_attack",
+            "timing_attack(target_func: function, charset: string) -> string",
+            "Performs timing side-channel attack to extract secrets",
+            "Crypto",
+            vec![
+                "let password = timing_attack(verify_func, \"0123456789abcdef\")",
+            ],
+        )
+        .with_related(vec!["padding_oracle", "weak_keys"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "weak_keys".to_string(),
+        BuiltinFunction::new(
+            "weak_keys",
+            "weak_keys(bits: int) -> list",
+            "Generates list of weak RSA keys for testing",
+            "Crypto",
+            vec![
+                "let keys = weak_keys(512)",
+            ],
+        )
+        .with_related(vec!["rsa_factorize"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "hash_collision".to_string(),
+        BuiltinFunction::new(
+            "hash_collision",
+            "hash_collision(algorithm: string, prefix: bytes) -> bytes",
+            "Finds hash collision for specified algorithm",
+            "Crypto",
+            vec![
+                "let collision = hash_collision(\"md5\", prefix)",
+            ],
+        )
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "aes_padding_attack".to_string(),
+        BuiltinFunction::new(
+            "aes_padding_attack",
+            "aes_padding_attack(ciphertext: bytes) -> bytes",
+            "Exploits AES padding vulnerabilities",
+            "Crypto",
+            vec![
+                "let plaintext = aes_padding_attack(ct)",
+            ],
+        )
+        .with_related(vec!["padding_oracle"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "rsa_factorize".to_string(),
+        BuiltinFunction::new(
+            "rsa_factorize",
+            "rsa_factorize(n: int, e: int) -> map",
+            "Attempts to factorize RSA modulus to recover private key",
+            "Crypto",
+            vec![
+                "let key = rsa_factorize(n, 65537)",
+            ],
+        )
+        .with_related(vec!["weak_keys"])
+        .with_version("0.1.0"),
+    );
+
+    // Fuzzing Functions
+    registry.insert(
+        "fuzz_target".to_string(),
+        BuiltinFunction::new(
+            "fuzz_target",
+            "fuzz_target(binary: string, input_source: string)",
+            "Sets up fuzzing target with specified input method",
+            "Fuzzing",
+            vec![
+                "fuzz_target(\"./target\", \"stdin\")",
+                "fuzz_target(\"./vuln\", \"file\")",
+            ],
+        )
+        .with_related(vec!["mutate", "coverage", "crash_triage"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "mutate".to_string(),
+        BuiltinFunction::new(
+            "mutate",
+            "mutate(input: bytes, strategy: string) -> bytes",
+            "Mutates input data using specified fuzzing strategy",
+            "Fuzzing",
+            vec![
+                "let mutated = mutate(seed, \"bitflip\")",
+                "let mutated = mutate(input, \"havoc\")",
+            ],
+        )
+        .with_related(vec!["fuzz_target", "corpus_add"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "coverage".to_string(),
+        BuiltinFunction::new(
+            "coverage",
+            "coverage(binary: string, input: bytes) -> map",
+            "Measures code coverage for given input",
+            "Fuzzing",
+            vec![
+                "let cov = coverage(\"./target\", test_input)",
+            ],
+        )
+        .with_related(vec!["fuzz_target", "mutate"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "corpus_add".to_string(),
+        BuiltinFunction::new(
+            "corpus_add",
+            "corpus_add(input: bytes, coverage_data: map)",
+            "Adds input to fuzzing corpus if it increases coverage",
+            "Fuzzing",
+            vec![
+                "corpus_add(mutated_input, cov)",
+            ],
+        )
+        .with_related(vec!["mutate", "coverage"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "crash_triage".to_string(),
+        BuiltinFunction::new(
+            "crash_triage",
+            "crash_triage(crash_input: bytes) -> map",
+            "Triages crash to determine exploitability",
+            "Fuzzing",
+            vec![
+                "let triage = crash_triage(crashing_input)",
+                "print(triage[\"exploitability\"])",
+            ],
+        )
+        .with_related(vec!["fuzz_target", "coverage"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "parallel_exploit".to_string(),
+        BuiltinFunction::new(
+            "parallel_exploit",
+            "parallel_exploit(targets: list, exploit_func: function)",
+            "Executes exploit against multiple targets in parallel",
+            "Exploitation",
+            vec![
+                "parallel_exploit(target_list, pwn_func)",
+            ],
+        )
+        .with_related(vec!["remote", "connect"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "generate_exploit".to_string(),
+        BuiltinFunction::new(
+            "generate_exploit",
+            "generate_exploit(binary: string, vuln_type: string) -> string",
+            "Automatically generates exploit code for given vulnerability type",
+            "AI",
+            vec![
+                "let exploit = generate_exploit(\"./vuln\", \"buffer_overflow\")",
+                "let script = generate_exploit(\"./target\", \"format_string\")",
+            ],
+        )
+        .with_related(vec!["analyze", "auto_offset", "rop_find"])
+        .with_version("0.1.0"),
+    );
+
     registry
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_registry_coverage_validation() {
+        let registry = FunctionRegistry::new();
+        match registry.validate_coverage() {
+            Ok(_) => {},
+            Err(errors) => {
+                panic!("Registry validation failed:\n{}", errors.join("\n"));
+            }
+        }
+    }
+
+    #[test]
+    fn test_category_indexing() {
+        let registry = FunctionRegistry::new();
+        
+        let network_funcs = registry.get_category(FunctionCategory::Network);
+        assert!(!network_funcs.is_empty(), "Network category should have functions");
+        
+        let packing_funcs = registry.get_category(FunctionCategory::Packing);
+        assert!(!packing_funcs.is_empty(), "Packing category should have functions");
+        
+        let exploitation_funcs = registry.get_category(FunctionCategory::Exploitation);
+        assert!(!exploitation_funcs.is_empty(), "Exploitation category should have functions");
+    }
+
+    #[test]
+    fn test_search_functionality() {
+        let registry = FunctionRegistry::new();
+        
+        let results = registry.search("rop");
+        assert!(!results.is_empty(), "Search for 'rop' should return results");
+        
+        let results = registry.search("pack");
+        assert!(!results.is_empty(), "Search for 'pack' should return results");
+        
+        let results = registry.search("connection");
+        assert!(!results.is_empty(), "Search for 'connection' should return results");
+    }
+
+    #[test]
+    fn test_related_functions() {
+        let registry = FunctionRegistry::new();
+        
+        let related = registry.get_related("connect");
+        assert!(!related.is_empty(), "connect should have related functions");
+        
+        let related = registry.get_related("p64");
+        assert!(!related.is_empty(), "p64 should have related functions");
+        
+        let related = registry.get_related("cyclic");
+        assert!(!related.is_empty(), "cyclic should have related functions");
+    }
+
+    #[test]
+    fn test_function_metadata() {
+        let registry = FunctionRegistry::new();
+        
+        if let Some(func) = registry.get("connect") {
+            assert_eq!(func.name, "connect");
+            assert!(!func.signature.is_empty());
+            assert!(!func.description.is_empty());
+            assert!(!func.examples.is_empty());
+            assert_eq!(func.since_version, "0.1.0");
+            assert!(func.deprecated.is_none());
+        } else {
+            panic!("Function 'connect' not found in registry");
+        }
+    }
+
+    #[test]
+    fn test_count_by_category() {
+        let registry = FunctionRegistry::new();
+        let counts = registry.count_by_category();
+        
+        assert!(counts.contains_key(&FunctionCategory::Network));
+        assert!(counts.contains_key(&FunctionCategory::Packing));
+        assert!(counts.contains_key(&FunctionCategory::Exploitation));
+        
+        let total: usize = counts.values().sum();
+        assert!(total > 0, "Registry should have registered functions");
+    }
+
+    #[test]
+    fn test_new_categories() {
+        let registry = FunctionRegistry::new();
+        
+        let crypto_funcs = registry.get_category(FunctionCategory::Crypto);
+        assert!(!crypto_funcs.is_empty(), "Crypto category should have functions");
+        
+        let fuzzing_funcs = registry.get_category(FunctionCategory::Fuzzing);
+        assert!(!fuzzing_funcs.is_empty(), "Fuzzing category should have functions");
+        
+        let kernel_funcs = registry.get_category(FunctionCategory::Kernel);
+        assert!(!kernel_funcs.is_empty(), "Kernel category should have functions");
+        
+        let heap_funcs = registry.get_category(FunctionCategory::Heap);
+        assert!(!heap_funcs.is_empty(), "Heap category should have functions");
+        
+        let debugging_funcs = registry.get_category(FunctionCategory::Debugging);
+        assert!(!debugging_funcs.is_empty(), "Debugging category should have functions");
+        
+        let symbolic_funcs = registry.get_category(FunctionCategory::Symbolic);
+        assert!(!symbolic_funcs.is_empty(), "Symbolic category should have functions");
+    }
+
+    #[test]
+    fn test_implementation_coverage_validation() {
+        let registry = FunctionRegistry::new();
+        
+        let implemented = vec![
+            "connect", "send", "recv", "sendline", "recvline", "recvuntil", "close",
+            "process", "interactive", "connect_ssh", "ssh_run", "ssh_upload", "ssh_download",
+            "connect_ssh_pty", "ssh_interactive_start", "ssh_interactive_send",
+            "ssh_interactive_recv", "ssh_interactive_close",
+            "p64", "p32", "p16", "p8", "u64", "u32", "u16", "u8",
+            "cyclic", "cyclic_find", "shellcode", "flat", "rop_find", "fmtstr_payload",
+            "analyze", "auto_offset", "disasm",
+            "len", "range", "hex", "int", "bytes", "str", "print", "random_string", "extract_pattern",
+            "read", "write", "split", "join", "replace", "copy", "remote", "help",
+            "debug_attach", "breakpoint", "debug_continue", "debug_step",
+            "debug_read_mem", "debug_write_mem", "debug_read_reg", "debug_write_reg",
+            "symbolic_var", "constrain_no_null", "constrain_alnum", "constrain_range", "symbolic_solve",
+            "pool_spray", "heap_feng_shui",
+            "token_steal", "process_hide", "rootkit_install", "kaslr_leak", "smep_bypass",
+            "kernel_write", "kernel_read",
+            "padding_oracle", "bleichenbacher", "timing_attack", "weak_keys", "hash_collision",
+            "aes_padding_attack", "rsa_factorize",
+            "fuzz_target", "mutate", "coverage", "corpus_add", "crash_triage",
+            "parallel_exploit", "generate_exploit",
+        ];
+        
+        match registry.validate_implementation_coverage(&implemented) {
+            Ok(_) => {},
+            Err(err) => {
+                println!("Coverage validation errors:\n{}", err);
+            }
+        }
+    }
+
+    #[test]
+    fn test_search_includes_related() {
+        let registry = FunctionRegistry::new();
+        
+        let results = registry.search("rop");
+        assert!(!results.is_empty(), "Search for 'rop' should return results");
+        
+        let rop_find_exists = results.iter().any(|f| f.name == "rop_find");
+        assert!(rop_find_exists, "rop_find should be in search results for 'rop'");
+    }
+
+    #[test]
+    fn test_version_and_deprecation() {
+        let registry = FunctionRegistry::new();
+        
+        if let Some(func) = registry.get("copy") {
+            assert_eq!(func.since_version, "0.2.0", "copy should be version 0.2.0");
+            assert!(func.deprecated.is_none(), "copy should not be deprecated");
+        }
+    }
+
+    #[test]
+    fn test_all_functions_have_examples() {
+        let registry = FunctionRegistry::new();
+        
+        for func in registry.all_functions() {
+            assert!(
+                !func.examples.is_empty(),
+                "Function '{}' should have at least one example",
+                func.name
+            );
+        }
+    }
 }

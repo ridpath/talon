@@ -61,3 +61,4 @@ pub mod ctf_helpers;
 pub mod ctf_quick_helpers;
 pub mod helpers;
 pub mod output_utils;
+pub mod registry;
