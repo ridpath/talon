@@ -54,8 +54,11 @@ pub mod repl;
 pub mod runtime_safety;
 pub mod shellcode_db;
 pub mod socket_tools;
+pub mod session_state;
+pub mod split_screen_debugger;
 pub mod ssh_bridge;
 pub mod symbolic_engine;
+pub mod time_travel;
 pub mod web_tools;
 
 pub mod ctf_helpers;

@@ -133,8 +133,9 @@ mod observable; // Reactive Observable<T> type system for state management
 mod orchestrator; // Async orchestrator runtime with task management
 mod parallel_execution; // Parallel for, race, and concurrent strategies
 mod resilient_execution; // Resilient execution with auto-rollback
-mod session_state; // First-class exploit session state management
-mod time_travel; // Time-travel debugging with checkpoint/rewind // Intelligent exploit suggestion and auto-weaponization
+mod session_state;
+mod split_screen_debugger;
+mod time_travel;
 
 // PHASE 20 - REVOLUTIONARY UX & COMMUNITY FEATURES
 mod adversary_playbook; // Adversary emulation playbook simulator
@@ -168,6 +169,7 @@ mod vuln_forecast; // Vulnerability prediction and patch analysis // Auto-assemb
 mod auto_offset; // Automatic offset finding with crash analysis
 mod flag_tools; // Flag pattern search and CTF platform submission
 mod gdb_parser; // Real GDB output parsing with MI support
+mod gdb_tools; // GDB session management and control
 mod libc_database; // libc.rip integration for libc identification and download
 mod quick_mode; // Interactive quick-mode helpers (quick_shell, quick_rop, etc.)
 

@@ -1,5 +1,6 @@
 #![allow(dead_code)]
 
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -11,7 +12,7 @@ pub struct ExploitSession {
     history: Arc<RwLock<Vec<StateSnapshot>>>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SessionState {
     pub target: TargetInfo,
     pub memory: MemoryState,
@@ -21,16 +22,17 @@ pub struct SessionState {
     pub metadata: HashMap<String, String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TargetInfo {
     pub pid: Option<u32>,
+    #[serde(skip)]
     pub address: Option<SocketAddr>,
     pub binary_path: Option<String>,
     pub architecture: Architecture,
     pub protections: ProtectionFlags,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum Architecture {
     X86,
     X86_64,
@@ -40,7 +42,7 @@ pub enum Architecture {
     Unknown,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProtectionFlags {
     pub nx: bool,
     pub pie: bool,
@@ -49,14 +51,14 @@ pub struct ProtectionFlags {
     pub relro: RelroLevel,
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum RelroLevel {
     None,
     Partial,
     Full,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryState {
     pub stack_pointer: Option<u64>,
     pub base_pointer: Option<u64>,
@@ -65,7 +67,7 @@ pub struct MemoryState {
     pub allocations: Vec<MemoryAllocation>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct MemoryAllocation {
     pub address: u64,
     pub size: usize,
@@ -73,7 +75,7 @@ pub struct MemoryAllocation {
     pub label: Option<String>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AddressTable {
     pub libc_base: Option<u64>,
     pub heap_base: Option<u64>,
@@ -82,30 +84,36 @@ pub struct AddressTable {
     pub symbols: HashMap<String, u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ConnectionInfo {
     pub connection_type: ConnectionType,
     pub status: ConnectionStatus,
     pub bytes_sent: usize,
     pub bytes_received: usize,
+    #[serde(skip, default = "default_instant")]
     pub established_at: std::time::Instant,
 }
 
-#[derive(Debug, Clone)]
+fn default_instant() -> std::time::Instant {
+    std::time::Instant::now()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ConnectionType {
+    #[serde(skip)]
     Socket(SocketAddr),
     Process(u32),
     Serial(String),
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ConnectionStatus {
     Connected,
     Disconnected,
     Error,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SessionValue {
     Integer(i64),
     String(String),
@@ -115,9 +123,10 @@ pub enum SessionValue {
     Map(HashMap<String, SessionValue>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct StateSnapshot {
     pub id: u64,
+    #[serde(skip, default = "default_instant")]
     pub timestamp: std::time::Instant,
     pub state: SessionState,
     pub label: Option<String>,

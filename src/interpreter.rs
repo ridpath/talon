@@ -4015,6 +4015,59 @@ fn eval_expr<'a>(
                         println!("[CLIPBOARD] Copied {} bytes to clipboard", data.len());
                         Ok(Value::Null)
                     }
+                    "debug" => {
+                        use crate::session_state::ExploitSession;
+                        use crate::time_travel::TimeTravelDebugger;
+                        use crate::split_screen_debugger::start_split_screen_debug;
+                        use std::sync::Arc;
+                        
+                        if arg_values.is_empty() {
+                            return Err("debug() requires a connection or PID argument".to_string());
+                        }
+                        
+                        let pid = match &arg_values[0] {
+                            Value::Number(n) => *n as u32,
+                            Value::Map(conn_map) => {
+                                if let Some(Value::Number(id)) = conn_map.get("id") {
+                                    *id as u32
+                                } else {
+                                    return Err("Connection does not have a PID".to_string());
+                                }
+                            }
+                            _ => return Err("debug() requires a PID (number) or connection object".to_string()),
+                        };
+                        
+                        let source_file = if arg_values.len() > 1 {
+                            Some(arg_values[1].to_string())
+                        } else {
+                            None
+                        };
+                        
+                        println!("[DEBUG] Starting split-screen debugger for PID {}", pid);
+                        println!("[DEBUG] Commands: s=step, c=continue, r=reverse-step, R=reverse-continue, b=breakpoint, p=print-vars, q=quit");
+                        
+                        let session = Arc::new(ExploitSession::new());
+                        let debugger = TimeTravelDebugger::new(session.clone());
+                        
+                        debugger.attach_gdb(pid).await?;
+                        debugger.start_recording().await;
+                        
+                        let gdb_session = Arc::clone(&debugger.gdb_session);
+                        let debugger_arc = Arc::new(debugger);
+                        
+                        tokio::task::spawn_blocking(move || {
+                            let runtime = tokio::runtime::Runtime::new().unwrap();
+                            runtime.block_on(async {
+                                start_split_screen_debug(gdb_session, debugger_arc, source_file).await
+                            })
+                        })
+                        .await
+                        .map_err(|e| format!("Debug session error: {}", e))?
+                        .map_err(|e| format!("Debug session error: {}", e))?;
+                        
+                        println!("[DEBUG] Split-screen debugger closed");
+                        Ok(Value::Null)
+                    }
                     "mitigation_analyze" => {
                         use crate::mitigation_detector::MitigationDetector;
                         use colored::Colorize;
