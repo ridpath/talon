@@ -1,6 +1,7 @@
 use crate::helpers::{DocGenerator, ErrorHelper, ScriptHelper};
 use crate::interpreter::interpret;
 use crate::parser::parse_script;
+use crate::registry::FunctionRegistry;
 use rustyline::completion::{Completer, Pair};
 use rustyline::error::ReadlineError;
 use rustyline::highlight::Highlighter;
@@ -9,9 +10,11 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{hint::HistoryHinter, Context, Editor, Helper};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use colored::Colorize;
 
 struct TalonCompleter {
     hinter: HistoryHinter,
+    registry: FunctionRegistry,
 }
 
 impl Completer for TalonCompleter {
@@ -24,35 +27,6 @@ impl Completer for TalonCompleter {
         _ctx: &Context<'_>,
     ) -> Result<(usize, Vec<Pair>), ReadlineError> {
         let mut candidates = Vec::new();
-
-        let functions = vec![
-            "cyclic",
-            "cyclic_find",
-            "shellcode",
-            "rop_find",
-            "fmtstr_payload",
-            "interactive",
-            "disasm",
-            "connect",
-            "analyze",
-            "fuzz",
-            "parse",
-            "scan",
-            "detect",
-            "execute",
-            "load",
-            "print",
-            "hex",
-            "base64",
-            "xor",
-            "aes",
-            "rsa",
-            "socket",
-            "http",
-            "fetch",
-            "send",
-            "recv",
-        ];
 
         let keywords = vec![
             "let", "const", "define", "function", "if", "else", "for", "in", "end", "return",
@@ -85,11 +59,12 @@ impl Completer for TalonCompleter {
             .unwrap_or(0);
         let prefix = &line[word_start..pos];
 
-        for func in functions {
-            if func.starts_with(prefix) {
+        for func in self.registry.all_functions() {
+            if func.name.starts_with(prefix) {
+                let display = format!("{} - {}", func.name, func.signature);
                 candidates.push(Pair {
-                    display: func.to_string(),
-                    replacement: func.to_string(),
+                    display,
+                    replacement: func.name.clone(),
                 });
             }
         }
@@ -126,11 +101,70 @@ impl Hinter for TalonCompleter {
 
 impl Highlighter for TalonCompleter {
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
-        Cow::Borrowed(line)
+        let keywords = vec![
+            "let", "const", "define", "function", "if", "else", "for", "in", "end", "return",
+            "match", "case", "try", "catch", "async", "await", "struct", "import", "include",
+            "parallel",
+        ];
+        
+        let mut result = String::new();
+        let mut chars = line.chars().peekable();
+        let mut current_word = String::new();
+        let mut in_string = false;
+        let mut string_char = ' ';
+        
+        while let Some(ch) = chars.next() {
+            if in_string {
+                current_word.push(ch);
+                if ch == string_char && (current_word.len() == 1 || !current_word.ends_with("\\")) {
+                    result.push_str(&current_word.green().to_string());
+                    current_word.clear();
+                    in_string = false;
+                }
+            } else if ch == '"' || ch == '\'' {
+                if !current_word.is_empty() {
+                    result.push_str(&Self::highlight_word(&current_word, &keywords, &self.registry));
+                    current_word.clear();
+                }
+                in_string = true;
+                string_char = ch;
+                current_word.push(ch);
+            } else if ch.is_whitespace() || ch == '(' || ch == ')' || ch == '{' || ch == '}' || ch == '[' || ch == ']' || ch == ',' || ch == ';' {
+                if !current_word.is_empty() {
+                    result.push_str(&Self::highlight_word(&current_word, &keywords, &self.registry));
+                    current_word.clear();
+                }
+                result.push(ch);
+            } else {
+                current_word.push(ch);
+            }
+        }
+        
+        if in_string {
+            result.push_str(&current_word.green().to_string());
+        } else if !current_word.is_empty() {
+            result.push_str(&Self::highlight_word(&current_word, &keywords, &self.registry));
+        }
+        
+        Cow::Owned(result)
     }
 
     fn highlight_char(&self, _line: &str, _pos: usize, _forced: bool) -> bool {
-        false
+        true
+    }
+}
+
+impl TalonCompleter {
+    fn highlight_word(word: &str, keywords: &[&str], registry: &FunctionRegistry) -> String {
+        if keywords.contains(&word) {
+            word.blue().to_string()
+        } else if word.parse::<i64>().is_ok() || word.starts_with("0x") {
+            word.cyan().to_string()
+        } else if registry.get(word).is_some() {
+            word.yellow().to_string()
+        } else {
+            word.to_string()
+        }
     }
 }
 
@@ -166,7 +200,11 @@ impl REPL {
     fn get_history_file() -> Option<std::path::PathBuf> {
         use directories::BaseDirs;
         if let Some(base_dirs) = BaseDirs::new() {
-            Some(base_dirs.home_dir().join(".talon_history"))
+            let talon_dir = base_dirs.home_dir().join(".talon");
+            if !talon_dir.exists() {
+                let _ = std::fs::create_dir_all(&talon_dir);
+            }
+            Some(talon_dir.join("history"))
         } else {
             None
         }
@@ -215,6 +253,7 @@ impl REPL {
 
         let helper = TalonCompleter {
             hinter: HistoryHinter {},
+            registry: FunctionRegistry::new(),
         };
         let mut rl = Editor::new().unwrap();
         rl.set_helper(Some(helper));
@@ -334,7 +373,7 @@ impl REPL {
             }
             "exit" | "quit" | "q" => {
                 self.save_history();
-                println!("History saved to ~/.talon_history");
+                println!("History saved to ~/.talon/history");
                 println!("Goodbye!");
                 std::process::exit(0);
             }
