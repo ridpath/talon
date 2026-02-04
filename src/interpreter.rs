@@ -2797,6 +2797,88 @@ fn eval_expr<'a>(
                         );
                         Ok(Value::List(result_list))
                     }
+                    "mass_connect" => {
+                        use crate::parallel_exploit::mass_connect;
+
+                        if arg_values.is_empty() {
+                            return Err("mass_connect() requires hosts list".to_string());
+                        }
+
+                        let hosts = if let Value::List(h) = &arg_values[0] {
+                            h.iter().map(|v| v.to_string()).collect()
+                        } else {
+                            return Err("mass_connect() requires list of host strings".to_string());
+                        };
+
+                        let port = if arg_values.len() > 1 {
+                            if let Value::Number(n) = &arg_values[1] {
+                                *n as u16
+                            } else {
+                                return Err("mass_connect() port must be a number".to_string());
+                            }
+                        } else {
+                            return Err("mass_connect() requires port number".to_string());
+                        };
+
+                        let max_concurrent = if arg_values.len() > 2 {
+                            if let Value::Number(n) = &arg_values[2] {
+                                Some(*n as usize)
+                            } else {
+                                return Err("max_concurrent must be a number".to_string());
+                            }
+                        } else {
+                            None
+                        };
+
+                        let timeout_ms = if arg_values.len() > 3 {
+                            if let Value::Number(n) = &arg_values[3] {
+                                Some(*n as u64)
+                            } else {
+                                return Err("timeout_ms must be a number".to_string());
+                            }
+                        } else {
+                            None
+                        };
+
+                        let rate_limit_ms = if arg_values.len() > 4 {
+                            if let Value::Number(n) = &arg_values[4] {
+                                Some(*n as u64)
+                            } else {
+                                return Err("rate_limit_ms must be a number".to_string());
+                            }
+                        } else {
+                            None
+                        };
+
+                        let results = mass_connect(hosts, port, max_concurrent, timeout_ms, rate_limit_ms)
+                            .await
+                            .map_err(|e| format!("Mass connection failed: {}", e))?;
+
+                        let success_count = results.iter().filter(|r| r.success).count();
+                        let result_list: Vec<Value> = results
+                            .iter()
+                            .map(|r| {
+                                let mut map = HashMap::new();
+                                map.insert("target".to_string(), Value::String(r.target.clone()));
+                                map.insert("success".to_string(), Value::Number(if r.success { 1 } else { 0 }));
+                                map.insert("duration_ms".to_string(), Value::Number(r.duration_ms as i64));
+                                if let Some(conn_id) = r.connection_id {
+                                    map.insert("connection_id".to_string(), Value::Number(conn_id as i64));
+                                }
+                                if let Some(ref err) = r.error {
+                                    map.insert("error".to_string(), Value::String(err.clone()));
+                                }
+                                Value::Map(map)
+                            })
+                            .collect();
+
+                        println!(
+                            "[MASS] Successfully connected to {}/{} targets",
+                            success_count,
+                            results.len()
+                        );
+                        Ok(Value::List(result_list))
+                    }
                     "generate_exploit" => {
                         use crate::ai_exploit_gen::{generate_exploit_ai, AIConfig};
                         use colored::*;

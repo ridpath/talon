@@ -1628,7 +1628,23 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
                 "parallel_exploit(target_list, pwn_func)",
             ],
         )
-        .with_related(vec!["remote", "connect"])
+        .with_related(vec!["remote", "connect", "mass_connect"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "mass_connect".to_string(),
+        BuiltinFunction::new(
+            "mass_connect",
+            "mass_connect(hosts: list, port: int, max_concurrent: int, timeout_ms: int, rate_limit_ms: int) -> list",
+            "Establishes concurrent TCP connections to multiple hosts using Tokio async runtime with connection pooling, rate limiting, and progress reporting. Supports up to 1000 concurrent connections with zero-copy I/O for optimal performance.",
+            "Network",
+            vec![
+                "let results = mass_connect([\"192.168.1.1\", \"192.168.1.2\"], 22, 100, 5000, 50)",
+                "let conns = mass_connect(target_hosts, 4444, 50, 10000, 100)",
+            ],
+        )
+        .with_related(vec!["parallel_exploit", "remote", "connect"])
         .with_version("0.1.0"),
     );
 
