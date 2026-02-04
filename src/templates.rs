@@ -198,14 +198,7 @@ impl TemplateGenerator {
                 }
             },
             "6" => {
-                print!("\nChallenge name: ");
-                io::stdout().flush().ok();
-                
-                let mut challenge = String::new();
-                io::stdin().read_line(&mut challenge).map_err(|e| e.to_string())?;
-                let challenge = challenge.trim().replace(' ', "_").to_lowercase();
-                
-                ("basic", challenge.as_str())
+                ("basic", "ctf_challenge")
             },
             "7" => {
                 println!("\nOther Options:");
@@ -228,16 +221,21 @@ impl TemplateGenerator {
             _ => ("basic", "exploit"),
         };
         
-        print!("\nExploit name [{}]: ", suggested_name);
+        println!("\nExploit name (default: {})", suggested_name);
+        print!("Name: ");
         io::stdout().flush().ok();
         
-        let mut name = String::new();
-        io::stdin().read_line(&mut name).map_err(|e| e.to_string())?;
-        let name = name.trim();
-        let final_name = if name.is_empty() { suggested_name } else { name };
+        let mut name_input = String::new();
+        io::stdin().read_line(&mut name_input).map_err(|e| e.to_string())?;
+        let trimmed = name_input.trim();
+        let final_name = if trimmed.is_empty() { 
+            suggested_name.to_string() 
+        } else { 
+            trimmed.to_string()
+        };
         
         println!();
-        self.generate(template_type, final_name)
+        self.generate(template_type, &final_name)
     }
 }
 
