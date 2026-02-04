@@ -64,7 +64,8 @@ pub fn run_fast(script: &str) -> Result<(), String> {
     
     let commands = parser::parse_script(script)?;
     
-    interpreter::interpret(&commands)?;
+    let rt = tokio::runtime::Runtime::new().map_err(|e| e.to_string())?;
+    rt.block_on(interpreter::interpret(&commands))?;
     
     Ok(())
 }

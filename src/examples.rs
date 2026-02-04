@@ -381,7 +381,8 @@ print "Root shell obtained"
             let cmds = crate::parser::parse_script(&example.code)
                 .map_err(|e| format!("Parse error: {}", e))?;
 
-            crate::interpreter::interpret(&cmds).map_err(|e| format!("Execution error: {}", e))?;
+            let rt = tokio::runtime::Runtime::new().map_err(|e| format!("Runtime error: {}", e))?;
+            rt.block_on(crate::interpreter::interpret(&cmds)).map_err(|e| format!("Execution error: {}", e))?;
 
             Ok(())
         } else {
