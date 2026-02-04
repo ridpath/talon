@@ -166,6 +166,8 @@ tests/integration/output/
 # Cache directories
 .talon/
 ~/.talon/
+.talon_cache/
+.talon_history
 
 # Security-sensitive files (CRITICAL)
 *.key
