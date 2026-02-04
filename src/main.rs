@@ -33,8 +33,6 @@ mod ctf_helpers;
 mod encoding_tools;
 mod stego_tools;
 mod web_tools;
-// DISABLED: forensics_tools has persistent Unicode encoding issues on Windows
-// mod forensics_tools;
 mod archive_tools;
 mod binary_patch;
 mod blockchain_tools;
