@@ -530,6 +530,55 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         ),
     );
 
+    registry.insert(
+        "ssh_interact".to_string(),
+        BuiltinFunction::new(
+            "ssh_interact",
+            "ssh_interact(ssh: SSH, command: string, interactions: list<[string, string]>, timeout: int) -> string",
+            "Expect-style automation for SSH commands with interactive prompts (like pwntools sendlineafter)",
+            "SSH",
+            vec![
+                "let interactions = [[\"password:\", \"mypass\\n\"], [\"yes/no\", \"yes\\n\"]]",
+                "let output = ssh_interact(ssh, \"git clone ...\", interactions, 60)",
+                "let interactions = [[\"--More--\", \"v\"], [\"~\", \":shell\\n\"]]",
+                "let vim_output = ssh_interact(ssh, \"cat readme.txt\", interactions, 30)",
+            ],
+        )
+        .with_related(vec!["ssh_run", "ssh_interactive_start", "connect_ssh"]),
+    );
+
+    registry.insert(
+        "connect_ssh_key".to_string(),
+        BuiltinFunction::new(
+            "connect_ssh_key",
+            "connect_ssh_key(host: string, port: int, user: string, key_path: string, passphrase?: string) -> SSH",
+            "Establishes SSH connection with public key authentication (optional passphrase)",
+            "SSH",
+            vec![
+                "let ssh = connect_ssh_key(\"target.com\", 22, \"user\", \"~/.ssh/id_rsa\")",
+                "let ssh = connect_ssh_key(\"10.0.0.1\", 2222, \"root\", \"/root/.ssh/key\", \"passphrase\")",
+                "let ssh = connect_ssh_key(\"ctf.com\", 22, \"player\", \"./key.pem\", null)",
+            ],
+        )
+        .with_related(vec!["connect_ssh", "ssh_run"]),
+    );
+
+    registry.insert(
+        "ssh_forward".to_string(),
+        BuiltinFunction::new(
+            "ssh_forward",
+            "ssh_forward(ssh: SSH, local_port: int, remote_host: string, remote_port: int)",
+            "Creates local port forward through SSH tunnel (localhost:local_port -> remote_host:remote_port via SSH)",
+            "SSH",
+            vec![
+                "ssh_forward(ssh, 8080, \"internal.server\", 80)",
+                "ssh_forward(ssh, 3306, \"localhost\", 3306)",
+                "ssh_forward(ssh, 9000, \"192.168.1.100\", 8080)",
+            ],
+        )
+        .with_related(vec!["connect_ssh", "ssh_run"]),
+    );
+
     // Binary Packing
     registry.insert(
         "p64".to_string(),

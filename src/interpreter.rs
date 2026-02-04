@@ -3272,6 +3272,64 @@ fn eval_expr<'a>(
 
                         Ok(Value::SshConnection(conn_id))
                     }
+                    "connect_ssh_key" => {
+                        let host = arg_map
+                            .get("host")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("connect_ssh_key() requires 'host' parameter")?
+                            .to_string();
+
+                        let port = if let Some(Value::Number(p)) =
+                            arg_map.get("port").or_else(|| arg_values.get(1))
+                        {
+                            *p as u16
+                        } else {
+                            return Err("connect_ssh_key() requires 'port' parameter".to_string());
+                        };
+
+                        let user = arg_map
+                            .get("user")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("connect_ssh_key() requires 'user' parameter")?
+                            .to_string();
+
+                        let key_path = arg_map
+                            .get("key_path")
+                            .or_else(|| arg_values.get(3))
+                            .ok_or("connect_ssh_key() requires 'key_path' parameter")?
+                            .to_string();
+
+                        let passphrase = arg_map
+                            .get("passphrase")
+                            .or_else(|| arg_values.get(4))
+                            .map(|v| v.to_string());
+
+                        use colored::Colorize;
+
+                        println!(
+                            "{} Connecting to {}@{}:{} with key {}",
+                            "[SSH]".cyan(),
+                            user.yellow(),
+                            host.yellow(),
+                            port.to_string().yellow(),
+                            key_path.yellow()
+                        );
+
+                        let connection = SshConnection::connect_with_key(
+                            &host,
+                            port,
+                            &user,
+                            &key_path,
+                            passphrase.as_deref()
+                        )
+                        .map_err(|e| format!("SSH key authentication failed: {}", e))?;
+
+                        println!("{} SSH connection established", "[SSH]".green());
+
+                        let conn_id = SSH_CONNECTIONS.lock().await.add(connection);
+
+                        Ok(Value::SshConnection(conn_id))
+                    }
                     "ssh_run" => {
                         let ssh = arg_map
                             .get("ssh")
@@ -3386,6 +3444,60 @@ fn eval_expr<'a>(
                             "[SSH]".green(),
                             remote_path.yellow(),
                             local_path.yellow()
+                        );
+
+                        Ok(Value::Null)
+                    }
+                    "ssh_forward" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_forward() requires SSH connection")?;
+
+                        let local_port = if let Some(Value::Number(p)) =
+                            arg_map.get("local_port").or_else(|| arg_values.get(1))
+                        {
+                            *p as u16
+                        } else {
+                            return Err("ssh_forward() requires 'local_port' parameter".to_string());
+                        };
+
+                        let remote_host = arg_map
+                            .get("remote_host")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("ssh_forward() requires 'remote_host' parameter")?
+                            .to_string();
+
+                        let remote_port = if let Some(Value::Number(p)) =
+                            arg_map.get("remote_port").or_else(|| arg_values.get(3))
+                        {
+                            *p as u16
+                        } else {
+                            return Err("ssh_forward() requires 'remote_port' parameter".to_string());
+                        };
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err("ssh_forward() requires SSH connection object".to_string());
+                        };
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        connection
+                            .forward_local(local_port, &remote_host, remote_port)
+                            .map_err(|e| format!("Port forwarding failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!(
+                            "{} Port forward: localhost:{} -> {}:{}",
+                            "[SSH]".green(),
+                            local_port,
+                            remote_host.yellow(),
+                            remote_port
                         );
 
                         Ok(Value::Null)
@@ -3521,6 +3633,86 @@ fn eval_expr<'a>(
                         println!("{} Interactive session closed", "[SSH]".yellow());
 
                         Ok(Value::Null)
+                    }
+                    "ssh_interact" => {
+                        let ssh = arg_map
+                            .get("ssh")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("ssh_interact() requires SSH connection")?;
+
+                        let command = arg_map
+                            .get("command")
+                            .or_else(|| arg_values.get(1))
+                            .ok_or("ssh_interact() requires 'command' parameter")?
+                            .to_string();
+
+                        let interactions_val = arg_map
+                            .get("interactions")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("ssh_interact() requires 'interactions' parameter")?;
+
+                        let timeout = if let Some(Value::Number(t)) =
+                            arg_map.get("timeout").or_else(|| arg_values.get(3))
+                        {
+                            *t as u64
+                        } else {
+                            return Err("ssh_interact() requires 'timeout' parameter (seconds)".to_string());
+                        };
+
+                        let ssh_id = if let Value::SshConnection(id) = ssh {
+                            *id
+                        } else {
+                            return Err("ssh_interact() requires SSH connection object".to_string());
+                        };
+
+                        let interactions = if let Value::List(list) = interactions_val {
+                            let mut parsed_interactions = Vec::new();
+                            for item in list {
+                                if let Value::List(pair) = item {
+                                    if pair.len() != 2 {
+                                        return Err(format!(
+                                            "ssh_interact() interactions must be [pattern, response] pairs, got list of length {}",
+                                            pair.len()
+                                        ));
+                                    }
+                                    let pattern = pair[0].to_string();
+                                    let response = pair[1].to_string();
+                                    parsed_interactions.push((pattern, response));
+                                } else {
+                                    return Err(format!(
+                                        "ssh_interact() interactions must be a list of [pattern, response] pairs, got {:?}",
+                                        item
+                                    ));
+                                }
+                            }
+                            parsed_interactions
+                        } else {
+                            return Err(format!(
+                                "ssh_interact() interactions must be a list, got {:?}",
+                                interactions_val
+                            ));
+                        };
+
+                        use colored::Colorize;
+                        println!(
+                            "{} Expect-style automation: {} interactions, timeout {}s",
+                            "[SSH]".cyan(),
+                            interactions.len(),
+                            timeout
+                        );
+
+                        let registry = SSH_CONNECTIONS.lock().await;
+                        let connection = registry
+                            .get(ssh_id)
+                            .ok_or_else(|| format!("SSH connection {} not found", ssh_id))?;
+
+                        let output = connection
+                            .interact(&command, &interactions, timeout)
+                            .map_err(|e| format!("ssh_interact() failed: {}", e))?;
+
+                        println!("{} Automation completed", "[SSH]".green());
+
+                        Ok(Value::String(output))
                     }
                     "send" => {
                         let conn = arg_map

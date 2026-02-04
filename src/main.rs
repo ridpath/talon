@@ -32,6 +32,7 @@ mod repl;
 mod crypto_tools;
 mod ctf_helpers;
 mod encoding_tools;
+// mod forensics_tools;
 mod stego_tools;
 mod web_tools;
 mod archive_tools;

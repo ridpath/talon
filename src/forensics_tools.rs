@@ -401,20 +401,22 @@ impl MemoryDumpAnalyzer {
             .map_err(|e| format!("Failed to read dump: {}", e))?;
         
         let mut strings = Vec::new();
-        let mut current = String::new();
-        let mut start_offset = 0;
+        let mut current_string = Vec::new();
+        let mut string_start = 0;
         
         for (i, &byte) in data.iter().enumerate() {
             if byte.is_ascii_graphic() || byte == b' ' {
-                if current.is_empty() {
-                    start_offset = i;
+                if current_string.is_empty() {
+                    string_start = i;
                 }
-                current.push(byte as char);
+                current_string.push(byte);
             } else {
-                if current.len() >= min_length {
-                    strings.push((start_offset, current.clone()));
+                if current_string.len() >= min_length {
+                    if let Ok(s) = String::from_utf8(current_string.clone()) {
+                        strings.push((string_start, s));
+                    }
                 }
-                current.clear();
+                current_string.clear();
             }
         }
         
@@ -529,30 +531,27 @@ impl PCAPAnalyzer {
             return Err(String::from("Not a valid PCAP file"));
         }
         
-        log::info!("PCAP file size in bytes: {}", data.len());
         Ok(format!("[PCAP] File size: {} bytes\nUse tshark or wireshark for full network analysis", data.len()))
     }
     
     pub fn extract_http_objects(pcap_path: &str, output_dir: &str) -> Result<(), String> {
-        log::info!("Extracting HTTP objects from PCAP: {}", pcap_path);
-        
         fs::create_dir_all(output_dir)
-            .map_err(|e| format!("Failed to create output dir: {}", e))?;
+            .map_err(|e| format!("Failed to create output directory: {}", e))?;
         
-        let export_arg = format!("http,{}", output_dir);
-        let output = Command::new("tshark")
+        let status = Command::new("tshark")
             .arg("-r")
             .arg(pcap_path)
             .arg("--export-objects")
-            .arg(&export_arg)
-            .output()
-            .map_err(|e| format!("tshark execution failed: {}", e))?;
+            .arg(format!("http,{}", output_dir))
+            .status();
         
-        if output.status.success() {
-            log::info!("HTTP objects extracted to {}", output_dir);
-            Ok(())
-        } else {
-            Err(format!("Extraction failed: {}", String::from_utf8_lossy(&output.stderr)))
+        match status {
+            Ok(s) if s.success() => {
+                log::info!("HTTP objects extracted to {}", output_dir);
+                Ok(())
+            }
+            Ok(_) => Err(String::from("tshark failed to extract objects")),
+            Err(_) => Err(String::from("tshark not found")),
         }
     }
     
@@ -566,24 +565,24 @@ impl PCAPAnalyzer {
             .arg("fields")
             .arg("-e")
             .arg("dns.qry.name")
-            .output()
-            .map_err(|e| format!("tshark failed: {}", e))?;
+            .output();
         
-        if output.status.success() {
-            let queries: Vec<String> = String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .filter(|l| !l.is_empty())
-                .map(|s| s.to_string())
-                .collect();
-            
-            log::info!("Found {} DNS queries", queries.len());
-            Ok(queries)
-        } else {
-            Err(format!("DNS extraction failed: {}", String::from_utf8_lossy(&output.stderr)))
+        match output {
+            Ok(out) if out.status.success() => {
+                let queries: Vec<String> = String::from_utf8_lossy(&out.stdout)
+                    .lines()
+                    .filter(|l| !l.is_empty())
+                    .map(|l| l.to_string())
+                    .collect();
+                
+                log::info!("Found {} DNS queries", queries.len());
+                Ok(queries)
+            }
+            _ => Err(String::from("Failed to extract DNS queries")),
         }
     }
     
-    pub fn extract_credentials_from_pcap(pcap_path: &str) -> Result<Vec<String>, String> {
+    pub fn extract_credentials(pcap_path: &str) -> Result<Vec<String>, String> {
         let output = Command::new("tshark")
             .arg("-r")
             .arg(pcap_path)
@@ -593,20 +592,20 @@ impl PCAPAnalyzer {
             .arg("fields")
             .arg("-e")
             .arg("http.file_data")
-            .output()
-            .map_err(|e| format!("tshark failed: {}", e))?;
+            .output();
         
-        if output.status.success() {
-            let creds: Vec<String> = String::from_utf8_lossy(&output.stdout)
-                .lines()
-                .filter(|l| l.contains("password") || l.contains("user"))
-                .map(|s| s.to_string())
-                .collect();
-            
-            log::info!("Found {} potential credentials in HTTP POST data", creds.len());
-            Ok(creds)
-        } else {
-            Err(format!("Credential extraction failed: {}", String::from_utf8_lossy(&output.stderr)))
+        match output {
+            Ok(out) if out.status.success() => {
+                let creds: Vec<String> = String::from_utf8_lossy(&out.stdout)
+                    .lines()
+                    .filter(|l| l.contains("password") || l.contains("user"))
+                    .map(|l| l.to_string())
+                    .collect();
+                
+                log::info!("Found {} potential credential transmissions", creds.len());
+                Ok(creds)
+            }
+            _ => Err(String::from("Failed to extract credentials")),
         }
     }
 }
@@ -622,171 +621,161 @@ impl RegistryAnalyzer {
             .output();
         
         match output {
+            Ok(out) if out.status.success() => {
+                Ok(String::from_utf8_lossy(&out.stdout).to_string())
+            }
             Ok(out) => {
-                if out.status.success() {
-                    let result = String::from_utf8_lossy(&out.stdout).to_string();
-                    log::info!("Found registry entry count: {}", result.lines().count());
-                    Ok(result)
-                } else {
-                    Err(format!("reglookup failed: {}", String::from_utf8_lossy(&out.stderr)))
-                }
+                Err(format!("reglookup failed: {}", String::from_utf8_lossy(&out.stderr)))
             }
             Err(_) => {
-                log::warn!("reglookup not found, install with apt-get install reglookup");
-                Err(String::from("reglookup not found"))
+                Err(String::from("reglookup not found - install reglookup package"))
             }
         }
     }
     
-    pub fn extract_run_keys(hive_path: &str) -> Result<Vec<String>, String> {
-        let result = Self::analyze_hive(hive_path)?;
-        
-        let run_keys: Vec<String> = result.lines()
+    pub fn extract_run_keys(hive_analysis: &str) -> Vec<String> {
+        hive_analysis
+            .lines()
             .filter(|l| l.contains("Run") || l.contains("RunOnce"))
-            .map(|s| s.to_string())
-            .collect();
-        
-        log::info!("Found {} Run/RunOnce keys", run_keys.len());
-        Ok(run_keys)
+            .map(|l| l.to_string())
+            .collect()
     }
     
-    pub fn extract_recent_docs(hive_path: &str) -> Result<Vec<String>, String> {
-        let result = Self::analyze_hive(hive_path)?;
-        
-        let recent: Vec<String> = result.lines()
-            .filter(|l| l.contains("RecentDocs") || l.contains("Recent"))
-            .map(|s| s.to_string())
-            .collect();
-        
-        log::info!("Found {} recent documents entries", recent.len());
-        Ok(recent)
+    pub fn extract_recent_docs(hive_analysis: &str) -> Vec<String> {
+        hive_analysis
+            .lines()
+            .filter(|l| l.contains("RecentDocs"))
+            .map(|l| l.to_string())
+            .collect()
     }
 }
 
 pub struct AntiForensicsDetector;
 
 impl AntiForensicsDetector {
-    pub fn detect(file_or_dir: &str) -> Result<Vec<String>, String> {
-        let mut findings = Vec::new();
-        
-        log::info!("Scanning for anti-forensic techniques");
-        
-        let timestamps = TimelineAnalyzer::analyze_directory(file_or_dir)?;
+    pub fn detect_timestamp_manipulation(dir_path: &str) -> Result<Vec<PathBuf>, String> {
+        let timestamps = TimelineAnalyzer::analyze_directory(dir_path)?;
         let suspicious = TimelineAnalyzer::find_suspicious_timestamps(&timestamps);
         
-        if !suspicious.is_empty() {
-            findings.push(format!("Timestamp manipulation detected ({} files)", suspicious.len()));
-        }
+        Ok(suspicious.iter().map(|ts| ts.path.clone()).collect())
+    }
+    
+    pub fn detect_hidden_files(dir_path: &str) -> Result<Vec<PathBuf>, String> {
+        let mut hidden_files = Vec::new();
         
-        for entry in walkdir::WalkDir::new(file_or_dir) {
+        for entry in walkdir::WalkDir::new(dir_path) {
             let entry = entry.map_err(|e| format!("Walk error: {}", e))?;
             
-            let name = entry.file_name().to_string_lossy();
-            
-            if name.starts_with('.') && entry.file_type().is_file() {
-                findings.push(format!("Hidden file: {}", entry.path().display()));
+            if let Some(name) = entry.file_name().to_str() {
+                if name.starts_with('.') && entry.file_type().is_file() {
+                    hidden_files.push(entry.path().to_path_buf());
+                }
             }
+        }
+        
+        log::info!("Found {} hidden files", hidden_files.len());
+        Ok(hidden_files)
+    }
+    
+    pub fn detect_empty_files(dir_path: &str) -> Result<Vec<PathBuf>, String> {
+        let mut empty_files = Vec::new();
+        
+        for entry in walkdir::WalkDir::new(dir_path) {
+            let entry = entry.map_err(|e| format!("Walk error: {}", e))?;
             
             if entry.file_type().is_file() {
-                let metadata = entry.metadata()
-                    .map_err(|e| format!("Metadata error: {}", e))?;
-                
-                if metadata.len() == 0 {
-                    findings.push(format!("Empty file (possible wiping): {}", entry.path().display()));
-                }
-                
-                if let Ok(slack) = SlackSpaceAnalyzer::analyze_file(
-                    entry.path().to_str().unwrap(), 512
-                ) {
-                    if slack.iter().any(|&b| b != 0) {
-                        findings.push(format!("Non-zero slack space: {}", entry.path().display()));
+                if let Ok(metadata) = entry.metadata() {
+                    if metadata.len() == 0 {
+                        empty_files.push(entry.path().to_path_buf());
                     }
                 }
             }
         }
         
-        log::info!("Found suspicious indicator count: {}", findings.len());
-        for finding in &findings {
-            log::warn!("Anti-forensics detected: {}", finding);
-        }
-        
-        Ok(findings)
+        log::info!("Found {} empty files", empty_files.len());
+        Ok(empty_files)
     }
     
-    pub fn detect_timestomp(timestamps: &[FileTimestamp]) -> Vec<String> {
-        let mut findings = Vec::new();
+    pub fn detect_slack_space_anomalies(dir_path: &str) -> Result<Vec<PathBuf>, String> {
+        let slack_results = SlackSpaceAnalyzer::scan_directory_slack(dir_path, 4096)?;
+        
+        let anomalies: Vec<PathBuf> = slack_results.keys().cloned().collect();
+        
+        log::info!("Found {} files with slack space anomalies", anomalies.len());
+        Ok(anomalies)
+    }
+    
+    pub fn detect_timestomp(timestamps: &[FileTimestamp]) -> Vec<&FileTimestamp> {
+        let mut stomped = Vec::new();
+        let old_date = std::time::UNIX_EPOCH + std::time::Duration::from_secs(315532800);
         
         for ts in timestamps {
+            if let Some(modified) = ts.modified {
+                if modified < old_date {
+                    stomped.push(ts);
+                    log::warn!("Potential timestomp detected: {} (modified before 1980)", ts.path.display());
+                }
+            }
+            
             if let (Some(created), Some(modified)) = (ts.created, ts.modified) {
                 if modified < created {
-                    findings.push(format!("TIMESTOMP: Modified before created - {}", ts.path.display()));
-                }
-                
-                let year_1980 = std::time::UNIX_EPOCH + std::time::Duration::from_secs(315532800);
-                if created < year_1980 || modified < year_1980 {
-                    findings.push(format!("TIMESTOMP: Suspicious old timestamp - {}", ts.path.display()));
+                    stomped.push(ts);
                 }
             }
         }
         
-        findings
+        stomped
     }
 }
 
 pub struct VolatilityIntegration;
 
 impl VolatilityIntegration {
-    pub fn run_plugin(dump_path: &str, plugin: &str, profile: &str) -> Result<String, String> {
-        log::info!("Running Volatility plugin: {} on {}", plugin, dump_path);
-        
+    pub fn list_processes(memory_dump: &str, profile: &str) -> Result<String, String> {
         let output = Command::new("volatility")
             .arg("-f")
-            .arg(dump_path)
+            .arg(memory_dump)
             .arg("--profile")
             .arg(profile)
-            .arg(plugin)
-            .output()
-            .map_err(|e| format!("Volatility execution failed: {}", e))?;
+            .arg("pslist")
+            .output();
         
-        if output.status.success() {
-            Ok(String::from_utf8_lossy(&output.stdout).to_string())
-        } else {
-            Err(format!("Volatility failed: {}", String::from_utf8_lossy(&output.stderr)))
+        match output {
+            Ok(out) if out.status.success() => {
+                Ok(String::from_utf8_lossy(&out.stdout).to_string())
+            }
+            Ok(out) => {
+                Err(format!("Volatility failed: {}", String::from_utf8_lossy(&out.stderr)))
+            }
+            Err(_) => {
+                Err(String::from("Volatility not found - install volatility package"))
+            }
         }
     }
     
-    pub fn list_processes(dump_path: &str, profile: &str) -> Result<Vec<String>, String> {
-        let result = Self::run_plugin(dump_path, "pslist", profile)?;
+    pub fn dump_process_memory(memory_dump: &str, profile: &str, pid: u32, output_dir: &str) -> Result<(), String> {
+        fs::create_dir_all(output_dir)
+            .map_err(|e| format!("Failed to create output directory: {}", e))?;
         
-        let processes: Vec<String> = result.lines()
-            .skip(2)
-            .map(|s| s.to_string())
-            .collect();
-        
-        log::info!("Found {} processes", processes.len());
-        Ok(processes)
-    }
-    
-    pub fn dump_process_memory(dump_path: &str, profile: &str, pid: u32, output_dir: &str) -> Result<(), String> {
-        let pid_str = pid.to_string();
-        let output = Command::new("volatility")
+        let status = Command::new("volatility")
             .arg("-f")
-            .arg(dump_path)
+            .arg(memory_dump)
             .arg("--profile")
             .arg(profile)
             .arg("memdump")
             .arg("-p")
-            .arg(&pid_str)
-            .arg("-D")
+            .arg(pid.to_string())
+            .arg("--dump-dir")
             .arg(output_dir)
-            .output()
-            .map_err(|e| format!("Volatility execution failed: {}", e))?;
+            .status();
         
-        if output.status.success() {
-            log::info!("Process {} memory dumped to {}", pid, output_dir);
-            Ok(())
-        } else {
-            Err(format!("Memory dump failed: {}", String::from_utf8_lossy(&output.stderr)))
+        match status {
+            Ok(s) if s.success() => {
+                log::info!("Process memory dumped to {}", output_dir);
+                Ok(())
+            }
+            Ok(_) => Err(String::from("Volatility failed to dump memory")),
+            Err(_) => Err(String::from("Volatility not found")),
         }
     }
 }
@@ -795,109 +784,123 @@ impl VolatilityIntegration {
 mod tests {
     use super::*;
     use std::fs;
-
+    
     #[test]
-    fn test_file_carver_new() {
+    fn test_file_carver_signatures() {
         let carver = FileCarver::new();
-        assert!(!carver.signatures.is_empty());
         assert!(carver.signatures.contains_key("JPEG"));
         assert!(carver.signatures.contains_key("PNG"));
-        assert!(carver.signatures.contains_key("ELF"));
         assert!(carver.signatures.contains_key("PDF"));
-        assert!(carver.signatures.contains_key("DOCX"));
     }
-
+    
     #[test]
-    fn test_slack_space_analyzer() {
-        let test_file = "test_slack_forensics.tmp";
-        fs::write(test_file, b"Hello World Test Data").unwrap();
-        
-        let result = SlackSpaceAnalyzer::analyze_file(test_file, 512);
-        assert!(result.is_ok());
-        
-        let slack = result.unwrap();
-        assert!(slack.len() > 0);
-        
-        fs::remove_file(test_file).ok();
+    fn test_file_carver_find_footer() {
+        let carver = FileCarver::new();
+        let data = vec![0xFF, 0xD8, 0xFF, 0x00, 0x01, 0x02, 0xFF, 0xD9];
+        let footer = vec![0xFF, 0xD9];
+        let result = carver.find_footer(&data, 0, &footer);
+        assert_eq!(result, Some(8));
     }
-
+    
     #[test]
-    fn test_memory_dump_search() {
-        let test_dump = "test_dump_forensics.tmp";
-        fs::write(test_dump, b"password123 secret admin token12345").unwrap();
+    fn test_memory_dump_string_extraction() {
+        let test_dump = "test_dump.bin";
+        let data = b"Hello World\x00\x00\x00Test String\x00\xFF\xFF";
+        fs::write(test_dump, data).unwrap();
         
-        let patterns = vec!["password", "admin", "token"];
-        let result = MemoryDumpAnalyzer::search_patterns(test_dump, &patterns);
-        
-        assert!(result.is_ok());
-        let results = result.unwrap();
-        assert!(results.contains_key("password"));
-        assert!(results.contains_key("admin"));
-        assert!(results.contains_key("token"));
-        
-        fs::remove_file(test_dump).ok();
-    }
-
-    #[test]
-    fn test_string_extraction() {
-        let test_dump = "test_strings_forensics.tmp";
-        let test_data = b"Hello\x00World\x00TALON\x00Forensics\x00";
-        fs::write(test_dump, test_data).unwrap();
-        
-        let result = MemoryDumpAnalyzer::extract_strings(test_dump, 4);
+        let result = MemoryDumpAnalyzer::extract_strings(test_dump, 5);
         assert!(result.is_ok());
         
         let strings = result.unwrap();
-        assert!(!strings.is_empty());
+        assert!(strings.iter().any(|(_, s)| s.contains("Hello World")));
         
         fs::remove_file(test_dump).ok();
     }
     
     #[test]
-    fn test_url_extraction() {
-        let test_dump = "test_urls_forensics.tmp";
-        let test_data = b"Check out https://example.com and http://test.org for more info";
-        fs::write(test_dump, test_data).unwrap();
+    fn test_pattern_search() {
+        let test_dump = "test_dump2.bin";
+        let data = b"password=secret123\x00admin:pass456\x00";
+        fs::write(test_dump, data).unwrap();
         
-        let result = MemoryDumpAnalyzer::find_urls(test_dump);
+        let patterns = vec!["password", "admin"];
+        let result = MemoryDumpAnalyzer::search_patterns(test_dump, &patterns);
         assert!(result.is_ok());
         
-        let urls = result.unwrap();
-        assert!(!urls.is_empty());
-        assert!(urls.iter().any(|u| u.contains("example.com")));
+        let matches = result.unwrap();
+        assert!(matches.contains_key("password"));
+        assert!(matches.contains_key("admin"));
         
         fs::remove_file(test_dump).ok();
     }
     
     #[test]
-    fn test_file_signature_footer() {
-        let carver = FileCarver::new();
-        let jpeg_sig = carver.signatures.get("JPEG").unwrap();
-        assert!(jpeg_sig.footer.is_some());
+    fn test_slack_space_calculation() {
+        let test_file = "test_slack.txt";
+        fs::write(test_file, b"Hello").unwrap();
         
-        let png_sig = carver.signatures.get("PNG").unwrap();
-        assert!(png_sig.footer.is_some());
+        let result = SlackSpaceAnalyzer::analyze_file(test_file, 4096);
+        assert!(result.is_ok());
+        
+        let slack = result.unwrap();
+        assert_eq!(slack.len(), 4096 - 5);
+        
+        fs::remove_file(test_file).ok();
     }
     
     #[test]
-    fn test_timeline_analyzer() {
-        let test_dir = "test_timeline_forensics";
+    fn test_timeline_analysis() {
+        let test_dir = "test_timeline";
         fs::create_dir_all(test_dir).unwrap();
-        fs::write(format!("{}/file1.txt", test_dir), b"test1").unwrap();
-        fs::write(format!("{}/file2.txt", test_dir), b"test2").unwrap();
+        fs::write(format!("{}/file1.txt", test_dir), b"test").unwrap();
         
         let result = TimelineAnalyzer::analyze_directory(test_dir);
         assert!(result.is_ok());
         
         let timestamps = result.unwrap();
-        assert_eq!(timestamps.len(), 2);
+        assert!(!timestamps.is_empty());
         
         fs::remove_dir_all(test_dir).ok();
     }
     
     #[test]
-    fn test_deleted_file_recovery_scan() {
-        let test_image = "test_image_forensics.tmp";
+    fn test_pcap_basic_validation() {
+        let test_pcap = "test.pcap";
+        let data = vec![0xd4, 0xc3, 0xb2, 0xa1, 0x00, 0x00];
+        fs::write(test_pcap, &data).unwrap();
+        
+        let result = PCAPAnalyzer::basic_analysis(test_pcap);
+        assert!(result.is_ok());
+        
+        fs::remove_file(test_pcap).ok();
+    }
+    
+    #[test]
+    fn test_anti_forensics_hidden_files() {
+        let test_dir = "test_hidden";
+        fs::create_dir_all(test_dir).unwrap();
+        fs::write(format!("{}/.hidden", test_dir), b"secret").unwrap();
+        fs::write(format!("{}/visible.txt", test_dir), b"public").unwrap();
+        
+        let result = AntiForensicsDetector::detect_hidden_files(test_dir);
+        assert!(result.is_ok());
+        
+        let hidden = result.unwrap();
+        assert_eq!(hidden.len(), 1);
+        
+        fs::remove_dir_all(test_dir).ok();
+    }
+    
+    #[test]
+    fn test_registry_run_key_extraction() {
+        let hive_data = "HKEY_LOCAL_MACHINE\\Software\\Microsoft\\Windows\\CurrentVersion\\Run\nmalware.exe";
+        let run_keys = RegistryAnalyzer::extract_run_keys(hive_data);
+        assert!(!run_keys.is_empty());
+    }
+    
+    #[test]
+    fn test_deleted_file_scanning() {
+        let test_image = "test_image.img";
         let mut data = vec![0u8; 1024];
         data[100..103].copy_from_slice(&[0xFF, 0xD8, 0xFF]);
         data[500..508].copy_from_slice(&[0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);

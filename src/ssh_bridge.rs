@@ -314,6 +314,62 @@ impl SshConnection {
         }
     }
     
+    pub fn interact(&self, command: &str, interactions: &[(String, String)], timeout_seconds: u64) -> Result<String, SshError> {
+        let sess = self.session.lock().unwrap();
+        let mut channel = sess.channel_session()
+            .map_err(|e| SshError::ChannelError(format!("Failed to create channel: {}", e)))?;
+        
+        channel.exec(command)
+            .map_err(|e| SshError::ChannelError(format!("Failed to execute command: {}", e)))?;
+        
+        drop(sess);
+        
+        let mut all_output = String::new();
+        let mut interaction_idx = 0;
+        let start_time = std::time::Instant::now();
+        let timeout_duration = Duration::from_secs(timeout_seconds);
+        
+        loop {
+            if start_time.elapsed() >= timeout_duration {
+                break;
+            }
+            
+            let mut chunk = [0u8; 4096];
+            match channel.read(&mut chunk) {
+                Ok(0) => break,
+                Ok(n) => {
+                    let data = String::from_utf8_lossy(&chunk[..n]).to_string();
+                    all_output.push_str(&data);
+                    
+                    if interaction_idx < interactions.len() {
+                        let (pattern, response) = &interactions[interaction_idx];
+                        if all_output.contains(pattern) {
+                            channel.write_all(response.as_bytes())
+                                .map_err(|e| SshError::IoError(format!("Failed to send response: {}", e)))?;
+                            channel.flush()
+                                .map_err(|e| SshError::IoError(format!("Failed to flush: {}", e)))?;
+                            interaction_idx += 1;
+                        }
+                    }
+                }
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock || e.kind() == std::io::ErrorKind::TimedOut => {
+                    std::thread::sleep(Duration::from_millis(100));
+                    continue;
+                }
+                Err(e) => {
+                    return Err(SshError::IoError(format!("Failed to read from channel: {}", e)));
+                }
+            }
+        }
+        
+        channel.close()
+            .map_err(|e| SshError::ChannelError(format!("Failed to close channel: {}", e)))?;
+        channel.wait_close()
+            .map_err(|e| SshError::ChannelError(format!("Failed to wait for channel close: {}", e)))?;
+        
+        Ok(all_output)
+    }
+    
     pub fn get_host(&self) -> &str {
         &self.host
     }
