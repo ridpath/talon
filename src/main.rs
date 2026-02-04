@@ -48,6 +48,7 @@ mod cyclic_tools; // De Bruijn sequences for offset finding
 mod elf_tools; // ELF symbol resolution (symbols, plt, got) + string search
 mod exploit_templates; // Auto-generate exploit scripts
 mod fmtstr_tools; // Format string auto-exploit (optimized payload generation)
+mod oracle; // Vulnerability analysis and semantic shellcode selection
 mod heap_tools; // Modern heap exploitation (tcache, fastbin, unsorted bin)
 mod interactive_io; // Socket context with send/recv/interactive (FULL TTY)
 mod libc_db;

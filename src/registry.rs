@@ -1648,6 +1648,75 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         .with_version("0.1.0"),
     );
 
+    registry.insert(
+        "oracle_analyze".to_string(),
+        BuiltinFunction::new(
+            "oracle_analyze",
+            "oracle_analyze(binary: string) -> list",
+            "Analyzes binary for vulnerabilities using heuristic engine. Returns list of vulnerability reports.",
+            "Binary Analysis",
+            vec![
+                "let vulns = oracle_analyze(\"./vuln\")",
+                "for vuln in vulns { print(vuln.type) }",
+                "let report = oracle_analyze(\"./target\")",
+                "print(report[0].exploitability)",
+            ],
+        )
+        .with_related(vec!["oracle_find_shellcode", "oracle_gadget_density", "rop_find"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "oracle_find_shellcode".to_string(),
+        BuiltinFunction::new(
+            "oracle_find_shellcode",
+            "oracle_find_shellcode(avoid: list, max_size: int, arch: string) -> list",
+            "Finds shellcodes matching constraints (bad characters, size, architecture). Returns list of shellcode entries.",
+            "Binary Analysis",
+            vec![
+                "let sc = oracle_find_shellcode([0x00, 0x0a], 64, \"x86-64\")",
+                "let shellcodes = oracle_find_shellcode([0x00], 100, \"i386\")",
+                "print(sc[0].name)",
+            ],
+        )
+        .with_related(vec!["oracle_analyze", "shellcode"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "oracle_gadget_density".to_string(),
+        BuiltinFunction::new(
+            "oracle_gadget_density",
+            "oracle_gadget_density(binary: string) -> map",
+            "Analyzes ROP gadget availability and quality in binary. Returns gadget density metrics.",
+            "Binary Analysis",
+            vec![
+                "let gadgets = oracle_gadget_density(\"./vuln\")",
+                "print(gadgets.rop_possible)",
+                "print(gadgets.quality_score)",
+            ],
+        )
+        .with_related(vec!["oracle_analyze", "rop_find", "rop_chain"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "oracle_report".to_string(),
+        BuiltinFunction::new(
+            "oracle_report",
+            "oracle_report(vulnerabilities: list) -> string",
+            "Generates comprehensive vulnerability analysis report from analysis results.",
+            "Binary Analysis",
+            vec![
+                "let vulns = oracle_analyze(\"./vuln\")",
+                "let report = oracle_report(vulns)",
+                "print(report)",
+            ],
+        )
+        .with_related(vec!["oracle_analyze"])
+        .with_version("0.1.0"),
+    );
+
     registry
 }
 
