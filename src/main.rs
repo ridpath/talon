@@ -24,6 +24,7 @@ mod socket_tools;
 
 // User-Friendly Enhancements
 mod helpers;
+mod registry;
 mod repl;
 
 // CTF/PENTESTING MODULES (Phase 1-5)

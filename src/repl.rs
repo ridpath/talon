@@ -1,5 +1,5 @@
 use crate::helpers::{DocGenerator, ErrorHelper, ScriptHelper};
-use crate::interpreter::interpret;
+use crate::interpreter::{interpret, Value};
 use crate::parser::parse_script;
 use crate::registry::FunctionRegistry;
 use rustyline::completion::{Completer, Pair};
@@ -59,31 +59,51 @@ impl Completer for TalonCompleter {
             .unwrap_or(0);
         let prefix = &line[word_start..pos];
 
-        for func in self.registry.all_functions() {
-            if func.name.starts_with(prefix) {
-                let display = format!("{} - {}", func.name, func.signature);
-                candidates.push(Pair {
-                    display,
-                    replacement: func.name.clone(),
-                });
+        if prefix.contains('.') {
+            let parts: Vec<&str> = prefix.split('.').collect();
+            if parts.len() == 2 {
+                let object_name = parts[0];
+                let method_prefix = parts[1];
+                
+                for func in self.registry.all_functions() {
+                    if func.name.starts_with(&format!("{}.", object_name)) 
+                        && func.name[object_name.len() + 1..].starts_with(method_prefix) {
+                        let method_name = &func.name[object_name.len() + 1..];
+                        let display = format!("{}.{} - {}", object_name, method_name, func.signature);
+                        candidates.push(Pair {
+                            display,
+                            replacement: func.name.clone(),
+                        });
+                    }
+                }
             }
-        }
-
-        for keyword in keywords {
-            if keyword.starts_with(prefix) {
-                candidates.push(Pair {
-                    display: keyword.to_string(),
-                    replacement: keyword.to_string(),
-                });
+        } else {
+            for func in self.registry.all_functions() {
+                if func.name.starts_with(prefix) {
+                    let display = format!("{} - {}", func.name, func.signature);
+                    candidates.push(Pair {
+                        display,
+                        replacement: func.name.clone(),
+                    });
+                }
             }
-        }
 
-        for cmd in commands {
-            if cmd.starts_with(prefix) {
-                candidates.push(Pair {
-                    display: cmd.to_string(),
-                    replacement: cmd.to_string(),
-                });
+            for keyword in keywords {
+                if keyword.starts_with(prefix) {
+                    candidates.push(Pair {
+                        display: keyword.to_string(),
+                        replacement: keyword.to_string(),
+                    });
+                }
+            }
+
+            for cmd in commands {
+                if cmd.starts_with(prefix) {
+                    candidates.push(Pair {
+                        display: cmd.to_string(),
+                        replacement: cmd.to_string(),
+                    });
+                }
             }
         }
 
@@ -164,6 +184,135 @@ impl TalonCompleter {
             word.yellow().to_string()
         } else {
             word.to_string()
+        }
+    }
+}
+
+fn pretty_print_bytes(bytes: &[u8]) -> String {
+    if bytes.is_empty() {
+        return "b\"\"".to_string();
+    }
+    
+    let mut output = String::new();
+    output.push_str(&format!("Bytes ({} bytes):\n", bytes.len()));
+    
+    for (i, chunk) in bytes.chunks(16).enumerate() {
+        output.push_str(&format!("{:08x}  ", i * 16));
+        
+        for (j, byte) in chunk.iter().enumerate() {
+            if j == 8 {
+                output.push(' ');
+            }
+            output.push_str(&format!("{:02x} ", byte));
+        }
+        
+        if chunk.len() < 16 {
+            for j in chunk.len()..16 {
+                if j == 8 {
+                    output.push(' ');
+                }
+                output.push_str("   ");
+            }
+        }
+        
+        output.push_str(" |");
+        for byte in chunk {
+            let ch = if byte.is_ascii_graphic() || *byte == b' ' {
+                *byte as char
+            } else {
+                '.'
+            };
+            output.push(ch);
+        }
+        output.push_str("|\n");
+    }
+    
+    output
+}
+
+fn pretty_print_map(map: &HashMap<String, Value>, indent: usize) -> String {
+    if map.is_empty() {
+        return "{}".to_string();
+    }
+    
+    let mut output = String::new();
+    output.push_str("{\n");
+    
+    let indent_str = "  ".repeat(indent + 1);
+    let close_indent = "  ".repeat(indent);
+    
+    let mut items: Vec<_> = map.iter().collect();
+    items.sort_by_key(|(k, _)| k.as_str());
+    
+    for (i, (key, value)) in items.iter().enumerate() {
+        output.push_str(&indent_str);
+        output.push_str(&format!("\"{}\": ", key));
+        
+        match value {
+            Value::Map(inner_map) => {
+                output.push_str(&pretty_print_map(inner_map, indent + 1));
+            }
+            Value::List(list) => {
+                output.push('[');
+                for (j, item) in list.iter().enumerate() {
+                    if j > 0 {
+                        output.push_str(", ");
+                    }
+                    output.push_str(&format_value(item));
+                }
+                output.push(']');
+            }
+            Value::String(s) => {
+                output.push_str(&format!("\"{}\"", s));
+            }
+            Value::Bytes(b) => {
+                output.push_str(&format!("b\"{}\"", hex::encode(b)));
+            }
+            other => {
+                output.push_str(&format_value(other));
+            }
+        }
+        
+        if i < items.len() - 1 {
+            output.push(',');
+        }
+        output.push('\n');
+    }
+    
+    output.push_str(&close_indent);
+    output.push('}');
+    
+    output
+}
+
+fn format_value(value: &Value) -> String {
+    match value {
+        Value::Number(n) => n.to_string(),
+        Value::String(s) => format!("\"{}\"", s),
+        Value::Bytes(b) => format!("0x{}", hex::encode(b)),
+        Value::Null => "null".to_string(),
+        Value::Map(m) => pretty_print_map(m, 0),
+        Value::List(l) => {
+            let items: Vec<_> = l.iter().map(format_value).collect();
+            format!("[{}]", items.join(", "))
+        }
+        Value::Set(s) => {
+            let items: Vec<_> = s.iter().map(|x| x.as_str()).collect();
+            format!("#{{{}}}", items.join(", "))
+        }
+    }
+}
+
+fn pretty_print_value(value: &Value) {
+    match value {
+        Value::Bytes(bytes) => {
+            println!("{}", pretty_print_bytes(bytes));
+        }
+        Value::Map(map) => {
+            println!("{}", pretty_print_map(map, 0));
+        }
+        other => {
+            println!("{}", format_value(other));
         }
     }
 }

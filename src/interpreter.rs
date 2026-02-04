@@ -140,6 +140,103 @@ impl std::fmt::Display for Value {
     }
 }
 
+fn print_hexdump(bytes: &[u8]) {
+    use colored::Colorize;
+    
+    for (i, chunk) in bytes.chunks(16).enumerate() {
+        print!("{:08x}  ", i * 16);
+        
+        for (j, byte) in chunk.iter().enumerate() {
+            if j == 8 {
+                print!(" ");
+            }
+            print!("{:02x} ", byte);
+        }
+        
+        if chunk.len() < 16 {
+            for j in chunk.len()..16 {
+                if j == 8 {
+                    print!(" ");
+                }
+                print!("   ");
+            }
+        }
+        
+        print!(" |");
+        for byte in chunk {
+            let ch = if byte.is_ascii_graphic() || *byte == b' ' {
+                *byte as char
+            } else {
+                '.'
+            };
+            print!("{}", ch.to_string().cyan());
+        }
+        println!("|");
+    }
+}
+
+fn print_map_pretty(map: &HashMap<String, Value>, indent: usize) {
+    use colored::Colorize;
+    
+    let indent_str = "  ".repeat(indent);
+    println!("{{");
+    
+    let mut items: Vec<_> = map.iter().collect();
+    items.sort_by_key(|(k, _)| *k);
+    
+    for (i, (key, value)) in items.iter().enumerate() {
+        print!("{}  {}: ", indent_str, key.green());
+        match value {
+            Value::Map(m) => {
+                print_map_pretty(m, indent + 1);
+            }
+            Value::Bytes(b) => {
+                println!("\"0x{}\"", hex::encode(b).cyan());
+            }
+            Value::String(s) => {
+                println!("\"{}\"", s.yellow());
+            }
+            Value::Number(n) => {
+                println!("{}", n.to_string().cyan());
+            }
+            Value::List(l) => {
+                println!("[");
+                for (j, item) in l.iter().enumerate() {
+                    print!("{}    ", indent_str);
+                    match item {
+                        Value::String(s) => print!("\"{}\"", s.yellow()),
+                        Value::Number(n) => print!("{}", n.to_string().cyan()),
+                        _ => print!("{}", item),
+                    }
+                    if j < l.len() - 1 {
+                        println!(",");
+                    } else {
+                        println!();
+                    }
+                }
+                print!("{}  ]", indent_str);
+            }
+            Value::Set(s) => {
+                let items: Vec<_> = s.iter().map(|x| x.as_str()).collect();
+                println!("#{{ {} }}", items.join(", "));
+            }
+            Value::Null => {
+                print!("null");
+            }
+        }
+        
+        if i < items.len() - 1 {
+            println!(",");
+        } else {
+            println!();
+        }
+    }
+    print!("{}}}", indent_str);
+    if indent == 0 {
+        println!();
+    }
+}
+
 #[allow(clippy::too_many_arguments)]
 fn interpret_with_scope<'a>(
     commands: &'a [Command],
@@ -3223,14 +3320,22 @@ fn eval_expr<'a>(
                             match val {
                                 Value::String(s) => print!("{}", s),
                                 Value::Number(n) => print!("{}", n),
-                                Value::Bytes(b) => print!("{:?}", b),
+                                Value::Bytes(b) => {
+                                    println!();
+                                    print_hexdump(b);
+                                }
                                 Value::List(l) => print!("{:?}", l),
-                                Value::Map(m) => print!("{:?}", m),
+                                Value::Map(m) => {
+                                    println!();
+                                    print_map_pretty(m, 0);
+                                }
                                 Value::Set(s) => print!("{:?}", s),
                                 Value::Null => print!("null"),
                             }
                         }
-                        println!();
+                        if !arg_values.iter().any(|v| matches!(v, Value::Bytes(_) | Value::Map(_))) {
+                            println!();
+                        }
                         Ok(Value::Null)
                     }
                     "copy" => {
