@@ -216,6 +216,76 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         ),
     );
 
+    registry.insert(
+        "connect_ssh_pty".to_string(),
+        BuiltinFunction::new(
+            "connect_ssh_pty",
+            "connect_ssh_pty(host: string, port: int, user: string, password: string, rows: int, cols: int) -> SSH",
+            "Establishes SSH connection with custom PTY dimensions for interactive sessions (useful for triggering --More-- prompts)",
+            "SSH",
+            vec![
+                "let ssh = connect_ssh_pty(\"bandit.labs.overthewire.org\", 2220, \"bandit26\", \"password\", 3, 20)",
+                "let ssh = connect_ssh_pty(\"target.com\", 22, \"user\", \"pass\", 24, 80)",
+            ],
+        ),
+    );
+
+    registry.insert(
+        "ssh_interactive_start".to_string(),
+        BuiltinFunction::new(
+            "ssh_interactive_start",
+            "ssh_interactive_start(ssh: SSH)",
+            "Start interactive shell session on SSH connection (for nested shells, vim, etc.)",
+            "SSH",
+            vec![
+                "ssh_interactive_start(ssh)",
+                "ssh_interactive_start(conn)",
+            ],
+        ),
+    );
+
+    registry.insert(
+        "ssh_interactive_send".to_string(),
+        BuiltinFunction::new(
+            "ssh_interactive_send",
+            "ssh_interactive_send(ssh: SSH, data: string)",
+            "Send data to interactive SSH session",
+            "SSH",
+            vec![
+                "ssh_interactive_send(ssh, \"v\")",
+                "ssh_interactive_send(ssh, \":set shell=/bin/bash\\r\")",
+                "ssh_interactive_send(ssh, \":!cat /etc/passwd\\r\")",
+            ],
+        ),
+    );
+
+    registry.insert(
+        "ssh_interactive_recv".to_string(),
+        BuiltinFunction::new(
+            "ssh_interactive_recv",
+            "ssh_interactive_recv(ssh: SSH, timeout_ms: int) -> string",
+            "Receive data from interactive SSH session with timeout in milliseconds",
+            "SSH",
+            vec![
+                "let output = ssh_interactive_recv(ssh, 1500)",
+                "let banner = ssh_interactive_recv(ssh, 1000)",
+            ],
+        ),
+    );
+
+    registry.insert(
+        "ssh_interactive_close".to_string(),
+        BuiltinFunction::new(
+            "ssh_interactive_close",
+            "ssh_interactive_close(ssh: SSH)",
+            "Close interactive SSH session",
+            "SSH",
+            vec![
+                "ssh_interactive_close(ssh)",
+            ],
+        ),
+    );
+
     // Binary Packing
     registry.insert(
         "p64".to_string(),
