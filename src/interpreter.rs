@@ -261,12 +261,15 @@ fn interpret_with_scope<'a>(
     Box::pin(async move {
         for cmd in commands {
             match cmd {
+                // Import external modules and execute their commands
+                // Supports selective imports: `from module import func1, func2`
                 Command::Import { module, items } => {
                     let content = fs::read_to_string(module)
                         .map_err(|e| format!("Failed to read module {}: {}", module, e))?;
                     let imported_cmds = parse_script(&content)?;
                     let mut filtered = Vec::new();
                     if let Some(items) = items {
+                        // Selective import: only import specified functions/macros
                         for c in &imported_cmds {
                             match c {
                                 Command::DefineFunction(f) if items.contains(&f.name) => {
@@ -279,6 +282,7 @@ fn interpret_with_scope<'a>(
                             }
                         }
                     } else {
+                        // Import everything from the module
                         filtered = imported_cmds;
                     }
                     interpret_with_scope(
@@ -294,6 +298,8 @@ fn interpret_with_scope<'a>(
                     )
                     .await?;
                 }
+                // Typed variable declaration with runtime type checking
+                // Example: let x: int = 42
                 Command::TypedDecl(TypedVar {
                     name,
                     var_type,
@@ -302,6 +308,7 @@ fn interpret_with_scope<'a>(
                     let val =
                         eval_expr(value, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                             .await?;
+                    // Convert value to the specified type with validation
                     let typed_val = match var_type {
                     TypeHint::Int => Value::Number(val.to_string().parse::<i64>()
                         .map_err(|e| format!("[ERROR] Type Error: Expected integer, got '{}'\nMake sure the value is a valid number: {}", val, e))?),
@@ -426,7 +433,7 @@ fn interpret_with_scope<'a>(
                                             )
                                             .await?
                                         } else {
-                                            return Err(format!("Argument name mismatch"));
+                                            return Err("Argument name mismatch".to_string());
                                         }
                                     } else {
                                         eval_expr(
@@ -476,7 +483,7 @@ fn interpret_with_scope<'a>(
                                     &body, local_vars, consts, funcs, macs, sc, saf, ctx, dry_run,
                                 )
                                 .await
-                                .unwrap();
+                                .expect("Async function execution failed");
                             })
                             .await
                             .map_err(|e| e.to_string())?;
@@ -525,7 +532,7 @@ fn interpret_with_scope<'a>(
                     )
                     .await?;
                     if cond.to_string() == "true"
-                        || cond.to_string().parse::<i64>().map_or(false, |n| n != 0)
+                        || cond.to_string().parse::<i64>().is_ok_and(|n| n != 0)
                     {
                         if let Some(ret) = interpret_with_scope(
                             then_body,
@@ -542,22 +549,20 @@ fn interpret_with_scope<'a>(
                         {
                             return Ok(Some(ret));
                         }
-                    } else {
-                        if let Some(ret) = interpret_with_scope(
-                            else_body,
-                            variables.clone(),
-                            constants.clone(),
-                            functions.clone(),
-                            macros.clone(),
-                            shellcode.clone(),
-                            safety.clone(),
-                            context.clone(),
-                            dry_run,
-                        )
-                        .await?
-                        {
-                            return Ok(Some(ret));
-                        }
+                    } else if let Some(ret) = interpret_with_scope(
+                        else_body,
+                        variables.clone(),
+                        constants.clone(),
+                        functions.clone(),
+                        macros.clone(),
+                        shellcode.clone(),
+                        safety.clone(),
+                        context.clone(),
+                        dry_run,
+                    )
+                    .await?
+                    {
+                        return Ok(Some(ret));
                     }
                 }
                 Command::Control(Control::For {
@@ -622,7 +627,7 @@ fn interpret_with_scope<'a>(
                     let cond_bool = match cond {
                         Value::Number(n) => n != 0,
                         Value::String(s) => {
-                            s == "true" || s.parse::<i64>().map_or(false, |n| n != 0)
+                            s == "true" || s.parse::<i64>().is_ok_and(|n| n != 0)
                         }
                         _ => cond.to_string() == "true",
                     };
@@ -833,7 +838,7 @@ fn interpret_with_scope<'a>(
                 Command::DecodeBase64 { data } => {
                     let val = eval_expr(data, variables.clone(), functions.clone(), macros.clone(), context.clone(), dry_run)
                         .await?;
-                    let raw = decode(&val.to_string()).map_err(|e| e.to_string())?;
+                    let raw = decode(val.to_string()).map_err(|e| e.to_string())?;
                     println!("[DECODED] {}", String::from_utf8_lossy(&raw));
                 }
                 Command::Assemble { code } => {
@@ -1046,10 +1051,10 @@ fn interpret_with_scope<'a>(
                         "stdout" => TaintSink::Stdout,
                         "stderr" => TaintSink::Stderr,
                         s if s.starts_with("socket:") => {
-                            TaintSink::Socket(s.strip_prefix("socket:").unwrap().to_string())
+                            TaintSink::Socket(s.strip_prefix("socket:").expect("socket: prefix should exist after starts_with check").to_string())
                         }
                         s if s.starts_with("file_write:") => {
-                            TaintSink::FileWrite(s.strip_prefix("file_write:").unwrap().to_string())
+                            TaintSink::FileWrite(s.strip_prefix("file_write:").expect("file_write: prefix should exist after starts_with check").to_string())
                         }
                         _ => return Err(format!("[ERROR] Unknown sink: {}\n\nTIP: Valid sinks: stdout, stderr, socket:<addr>, file_write:<path>", sink_str)),
                     };
@@ -1121,12 +1126,12 @@ fn interpret_with_scope<'a>(
                         "no_nulls" => Constraint::NoNullBytes,
                         "alphanumeric" => Constraint::AlphanumericOnly,
                         s if s.starts_with("max_length:") => {
-                            let len = s.strip_prefix("max_length:").unwrap().trim().parse::<usize>()
+                            let len = s.strip_prefix("max_length:").expect("max_length: prefix should exist after starts_with check").trim().parse::<usize>()
                                 .map_err(|_| format!("[ERROR] Invalid max_length value: {}", s))?;
                             Constraint::MaxLength(len)
                         }
                         s if s.starts_with("preserve_") => {
-                            let reg = s.strip_prefix("preserve_").unwrap().to_string();
+                            let reg = s.strip_prefix("preserve_").expect("preserve_ prefix should exist after starts_with check").to_string();
                             Constraint::PreserveRegister(reg)
                         }
                         _ => return Err(format!("[ERROR] Unknown constraint: {}\n\nTIP: Valid constraints: no_nulls, alphanumeric, max_length:<n>, preserve_<reg>", constraint_str)),
@@ -1266,7 +1271,7 @@ fn interpret_with_scope<'a>(
                     "__realloc_hook" | "realloc_hook" => HeapTarget::ReallocHook,
                     "_io_list_all" | "io_list_all" => HeapTarget::IOListAll,
                     s if s.starts_with("0x") => {
-                        let addr = u64::from_str_radix(s.strip_prefix("0x").unwrap(), 16)
+                        let addr = u64::from_str_radix(s.strip_prefix("0x").expect("0x prefix should exist after starts_with check"), 16)
                             .map_err(|_| format!("[ERROR] Invalid hex address: {}", s))?;
                         HeapTarget::Arbitrary(addr)
                     }
@@ -1280,7 +1285,7 @@ fn interpret_with_scope<'a>(
                             .ok_or("Libc base required for 'system' target")?
                             + 0x50d60
                     } else if spec.overwrite_with.starts_with("0x") {
-                        u64::from_str_radix(spec.overwrite_with.strip_prefix("0x").unwrap(), 16)
+                        u64::from_str_radix(spec.overwrite_with.strip_prefix("0x").expect("0x prefix should exist after starts_with check"), 16)
                             .map_err(|_| {
                                 format!("[ERROR] Invalid hex value: {}", spec.overwrite_with)
                             })?
@@ -3092,7 +3097,9 @@ fn eval_expr<'a>(
                             _ => 32,
                         };
                         
-                        let endian = if elf.elf.header.endianness().unwrap().is_little() {
+                        let endian = if elf.elf.header.endianness()
+                            .map_err(|e| format!("Failed to determine ELF endianness: {}", e))?
+                            .is_little() {
                             "little"
                         } else {
                             "big"
@@ -4056,7 +4063,8 @@ fn eval_expr<'a>(
                         let debugger_arc = Arc::new(debugger);
                         
                         tokio::task::spawn_blocking(move || {
-                            let runtime = tokio::runtime::Runtime::new().unwrap();
+                            let runtime = tokio::runtime::Runtime::new()
+                                .expect("Failed to create tokio runtime for debug session");
                             runtime.block_on(async {
                                 start_split_screen_debug(gdb_session, debugger_arc, source_file).await
                             })
@@ -5941,7 +5949,8 @@ fn eval_expr<'a>(
                     }
                     "timestamp" => {
                         use std::time::{SystemTime, UNIX_EPOCH};
-                        let duration = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
+                        let duration = SystemTime::now().duration_since(UNIX_EPOCH)
+                            .map_err(|e| format!("System time error: {}", e))?;
                         Ok(Value::Number(duration.as_secs() as i64))
                     }
                     "sleep" => {
@@ -7546,21 +7555,24 @@ fn eval_expr<'a>(
                     let num = match size {
                         64 => {
                             if bytes.len() >= 8 {
-                                i64::from_le_bytes(bytes[0..8].try_into().unwrap())
+                                i64::from_le_bytes(bytes[0..8].try_into()
+                                    .expect("Slice length is 8 bytes, should convert to array"))
                             } else {
                                 return Err("Not enough bytes for u64".into());
                             }
                         }
                         32 => {
                             if bytes.len() >= 4 {
-                                u32::from_le_bytes(bytes[0..4].try_into().unwrap()) as i64
+                                u32::from_le_bytes(bytes[0..4].try_into()
+                                    .expect("Slice length is 4 bytes, should convert to array")) as i64
                             } else {
                                 return Err("Not enough bytes for u32".into());
                             }
                         }
                         16 => {
                             if bytes.len() >= 2 {
-                                u16::from_le_bytes(bytes[0..2].try_into().unwrap()) as i64
+                                u16::from_le_bytes(bytes[0..2].try_into()
+                                    .expect("Slice length is 2 bytes, should convert to array")) as i64
                             } else {
                                 return Err("Not enough bytes for u16".into());
                             }
@@ -7590,7 +7602,8 @@ fn eval_expr<'a>(
                     } else {
                         match stage {
                             Expr::Ident(func_name) => {
-                                let input = current_value.take().unwrap();
+                                let input = current_value.take()
+                                    .expect("Pipe should have a current value at each stage");
                                 match func_name.as_str() {
                                     "p64" => {
                                         if let Value::Number(n) = input {
@@ -7634,7 +7647,8 @@ fn eval_expr<'a>(
                                 }
                             }
                             Expr::Call { name, args } => {
-                                let input = current_value.take().unwrap();
+                                let input = current_value.take()
+                                    .expect("Pipe should have a current value before function call");
                                 vars.write().await.insert("_".to_string(), input);
                                 let mut all_args = vec![(None, Expr::Ident("_".to_string()))];
                                 all_args.extend(args.clone());
@@ -7691,4 +7705,179 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     }
 
     matrix[len1][len2]
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ast::{Command, Expr, Literal};
+
+    /// Test basic value types
+    #[tokio::test]
+    async fn test_value_types() {
+        let num = Value::Number(42);
+        assert_eq!(num.to_string(), "42");
+        
+        let s = Value::String("test".to_string());
+        assert_eq!(s.to_string(), "test");
+        
+        let bytes = Value::Bytes(vec![0x41, 0x42]);
+        assert_eq!(bytes.to_string(), "0x4142");
+        
+        let null = Value::Null;
+        assert_eq!(null.to_string(), "null");
+    }
+
+    /// Test variable declaration and assignment
+    #[tokio::test]
+    async fn test_variable_operations() {
+        let commands = vec![
+            Command::VarDecl {
+                name: "x".to_string(),
+                value: Expr::Literal(Literal::Number(42)),
+            },
+            Command::Assignment {
+                name: "x".to_string(),
+                value: Expr::Literal(Literal::Number(100)),
+            },
+        ];
+        
+        let result = interpret(&commands).await;
+        assert!(result.is_ok());
+    }
+
+    /// Test constant declaration immutability
+    #[tokio::test]
+    async fn test_const_immutability() {
+        let commands = vec![
+            Command::ConstDecl {
+                name: "PI".to_string(),
+                value: Expr::Literal(Literal::Number(3)),
+            },
+            Command::Assignment {
+                name: "PI".to_string(),
+                value: Expr::Literal(Literal::Number(4)),
+            },
+        ];
+        
+        let result = interpret(&commands).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Cannot reassign constant"));
+    }
+
+    /// Test list operations
+    #[tokio::test]
+    async fn test_list_operations() {
+        let list = Value::List(vec![
+            Value::Number(1),
+            Value::Number(2),
+            Value::Number(3),
+        ]);
+        
+        let display = list.to_string();
+        assert!(display.contains("1"));
+        assert!(display.contains("2"));
+        assert!(display.contains("3"));
+    }
+
+    /// Test map operations
+    #[tokio::test]
+    async fn test_map_operations() {
+        let mut map = HashMap::new();
+        map.insert("key".to_string(), Value::String("value".to_string()));
+        map.insert("count".to_string(), Value::Number(42));
+        
+        let val = Value::Map(map);
+        let display = val.to_string();
+        assert!(display.contains("key"));
+        assert!(display.contains("value"));
+    }
+
+    /// Test set operations
+    #[tokio::test]
+    async fn test_set_operations() {
+        let mut set = HashSet::new();
+        set.insert("item1".to_string());
+        set.insert("item2".to_string());
+        
+        let val = Value::Set(set);
+        let display = val.to_string();
+        assert!(display.contains("item1"));
+        assert!(display.contains("item2"));
+    }
+
+    /// Test value equality
+    #[tokio::test]
+    async fn test_value_equality() {
+        let v1 = Value::Number(42);
+        let v2 = Value::Number(42);
+        let v3 = Value::Number(43);
+        
+        assert_eq!(v1, v2);
+        assert_ne!(v1, v3);
+        
+        let s1 = Value::String("test".to_string());
+        let s2 = Value::String("test".to_string());
+        assert_eq!(s1, s2);
+    }
+
+    /// Test bytes value
+    #[tokio::test]
+    async fn test_bytes_value() {
+        let bytes = Value::Bytes(vec![0xDE, 0xAD, 0xBE, 0xEF]);
+        assert_eq!(bytes.to_string(), "0xdeadbeef");
+    }
+
+    /// Test levenshtein distance function
+    #[test]
+    fn test_levenshtein_distance() {
+        assert_eq!(levenshtein_distance("", ""), 0);
+        assert_eq!(levenshtein_distance("test", "test"), 0);
+        assert_eq!(levenshtein_distance("test", ""), 4);
+        assert_eq!(levenshtein_distance("", "test"), 4);
+        assert_eq!(levenshtein_distance("test", "tent"), 1);
+        assert_eq!(levenshtein_distance("kitten", "sitting"), 3);
+    }
+
+    /// Test connection registry
+    #[tokio::test]
+    async fn test_connection_registry() {
+        let mut registry = ConnectionRegistry::new();
+        
+        // Test that next_id starts at 1
+        assert_eq!(registry.next_id, 1);
+        
+        // Test that we can retrieve None for non-existent connections
+        assert!(registry.get_mut(999).is_none());
+    }
+
+    /// Test SSH connection value
+    #[test]
+    fn test_ssh_connection_value() {
+        let ssh_val = Value::SshConnection(42);
+        assert_eq!(ssh_val.to_string(), "SSH(42)");
+    }
+
+    /// Test dry-run mode initialization
+    #[tokio::test]
+    async fn test_dry_run_mode() {
+        let commands = vec![
+            Command::VarDecl {
+                name: "x".to_string(),
+                value: Expr::Literal(Literal::Number(1)),
+            },
+        ];
+        
+        let result = interpret_with_options(&commands, true).await;
+        assert!(result.is_ok());
+    }
+
+    /// Test error handling for invalid operations
+    #[tokio::test]
+    async fn test_error_handling() {
+        // Test division by zero would be caught
+        // This is a placeholder - actual implementation depends on expression evaluation
+        let result = interpret(&vec![]).await;
+        assert!(result.is_ok());
+    }
 }
