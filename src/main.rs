@@ -2,6 +2,7 @@ mod ast;
 mod cli;
 mod codegen;
 mod dex_tools;
+mod error_context;
 mod interpreter;
 #[cfg(feature = "llvm")]
 mod llvm_codegen;
@@ -171,6 +172,8 @@ use std::env;
 use std::fs;
 
 fn main() {
+    error_context::init_error_system();
+    
     env_logger::Builder::from_default_env()
         .filter_level(log::LevelFilter::Info)
         .init();

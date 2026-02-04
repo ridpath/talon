@@ -2,6 +2,7 @@
 
 pub mod ast;
 pub mod codegen;
+pub mod error_context;
 pub mod interpreter;
 #[cfg(feature = "llvm")]
 pub mod llvm_codegen;
@@ -55,6 +56,7 @@ pub mod socket_tools;
 pub mod symbolic_engine;
 pub mod web_tools;
 
+pub mod ctf_helpers;
 pub mod ctf_quick_helpers;
 pub mod helpers;
 pub mod output_utils;
