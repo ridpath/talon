@@ -240,6 +240,11 @@ fn main() {
             cheatsheet::CheatSheet::show("all");
         }
 
+        "learn" => {
+            tutorial_system::TutorialSystem::select_tutorial()
+                .unwrap_or_else(|e| eprintln!("[ERROR] {}", e));
+        }
+
         _ => {
             cli::run(args);
         }

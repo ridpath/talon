@@ -253,6 +253,16 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
             }
         }
 
+        [_, "new", "--interactive"] | [_, "new", "-i"] => {
+            let gen = TemplateGenerator::new();
+            match gen.run_interactive_wizard() {
+                Ok(filename) => {
+                    println!("{} Generated template: {}", "[OK]".green(), filename);
+                }
+                Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+            }
+        }
+
         [_, "new", template_type, name] => {
             let gen = TemplateGenerator::new();
             match gen.generate(template_type, name) {
@@ -274,7 +284,10 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
                     println!("  {} - {}", template.green(), desc.bright_black());
                 }
             }
-            println!("\nUsage: talon new <type> <name>\n");
+            println!("\nUsage:");
+            println!("  talon new <type> <name>          Generate template from type");
+            println!("  talon new --interactive          Interactive template wizard");
+            println!("  talon new --list                 List all templates\n");
         }
 
         [_, "db", "search", query] => {
@@ -547,6 +560,25 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
             let tutorial = TutorialSystem::new();
             tutorial
                 .start_first_blood()
+                .unwrap_or_else(|e| eprintln!("{} {}", "[ERROR]".red(), e));
+        }
+
+        [_, "learn"] => {
+            TutorialSystem::select_tutorial()
+                .unwrap_or_else(|e| eprintln!("{} {}", "[ERROR]".red(), e));
+        }
+
+        [_, "learn", "first-blood"] => {
+            let tutorial = TutorialSystem::new();
+            tutorial
+                .start_first_blood()
+                .unwrap_or_else(|e| eprintln!("{} {}", "[ERROR]".red(), e));
+        }
+
+        [_, "learn", "bandit"] => {
+            let tutorial = TutorialSystem::new_bandit();
+            tutorial
+                .start_bandit()
                 .unwrap_or_else(|e| eprintln!("{} {}", "[ERROR]".red(), e));
         }
 

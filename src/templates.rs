@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 use std::fs;
+use std::io::{self, Write};
 
 pub struct TemplateGenerator {
     templates: HashMap<String, String>,
@@ -105,6 +106,138 @@ impl TemplateGenerator {
             "off-by-one" => Some("Off-by-one overflow exploitation"),
             _ => None,
         }
+    }
+
+    pub fn run_interactive_wizard(&self) -> Result<String, String> {
+        println!("\nTALON Template Wizard");
+        println!("=====================\n");
+        
+        println!("What type of vulnerability are you targeting?\n");
+        println!("  [1] Binary Exploitation (pwn)");
+        println!("  [2] Format String");
+        println!("  [3] Heap Exploitation");
+        println!("  [4] Kernel Exploitation");
+        println!("  [5] Web Exploitation");
+        println!("  [6] CTF Challenge");
+        println!("  [7] Other\n");
+        
+        print!("Select category [1-7]: ");
+        io::stdout().flush().ok();
+        
+        let mut category = String::new();
+        io::stdin().read_line(&mut category).map_err(|e| e.to_string())?;
+        let category = category.trim();
+        
+        let (template_type, suggested_name) = match category {
+            "1" => {
+                println!("\nBinary Exploitation Options:");
+                println!("  [1] Buffer Overflow");
+                println!("  [2] ROP Chain");
+                println!("  [3] Return-to-libc");
+                println!("  [4] ret2csu");
+                println!("  [5] ret2plt");
+                println!("  [6] SROP\n");
+                
+                print!("Select pwn type [1-6]: ");
+                io::stdout().flush().ok();
+                
+                let mut pwn_type = String::new();
+                io::stdin().read_line(&mut pwn_type).map_err(|e| e.to_string())?;
+                
+                match pwn_type.trim() {
+                    "1" => ("buffer-overflow", "buffer_overflow"),
+                    "2" => ("rop", "rop_chain"),
+                    "3" => ("ret2libc", "ret2libc"),
+                    "4" => ("ret2csu", "ret2csu"),
+                    "5" => ("ret2plt", "ret2plt"),
+                    "6" => ("srop", "srop"),
+                    _ => ("buffer-overflow", "exploit"),
+                }
+            },
+            "2" => ("format-string", "format_string"),
+            "3" => {
+                println!("\nHeap Exploitation Options:");
+                println!("  [1] Generic Heap Exploit");
+                println!("  [2] Use-After-Free");
+                println!("  [3] House of Force");
+                println!("  [4] Off-by-One");
+                println!("  [5] FSOP\n");
+                
+                print!("Select heap type [1-5]: ");
+                io::stdout().flush().ok();
+                
+                let mut heap_type = String::new();
+                io::stdin().read_line(&mut heap_type).map_err(|e| e.to_string())?;
+                
+                match heap_type.trim() {
+                    "1" => ("heap", "heap_exploit"),
+                    "2" => ("use-after-free", "uaf"),
+                    "3" => ("house-of-force", "house_of_force"),
+                    "4" => ("off-by-one", "off_by_one"),
+                    "5" => ("fsop", "fsop"),
+                    _ => ("heap", "heap_exploit"),
+                }
+            },
+            "4" => ("kernel", "kernel_exploit"),
+            "5" => {
+                println!("\nWeb Exploitation Options:");
+                println!("  [1] SQL Injection");
+                println!("  [2] Smart Contract");
+                println!("  [3] Other\n");
+                
+                print!("Select web type [1-3]: ");
+                io::stdout().flush().ok();
+                
+                let mut web_type = String::new();
+                io::stdin().read_line(&mut web_type).map_err(|e| e.to_string())?;
+                
+                match web_type.trim() {
+                    "1" => ("web-sqli", "sqli"),
+                    "2" => ("smart-contract", "contract_audit"),
+                    _ => ("basic", "web_exploit"),
+                }
+            },
+            "6" => {
+                print!("\nChallenge name: ");
+                io::stdout().flush().ok();
+                
+                let mut challenge = String::new();
+                io::stdin().read_line(&mut challenge).map_err(|e| e.to_string())?;
+                let challenge = challenge.trim().replace(' ', "_").to_lowercase();
+                
+                ("basic", challenge.as_str())
+            },
+            "7" => {
+                println!("\nOther Options:");
+                println!("  [1] Shellcode Development");
+                println!("  [2] Race Condition");
+                println!("  [3] Basic Template\n");
+                
+                print!("Select type [1-3]: ");
+                io::stdout().flush().ok();
+                
+                let mut other_type = String::new();
+                io::stdin().read_line(&mut other_type).map_err(|e| e.to_string())?;
+                
+                match other_type.trim() {
+                    "1" => ("shellcode", "shellcode"),
+                    "2" => ("race-condition", "race"),
+                    _ => ("basic", "exploit"),
+                }
+            },
+            _ => ("basic", "exploit"),
+        };
+        
+        print!("\nExploit name [{}]: ", suggested_name);
+        io::stdout().flush().ok();
+        
+        let mut name = String::new();
+        io::stdin().read_line(&mut name).map_err(|e| e.to_string())?;
+        let name = name.trim();
+        let final_name = if name.is_empty() { suggested_name } else { name };
+        
+        println!();
+        self.generate(template_type, final_name)
     }
 }
 
