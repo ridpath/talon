@@ -3,6 +3,7 @@ mod cli;
 mod codegen;
 mod dex_tools;
 mod error_context;
+mod fast_interpreter;
 mod interpreter;
 #[cfg(feature = "llvm")]
 mod llvm_codegen;
@@ -201,7 +202,9 @@ fn main() {
                 log::set_max_level(log::LevelFilter::Debug);
             }
 
-            if let Err(e) = run_script(&args[2]) {
+            let dev_mode = args.contains(&"--dev".to_string());
+
+            if let Err(e) = run_script(&args[2], dev_mode) {
                 eprintln!("{} {}", "[ERROR]".red(), e);
                 std::process::exit(1);
             }
@@ -241,7 +244,7 @@ fn main() {
 }
 
 /// Handles running a .talon script file
-fn run_script(path: &str) -> Result<(), String> {
+fn run_script(path: &str, dev_mode: bool) -> Result<(), String> {
     let script =
         fs::read_to_string(path).map_err(|e| format!("Failed to read script '{}': {}", path, e))?;
 
@@ -249,8 +252,13 @@ fn run_script(path: &str) -> Result<(), String> {
         return Err("Script is empty".into());
     }
 
-    let commands = parser::parse_script(&script)?;
-    interpreter::interpret(&commands)?;
+    if dev_mode {
+        fast_interpreter::run_fast(&script)?;
+    } else {
+        let commands = parser::parse_script(&script)?;
+        interpreter::interpret(&commands)?;
+    }
+    
     Ok(())
 }
 
@@ -882,6 +890,8 @@ OPTIONS:
 COMMANDS:
   {}
     run <file>            Execute a Talon script file
+                          Flags: --dev (fast interpreter mode, <500ms startup)
+                                 --verbose (enable debug logging)
     repl                  Start an interactive REPL shell
 
   {}
