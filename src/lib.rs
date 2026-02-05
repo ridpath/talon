@@ -70,6 +70,5 @@ pub mod oracle;
 pub mod output_utils;
 pub mod registry;
 
-// OpSec & EDR Evasion
-#[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
+// OpSec & EDR Evasion (syscalls only on Windows with feature flag)
 pub mod opsec;
