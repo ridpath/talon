@@ -319,8 +319,86 @@ fn pretty_print_value(value: &Value) {
 }
 
 impl Validator for TalonCompleter {
-    fn validate(&self, _ctx: &mut ValidationContext) -> Result<ValidationResult, ReadlineError> {
-        Ok(ValidationResult::Valid(None))
+    fn validate(&self, ctx: &mut ValidationContext) -> Result<ValidationResult, ReadlineError> {
+        let input = ctx.input();
+        
+        if Self::is_incomplete(input) {
+            Ok(ValidationResult::Incomplete)
+        } else {
+            Ok(ValidationResult::Valid(None))
+        }
+    }
+}
+
+impl TalonCompleter {
+    fn is_incomplete(line: &str) -> bool {
+        let mut paren_count = 0;
+        let mut bracket_count = 0;
+        let mut brace_count = 0;
+        let mut in_string = false;
+        let mut string_char = ' ';
+        let mut escape = false;
+        
+        for ch in line.chars() {
+            if escape {
+                escape = false;
+                continue;
+            }
+            
+            if ch == '\\' {
+                escape = true;
+                continue;
+            }
+            
+            if in_string {
+                if ch == string_char {
+                    in_string = false;
+                }
+                continue;
+            }
+            
+            match ch {
+                '"' | '\'' => {
+                    in_string = true;
+                    string_char = ch;
+                }
+                '(' => paren_count += 1,
+                ')' => paren_count -= 1,
+                '[' => bracket_count += 1,
+                ']' => bracket_count -= 1,
+                '{' => brace_count += 1,
+                '}' => brace_count -= 1,
+                _ => {}
+            }
+        }
+        
+        in_string || paren_count > 0 || bracket_count > 0 || brace_count > 0
+    }
+    
+    fn calculate_indent(lines: &[&str]) -> usize {
+        let mut indent = 0;
+        let indent_keywords = vec!["define", "if", "for", "match", "try", "parallel", "struct", "case"];
+        let dedent_keywords = vec!["end", "else"];
+        
+        for line in lines {
+            let trimmed = line.trim();
+            
+            for keyword in &indent_keywords {
+                if trimmed.starts_with(keyword) {
+                    indent += 1;
+                    break;
+                }
+            }
+            
+            for keyword in &dedent_keywords {
+                if trimmed.starts_with(keyword) && indent > 0 {
+                    indent -= 1;
+                    break;
+                }
+            }
+        }
+        
+        indent * 2
     }
 }
 
@@ -330,8 +408,10 @@ pub struct REPL {
     history: Vec<String>,
     variables: HashMap<String, String>,
     multiline_buffer: String,
+    multiline_lines: Vec<String>,
     in_block: bool,
     debug_mode: bool,
+    registry: FunctionRegistry,
 }
 
 impl REPL {
@@ -340,8 +420,10 @@ impl REPL {
             history: Vec::new(),
             variables: HashMap::new(),
             multiline_buffer: String::new(),
+            multiline_lines: Vec::new(),
             in_block: false,
             debug_mode: false,
+            registry: FunctionRegistry::new(),
         };
         repl.load_history();
         repl
@@ -432,15 +514,17 @@ impl REPL {
 
                     self.check_multiline(input);
 
-                    if self.in_block {
+                    if self.in_block || TalonCompleter::is_incomplete(input) {
                         self.multiline_buffer.push_str(input);
                         self.multiline_buffer.push('\n');
+                        self.multiline_lines.push(input.to_string());
                         continue;
                     }
 
                     let code = if !self.multiline_buffer.is_empty() {
                         let complete = format!("{}{}", self.multiline_buffer, input);
                         self.multiline_buffer.clear();
+                        self.multiline_lines.clear();
                         complete
                     } else {
                         input.to_string()
@@ -473,8 +557,10 @@ impl REPL {
     }
 
     fn get_prompt(&self) -> String {
-        if self.in_block {
-            "... ".to_string()
+        if self.in_block || !self.multiline_buffer.is_empty() {
+            let lines_ref: Vec<&str> = self.multiline_lines.iter().map(|s| s.as_str()).collect();
+            let indent = TalonCompleter::calculate_indent(&lines_ref);
+            format!("{}... ", " ".repeat(indent))
         } else {
             "talon> ".to_string()
         }
@@ -496,6 +582,12 @@ impl REPL {
     }
 
     fn handle_repl_command(&mut self, input: &str) -> bool {
+        if input.starts_with("help(") && input.ends_with(')') {
+            let func_name = input.trim_start_matches("help(").trim_end_matches(')').trim_matches('"').trim_matches('\'');
+            self.show_function_help(func_name);
+            return true;
+        }
+        
         match input {
             "help" | "?" => {
                 self.show_help();
@@ -565,19 +657,53 @@ impl REPL {
         }
     }
 
+    fn show_function_help(&self, func_name: &str) {
+        if let Some(func) = self.registry.get(func_name) {
+            println!("\n{}", "═".repeat(60));
+            println!("Function: {}", func.name);
+            println!("{}", "─".repeat(60));
+            println!("Signature: {}", func.signature);
+            println!("Description: {}", func.description);
+            if !func.examples.is_empty() {
+                println!("\nExamples:");
+                for example in &func.examples {
+                    println!("{}", example);
+                }
+            }
+            if !func.related.is_empty() {
+                println!("\nRelated functions:");
+                for related in &func.related {
+                    println!("  - {}", related);
+                }
+            }
+            println!("{}", "═".repeat(60));
+        } else {
+            println!("Function '{}' not found. Type 'help' for general help.", func_name);
+            
+            let similar = self.registry.search(func_name);
+            if !similar.is_empty() {
+                println!("\nDid you mean one of these?");
+                for func in similar.iter().take(5) {
+                    println!("  - {}", func.name);
+                }
+            }
+        }
+    }
+    
     fn show_help(&self) {
         println!("\nTALON REPL Help");
         println!("{}", "─".repeat(60));
         println!("TIP: Interactive Commands:");
-        println!("  help           - Show this help");
-        println!("  examples       - Show code examples");
-        println!("  templates      - List available templates");
-        println!("  cheatsheet     - Show syntax reference");
+        println!("  help              - Show this help");
+        println!("  help(\"function\")  - Show detailed help for a function");
+        println!("  examples          - Show code examples");
+        println!("  templates         - List available templates");
+        println!("  cheatsheet        - Show syntax reference");
         println!("  quickstart <type> - Generate quickstart (pwn/web3/fuzzing/recon)");
-        println!("  load <name>    - Load exploit template");
-        println!("  history        - Show command history");
-        println!("  clear          - Clear screen");
-        println!("  exit           - Exit REPL\n");
+        println!("  load <name>       - Load exploit template");
+        println!("  history           - Show command history");
+        println!("  clear             - Clear screen");
+        println!("  exit              - Exit REPL\n");
 
         println!("TIP: Advanced REPL Commands:");
         println!("  :debug on/off     - Toggle debug output");
@@ -591,7 +717,8 @@ impl REPL {
         println!("  let x = 42");
         println!("  connect to \"192.168.1.1\" on port 22");
         println!("  analyze pe file \"malware.exe\"");
-        println!("  fuzz file \"input.dat\"\n");
+        println!("  fuzz file \"input.dat\"");
+        println!("  help(\"connect\")  - Get help on connect function\n");
 
         println!("TIP: Common Mistakes:");
         for (mistake, tip) in ErrorHelper::common_mistakes() {
@@ -813,4 +940,245 @@ impl REPL {
 pub fn run_repl() {
     let mut repl = REPL::new();
     repl.run();
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_is_incomplete_balanced() {
+        assert!(!TalonCompleter::is_incomplete("let x = 42"));
+        assert!(!TalonCompleter::is_incomplete("connect(\"host\", 22)"));
+        assert!(!TalonCompleter::is_incomplete("[1, 2, 3]"));
+        assert!(!TalonCompleter::is_incomplete("{\"key\": \"value\"}"));
+    }
+
+    #[test]
+    fn test_is_incomplete_unbalanced_parens() {
+        assert!(TalonCompleter::is_incomplete("connect(\"host\""));
+        assert!(TalonCompleter::is_incomplete("func(arg1, arg2"));
+        assert!(TalonCompleter::is_incomplete("((nested)"));
+    }
+
+    #[test]
+    fn test_is_incomplete_unbalanced_brackets() {
+        assert!(TalonCompleter::is_incomplete("[1, 2, 3"));
+        assert!(TalonCompleter::is_incomplete("let arr = ["));
+        assert!(TalonCompleter::is_incomplete("[[nested]"));
+    }
+
+    #[test]
+    fn test_is_incomplete_unbalanced_braces() {
+        assert!(TalonCompleter::is_incomplete("{\"key\": \"value\""));
+        assert!(TalonCompleter::is_incomplete("let obj = {"));
+        assert!(TalonCompleter::is_incomplete("{{nested}"));
+    }
+
+    #[test]
+    fn test_is_incomplete_unclosed_string() {
+        assert!(TalonCompleter::is_incomplete("let s = \"hello"));
+        assert!(TalonCompleter::is_incomplete("let s = 'world"));
+        assert!(!TalonCompleter::is_incomplete("let s = \"hello\""));
+        assert!(!TalonCompleter::is_incomplete("let s = 'world'"));
+    }
+
+    #[test]
+    fn test_is_incomplete_escaped_quotes() {
+        assert!(!TalonCompleter::is_incomplete("let s = \"hello\\\"world\""));
+        assert!(!TalonCompleter::is_incomplete("let s = 'it\\'s'"));
+    }
+
+    #[test]
+    fn test_calculate_indent_basic() {
+        let lines = vec!["define function test()"];
+        let indent = TalonCompleter::calculate_indent(&lines);
+        assert_eq!(indent, 2);
+    }
+
+    #[test]
+    fn test_calculate_indent_nested() {
+        let lines = vec![
+            "define function test()",
+            "  if x > 0",
+        ];
+        let indent = TalonCompleter::calculate_indent(&lines);
+        assert_eq!(indent, 4);
+    }
+
+    #[test]
+    fn test_calculate_indent_with_end() {
+        let lines = vec![
+            "define function test()",
+            "  let x = 1",
+            "end",
+        ];
+        let indent = TalonCompleter::calculate_indent(&lines);
+        assert_eq!(indent, 0);
+    }
+
+    #[test]
+    fn test_calculate_indent_multiple_blocks() {
+        let lines = vec![
+            "define function test()",
+            "  for i in 0..10",
+            "    if i > 5",
+        ];
+        let indent = TalonCompleter::calculate_indent(&lines);
+        assert_eq!(indent, 6);
+    }
+
+    #[test]
+    fn test_repl_creation() {
+        let repl = REPL::new();
+        assert_eq!(repl.history.len(), 0);
+        assert!(!repl.in_block);
+        assert!(!repl.debug_mode);
+        assert_eq!(repl.multiline_buffer, "");
+        assert_eq!(repl.multiline_lines.len(), 0);
+    }
+
+    #[test]
+    fn test_repl_prompt_normal() {
+        let repl = REPL::new();
+        assert_eq!(repl.get_prompt(), "talon> ");
+    }
+
+    #[test]
+    fn test_repl_prompt_multiline() {
+        let mut repl = REPL::new();
+        repl.in_block = true;
+        repl.multiline_lines.push("define function test()".to_string());
+        let prompt = repl.get_prompt();
+        assert!(prompt.starts_with("  "));
+        assert!(prompt.ends_with("... "));
+    }
+
+    #[test]
+    fn test_format_value_number() {
+        let value = Value::Number(42);
+        assert_eq!(format_value(&value), "42");
+    }
+
+    #[test]
+    fn test_format_value_string() {
+        let value = Value::String("hello".to_string());
+        assert_eq!(format_value(&value), "\"hello\"");
+    }
+
+    #[test]
+    fn test_format_value_bytes() {
+        let value = Value::Bytes(vec![0x41, 0x42, 0x43]);
+        assert_eq!(format_value(&value), "0x414243");
+    }
+
+    #[test]
+    fn test_format_value_null() {
+        let value = Value::Null;
+        assert_eq!(format_value(&value), "null");
+    }
+
+    #[test]
+    fn test_format_value_list() {
+        let value = Value::List(vec![
+            Value::Number(1),
+            Value::Number(2),
+            Value::Number(3),
+        ]);
+        assert_eq!(format_value(&value), "[1, 2, 3]");
+    }
+
+    #[test]
+    fn test_format_value_set() {
+        let mut set = std::collections::HashSet::new();
+        set.insert("a".to_string());
+        set.insert("b".to_string());
+        let value = Value::Set(set);
+        let result = format_value(&value);
+        assert!(result.starts_with("#{"));
+        assert!(result.ends_with('}'));
+        assert!(result.contains('a') && result.contains('b'));
+    }
+
+    #[test]
+    fn test_pretty_print_bytes_empty() {
+        let bytes = vec![];
+        let result = pretty_print_bytes(&bytes);
+        assert_eq!(result, "b\"\"");
+    }
+
+    #[test]
+    fn test_pretty_print_bytes_basic() {
+        let bytes = vec![0x48, 0x65, 0x6c, 0x6c, 0x6f];
+        let result = pretty_print_bytes(&bytes);
+        assert!(result.contains("Bytes (5 bytes)"));
+        assert!(result.contains("48 65 6c 6c 6f"));
+        assert!(result.contains("Hello"));
+    }
+
+    #[test]
+    fn test_pretty_print_bytes_non_printable() {
+        let bytes = vec![0x00, 0x01, 0x02, 0x03];
+        let result = pretty_print_bytes(&bytes);
+        assert!(result.contains("00 01 02 03"));
+        assert!(result.contains("...."));
+    }
+
+    #[test]
+    fn test_pretty_print_map_empty() {
+        let map = HashMap::new();
+        let result = pretty_print_map(&map, 0);
+        assert_eq!(result, "{}");
+    }
+
+    #[test]
+    fn test_pretty_print_map_simple() {
+        let mut map = HashMap::new();
+        map.insert("key".to_string(), Value::String("value".to_string()));
+        let result = pretty_print_map(&map, 0);
+        assert!(result.contains("\"key\""));
+        assert!(result.contains("\"value\""));
+    }
+
+    #[test]
+    fn test_pretty_print_map_nested() {
+        let mut inner_map = HashMap::new();
+        inner_map.insert("inner".to_string(), Value::Number(42));
+        
+        let mut map = HashMap::new();
+        map.insert("outer".to_string(), Value::Map(inner_map));
+        
+        let result = pretty_print_map(&map, 0);
+        assert!(result.contains("\"outer\""));
+        assert!(result.contains("\"inner\""));
+        assert!(result.contains("42"));
+    }
+
+    #[test]
+    fn test_infer_type_number() {
+        assert_eq!(REPL::infer_type("42"), "Number");
+        assert_eq!(REPL::infer_type("-123"), "Number");
+    }
+
+    #[test]
+    fn test_infer_type_hex() {
+        assert_eq!(REPL::infer_type("0xdeadbeef"), "Hex/Address");
+        assert_eq!(REPL::infer_type("0x1234"), "Hex/Address");
+    }
+
+    #[test]
+    fn test_infer_type_list() {
+        assert_eq!(REPL::infer_type("[1, 2, 3]"), "List/Array");
+    }
+
+    #[test]
+    fn test_infer_type_map() {
+        assert_eq!(REPL::infer_type("{key: value}"), "Map/Object");
+    }
+
+    #[test]
+    fn test_infer_type_string() {
+        assert_eq!(REPL::infer_type("hello"), "String");
+        assert_eq!(REPL::infer_type("some text"), "String");
+    }
 }
