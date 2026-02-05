@@ -72,3 +72,6 @@ pub mod registry;
 
 // OpSec & EDR Evasion (syscalls only on Windows with feature flag)
 pub mod opsec;
+
+// Forensics & Anti-Sandbox (Phase 5.5)
+pub mod forensics;

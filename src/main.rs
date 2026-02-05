@@ -47,6 +47,9 @@ mod packet_tools;
 #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
 mod opsec;
 
+// Forensics & Anti-Sandbox (Phase 5.5)
+mod forensics;
+
 // EXPLOIT DEVELOPMENT MODULES (Phase 7+)
 mod cyclic_tools; // De Bruijn sequences for offset finding
 mod elf_tools; // ELF symbol resolution (symbols, plt, got) + string search
