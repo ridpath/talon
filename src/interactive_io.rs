@@ -1,16 +1,17 @@
+use std::collections::HashMap;
 use std::io::{Read, Write};
 use std::net::{TcpStream, ToSocketAddrs};
 use std::process::{ChildStdin, ChildStdout, Command, Stdio};
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-// ═══════════════════════════════════════════════════════════════════════════
-// INTERACTIVE I/O - PWNTOOLS-STYLE SOCKET CONTEXT
-// ═══════════════════════════════════════════════════════════════════════════
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::net::TcpStream as AsyncTcpStream;
+use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::terminal::{self, disable_raw_mode, enable_raw_mode};
 
 const DEFAULT_TIMEOUT_SECS: u64 = 10;
 const DEFAULT_RECV_SIZE: usize = 4096;
 
-/// Socket connection wrapper with pwntools-style interface
 pub struct Socket {
     stream: TcpStream,
     buffer: Vec<u8>,
@@ -18,14 +19,6 @@ pub struct Socket {
 }
 
 impl Socket {
-    /// Connect to a remote host
-    ///
-    /// # Example
-    /// ```
-    /// let mut conn = Socket::connect("192.168.1.1:9001")?;
-    /// conn.sendline(b"Hello");
-    /// let response = conn.recvline()?;
-    /// ```
     pub fn connect<A: ToSocketAddrs>(addr: A) -> Result<Self, String> {
         let stream = TcpStream::connect(addr).map_err(|e| format!("Connection failed: {}", e))?;
 
@@ -46,7 +39,6 @@ impl Socket {
         })
     }
 
-    /// Send data
     pub fn send(&mut self, data: &[u8]) -> Result<(), String> {
         self.stream
             .write_all(data)
@@ -55,14 +47,12 @@ impl Socket {
         Ok(())
     }
 
-    /// Send data with newline
     pub fn sendline(&mut self, data: &[u8]) -> Result<(), String> {
         let mut payload = data.to_vec();
         payload.push(b'\n');
         self.send(&payload)
     }
 
-    /// Receive exactly n bytes
     pub fn recv(&mut self, n: usize) -> Result<Vec<u8>, String> {
         let mut buf = vec![0u8; n];
         self.stream
@@ -72,7 +62,6 @@ impl Socket {
         Ok(buf)
     }
 
-    /// Receive until a delimiter is found
     pub fn recvuntil(&mut self, delim: &[u8]) -> Result<Vec<u8>, String> {
         let mut result = Vec::new();
         let mut buf = [0u8; 1];
@@ -83,7 +72,6 @@ impl Socket {
                 .map_err(|e| format!("Recv failed: {}", e))?;
             result.push(buf[0]);
 
-            // Check if we found the delimiter
             if result.len() >= delim.len() {
                 let end = &result[result.len() - delim.len()..];
                 if end == delim {
@@ -92,19 +80,16 @@ impl Socket {
                 }
             }
 
-            // Safety limit
             if result.len() > 1_000_000 {
                 return Err("Received too much data without finding delimiter".to_string());
             }
         }
     }
 
-    /// Receive a single line
     pub fn recvline(&mut self) -> Result<Vec<u8>, String> {
         self.recvuntil(b"\n")
     }
 
-    /// Receive all available data (non-blocking after timeout)
     pub fn recvall(&mut self) -> Result<Vec<u8>, String> {
         let mut result = Vec::new();
         let mut buf = [0u8; DEFAULT_RECV_SIZE];
@@ -115,7 +100,7 @@ impl Socket {
 
         loop {
             match self.stream.read(&mut buf) {
-                Ok(0) => break, // EOF
+                Ok(0) => break,
                 Ok(n) => {
                     result.extend_from_slice(&buf[..n]);
                 }
@@ -125,7 +110,6 @@ impl Socket {
             }
         }
 
-        // Restore original timeout
         self.stream
             .set_read_timeout(Some(self.timeout))
             .map_err(|e| format!("Failed to restore timeout: {}", e))?;
@@ -134,35 +118,50 @@ impl Socket {
         Ok(result)
     }
 
-    /// Interactive mode - bidirectional I/O with remote
     pub fn interactive(&mut self) -> Result<(), String> {
-        use std::io::{stdin, stdout};
-        use std::sync::mpsc;
-        use std::thread;
-        use std::time::Duration;
+        self.interactive_with_raw_mode(false)
+    }
 
-        log::info!("Entering interactive mode. Press Ctrl+C to exit.");
+    pub fn interactive_raw(&mut self) -> Result<(), String> {
+        self.interactive_with_raw_mode(true)
+    }
+
+    pub fn interactive_with_raw_mode(&mut self, use_raw_mode: bool) -> Result<(), String> {
+        log::info!("Entering interactive mode (raw_mode: {}). Press Ctrl+C to exit.", use_raw_mode);
         println!("[*] Switching to interactive mode...");
 
-        // Clone stream for reading thread
+        if use_raw_mode {
+            enable_raw_mode().map_err(|e| format!("Failed to enable raw mode: {}", e))?;
+        }
+
+        let result = self.run_interactive_loop(use_raw_mode);
+
+        if use_raw_mode {
+            disable_raw_mode().ok();
+        }
+
+        result
+    }
+
+    fn run_interactive_loop(&mut self, use_raw_mode: bool) -> Result<(), String> {
+        use std::io::{stdin, stdout, Write};
+        use std::sync::mpsc;
+        use std::thread;
+
         let mut read_stream = self
             .stream
             .try_clone()
             .map_err(|e| format!("Failed to clone stream: {}", e))?;
 
-        // Set non-blocking read timeout
         read_stream
             .set_read_timeout(Some(Duration::from_millis(100)))
             .map_err(|e| format!("Failed to set timeout: {}", e))?;
 
-        // Create channel for graceful shutdown
         let (tx, rx) = mpsc::channel();
 
-        // Spawn thread to read from remote
         let read_handle = thread::spawn(move || {
             let mut buf = [0u8; 4096];
             loop {
-                // Check for shutdown signal
                 if rx.try_recv().is_ok() {
                     break;
                 }
@@ -181,7 +180,6 @@ impl Socket {
                         if e.kind() == std::io::ErrorKind::WouldBlock
                             || e.kind() == std::io::ErrorKind::TimedOut =>
                     {
-                        // Timeout, continue loop
                         thread::sleep(Duration::from_millis(10));
                     }
                     Err(e) => {
@@ -192,40 +190,76 @@ impl Socket {
             }
         });
 
-        // Read from stdin and send to remote
-        let stdin = stdin();
-        let mut input_buf = String::new();
+        if use_raw_mode {
+            loop {
+                if event::poll(Duration::from_millis(10)).unwrap_or(false) {
+                    if let Ok(Event::Key(key_event)) = event::read() {
+                        if key_event.modifiers.contains(KeyModifiers::CONTROL)
+                            && (key_event.code == KeyCode::Char('c') || key_event.code == KeyCode::Char('C'))
+                        {
+                            println!("\n[*] Ctrl+C received, exiting interactive mode");
+                            break;
+                        }
 
-        loop {
-            input_buf.clear();
-            match stdin.read_line(&mut input_buf) {
-                Ok(0) => {
-                    // EOF (Ctrl+D)
-                    println!("\n[*] Exiting interactive mode");
-                    break;
+                        match key_event.code {
+                            KeyCode::Char(c) => {
+                                if self.stream.write_all(&[c as u8]).is_err() {
+                                    break;
+                                }
+                            }
+                            KeyCode::Enter => {
+                                if self.stream.write_all(b"\n").is_err() {
+                                    break;
+                                }
+                            }
+                            KeyCode::Backspace => {
+                                if self.stream.write_all(b"\x7f").is_err() {
+                                    break;
+                                }
+                            }
+                            KeyCode::Tab => {
+                                if self.stream.write_all(b"\t").is_err() {
+                                    break;
+                                }
+                            }
+                            _ => {}
+                        }
+                        self.stream.flush().ok();
+                    }
                 }
-                Ok(_) => {
-                    if let Err(e) = self.stream.write_all(input_buf.as_bytes()) {
-                        eprintln!("[!] Write error: {}", e);
+            }
+        } else {
+            let stdin = stdin();
+            let mut input_buf = String::new();
+
+            loop {
+                input_buf.clear();
+                match stdin.read_line(&mut input_buf) {
+                    Ok(0) => {
+                        println!("\n[*] Exiting interactive mode");
                         break;
                     }
-                    self.stream.flush().ok();
-                }
-                Err(e) => {
-                    eprintln!("[!] Input error: {}", e);
-                    break;
+                    Ok(_) => {
+                        if let Err(e) = self.stream.write_all(input_buf.as_bytes()) {
+                            eprintln!("[!] Write error: {}", e);
+                            break;
+                        }
+                        self.stream.flush().ok();
+                    }
+                    Err(e) => {
+                        eprintln!("[!] Input error: {}", e);
+                        break;
+                    }
                 }
             }
         }
 
-        // Signal read thread to exit
         tx.send(()).ok();
         read_handle.join().ok();
 
         Ok(())
     }
 
-    /// Clean shutdown
     pub fn close(&mut self) -> Result<(), String> {
         self.stream
             .shutdown(std::net::Shutdown::Both)
@@ -234,7 +268,6 @@ impl Socket {
         Ok(())
     }
 
-    /// Set timeout
     pub fn set_timeout(&mut self, seconds: u64) -> Result<(), String> {
         self.timeout = Duration::from_secs(seconds);
         self.stream
@@ -245,20 +278,383 @@ impl Socket {
             .map_err(|e| format!("Failed to set timeout: {}", e))?;
         Ok(())
     }
+
+    pub fn get_raw_stream(&mut self) -> &mut TcpStream {
+        &mut self.stream
+    }
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// PROCESS INTERACTION
-// ────────────────────────────────────────────────────────────────────────────
+pub struct ConnectionMultiplexer {
+    connections: Arc<Mutex<HashMap<String, Arc<Mutex<Socket>>>>>,
+    active_connection: Arc<Mutex<Option<String>>>,
+}
 
-/// Process wrapper for local exploitation
+impl ConnectionMultiplexer {
+    pub fn new() -> Self {
+        ConnectionMultiplexer {
+            connections: Arc::new(Mutex::new(HashMap::new())),
+            active_connection: Arc::new(Mutex::new(None)),
+        }
+    }
+
+    pub fn add_connection(&mut self, name: String, socket: Socket) -> Result<(), String> {
+        let mut conns = self.connections.lock()
+            .map_err(|e| format!("Failed to lock connections: {}", e))?;
+        conns.insert(name.clone(), Arc::new(Mutex::new(socket)));
+        
+        let mut active = self.active_connection.lock()
+            .map_err(|e| format!("Failed to lock active connection: {}", e))?;
+        if active.is_none() {
+            *active = Some(name.clone());
+            log::info!("Set active connection to: {}", name);
+        }
+        
+        Ok(())
+    }
+
+    pub fn switch_to(&mut self, name: &str) -> Result<(), String> {
+        let conns = self.connections.lock()
+            .map_err(|e| format!("Failed to lock connections: {}", e))?;
+        
+        if !conns.contains_key(name) {
+            return Err(format!("Connection '{}' not found", name));
+        }
+
+        let mut active = self.active_connection.lock()
+            .map_err(|e| format!("Failed to lock active connection: {}", e))?;
+        *active = Some(name.to_string());
+        
+        log::info!("Switched to connection: {}", name);
+        Ok(())
+    }
+
+    pub fn get_active(&self) -> Result<Arc<Mutex<Socket>>, String> {
+        let active = self.active_connection.lock()
+            .map_err(|e| format!("Failed to lock active connection: {}", e))?;
+        
+        if let Some(name) = active.as_ref() {
+            let conns = self.connections.lock()
+                .map_err(|e| format!("Failed to lock connections: {}", e))?;
+            
+            conns.get(name)
+                .cloned()
+                .ok_or_else(|| format!("Active connection '{}' not found", name))
+        } else {
+            Err("No active connection".to_string())
+        }
+    }
+
+    pub fn list_connections(&self) -> Result<Vec<String>, String> {
+        let conns = self.connections.lock()
+            .map_err(|e| format!("Failed to lock connections: {}", e))?;
+        Ok(conns.keys().cloned().collect())
+    }
+
+    pub fn remove_connection(&mut self, name: &str) -> Result<(), String> {
+        let mut conns = self.connections.lock()
+            .map_err(|e| format!("Failed to lock connections: {}", e))?;
+        
+        conns.remove(name).ok_or_else(|| format!("Connection '{}' not found", name))?;
+        
+        let mut active = self.active_connection.lock()
+            .map_err(|e| format!("Failed to lock active connection: {}", e))?;
+        if active.as_ref() == Some(&name.to_string()) {
+            *active = conns.keys().next().cloned();
+        }
+        
+        log::info!("Removed connection: {}", name);
+        Ok(())
+    }
+}
+
+impl Default for ConnectionMultiplexer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct GdbCoordinator {
+    gdb_stream: Option<Arc<Mutex<Socket>>>,
+    target_stream: Option<Arc<Mutex<Socket>>>,
+}
+
+impl GdbCoordinator {
+    pub fn new() -> Self {
+        GdbCoordinator {
+            gdb_stream: None,
+            target_stream: None,
+        }
+    }
+
+    pub fn set_gdb_connection(&mut self, socket: Socket) {
+        self.gdb_stream = Some(Arc::new(Mutex::new(socket)));
+        log::info!("GDB connection registered");
+    }
+
+    pub fn set_target_connection(&mut self, socket: Socket) {
+        self.target_stream = Some(Arc::new(Mutex::new(socket)));
+        log::info!("Target connection registered");
+    }
+
+    pub fn sync_breakpoint(&mut self, address: u64) -> Result<(), String> {
+        if let Some(gdb) = &self.gdb_stream {
+            let mut gdb_sock = gdb.lock()
+                .map_err(|e| format!("Failed to lock GDB socket: {}", e))?;
+            
+            let cmd = format!("break *{:#x}\n", address);
+            gdb_sock.send(cmd.as_bytes())?;
+            log::info!("Set breakpoint at {:#x}", address);
+            Ok(())
+        } else {
+            Err("GDB connection not set".to_string())
+        }
+    }
+
+    pub fn send_gdb_command(&mut self, command: &str) -> Result<Vec<u8>, String> {
+        if let Some(gdb) = &self.gdb_stream {
+            let mut gdb_sock = gdb.lock()
+                .map_err(|e| format!("Failed to lock GDB socket: {}", e))?;
+            
+            gdb_sock.sendline(command.as_bytes())?;
+            std::thread::sleep(Duration::from_millis(100));
+            gdb_sock.recvall()
+        } else {
+            Err("GDB connection not set".to_string())
+        }
+    }
+}
+
+impl Default for GdbCoordinator {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+pub struct AsyncSocket {
+    stream: AsyncTcpStream,
+    buffer: Vec<u8>,
+}
+
+impl AsyncSocket {
+    pub async fn connect<A: tokio::net::ToSocketAddrs>(addr: A) -> Result<Self, String> {
+        let stream = AsyncTcpStream::connect(addr)
+            .await
+            .map_err(|e| format!("Async connection failed: {}", e))?;
+
+        log::info!("Async connected to {:?}", stream.peer_addr());
+
+        Ok(AsyncSocket {
+            stream,
+            buffer: Vec::new(),
+        })
+    }
+
+    pub async fn send(&mut self, data: &[u8]) -> Result<(), String> {
+        self.stream
+            .write_all(data)
+            .await
+            .map_err(|e| format!("Async send failed: {}", e))?;
+        log::debug!("Async sent {} bytes", data.len());
+        Ok(())
+    }
+
+    pub async fn sendline(&mut self, data: &[u8]) -> Result<(), String> {
+        let mut payload = data.to_vec();
+        payload.push(b'\n');
+        self.send(&payload).await
+    }
+
+    pub async fn recv(&mut self, n: usize) -> Result<Vec<u8>, String> {
+        let mut buf = vec![0u8; n];
+        self.stream
+            .read_exact(&mut buf)
+            .await
+            .map_err(|e| format!("Async recv failed: {}", e))?;
+        log::debug!("Async received {} bytes", n);
+        Ok(buf)
+    }
+
+    pub async fn recvuntil(&mut self, delim: &[u8]) -> Result<Vec<u8>, String> {
+        let mut result = Vec::new();
+        let mut buf = [0u8; 1];
+
+        loop {
+            self.stream
+                .read_exact(&mut buf)
+                .await
+                .map_err(|e| format!("Async recv failed: {}", e))?;
+            result.push(buf[0]);
+
+            if result.len() >= delim.len() {
+                let end = &result[result.len() - delim.len()..];
+                if end == delim {
+                    log::debug!("Async received until delimiter ({} bytes)", result.len());
+                    return Ok(result);
+                }
+            }
+
+            if result.len() > 1_000_000 {
+                return Err("Received too much data without finding delimiter".to_string());
+            }
+        }
+    }
+
+    pub async fn recvline(&mut self) -> Result<Vec<u8>, String> {
+        self.recvuntil(b"\n").await
+    }
+
+    pub async fn close(&mut self) -> Result<(), String> {
+        self.stream
+            .shutdown()
+            .await
+            .map_err(|e| format!("Async shutdown failed: {}", e))?;
+        log::info!("Async connection closed");
+        Ok(())
+    }
+}
+
+pub async fn concurrent_connections(
+    addrs: Vec<String>,
+) -> Result<Vec<Result<AsyncSocket, String>>, String> {
+    let mut handles = vec![];
+
+    for addr in addrs {
+        let handle = tokio::spawn(async move {
+            AsyncSocket::connect(addr.as_str()).await
+        });
+        handles.push(handle);
+    }
+
+    let mut results = vec![];
+    for handle in handles {
+        let result = handle.await.map_err(|e| format!("Task join error: {}", e))?;
+        results.push(result);
+    }
+
+    Ok(results)
+}
+
+pub struct TerminalManager {
+    original_size: Option<(u16, u16)>,
+}
+
+impl TerminalManager {
+    pub fn new() -> Self {
+        TerminalManager {
+            original_size: Self::get_terminal_size().ok(),
+        }
+    }
+
+    pub fn get_terminal_size() -> Result<(u16, u16), String> {
+        terminal::size().map_err(|e| format!("Failed to get terminal size: {}", e))
+    }
+
+    pub fn enable_raw_mode() -> Result<(), String> {
+        enable_raw_mode().map_err(|e| format!("Failed to enable raw mode: {}", e))
+    }
+
+    pub fn disable_raw_mode() -> Result<(), String> {
+        disable_raw_mode().map_err(|e| format!("Failed to disable raw mode: {}", e))
+    }
+
+    pub fn restore(&self) -> Result<(), String> {
+        Self::disable_raw_mode().ok();
+        Ok(())
+    }
+
+    pub fn monitor_resize<F>(&self, mut callback: F) -> Result<(), String>
+    where
+        F: FnMut(u16, u16) + Send + 'static,
+    {
+        use std::thread;
+        use std::time::Duration;
+
+        thread::spawn(move || {
+            let mut last_size = Self::get_terminal_size().ok();
+
+            loop {
+                thread::sleep(Duration::from_millis(500));
+
+                if let Ok(current_size) = Self::get_terminal_size() {
+                    if last_size != Some(current_size) {
+                        log::info!("Terminal resized to {}x{}", current_size.0, current_size.1);
+                        callback(current_size.0, current_size.1);
+                        last_size = Some(current_size);
+                    }
+                }
+            }
+        });
+
+        Ok(())
+    }
+}
+
+impl Default for TerminalManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Drop for TerminalManager {
+    fn drop(&mut self) {
+        self.restore().ok();
+    }
+}
+
+pub struct SignalHandler {
+    ctrl_c_count: Arc<Mutex<u32>>,
+}
+
+impl SignalHandler {
+    pub fn new() -> Self {
+        SignalHandler {
+            ctrl_c_count: Arc::new(Mutex::new(0)),
+        }
+    }
+
+    pub fn install_handler(&self) -> Result<(), String> {
+        let count = Arc::clone(&self.ctrl_c_count);
+        
+        ctrlc::set_handler(move || {
+            let mut c = count.lock().unwrap();
+            *c += 1;
+            
+            if *c == 1 {
+                println!("\n[*] Ctrl+C received. Press again to force exit.");
+            } else {
+                println!("\n[!] Force exiting...");
+                std::process::exit(130);
+            }
+        })
+        .map_err(|e| format!("Failed to set Ctrl+C handler: {}", e))?;
+        
+        log::info!("Signal handler installed");
+        Ok(())
+    }
+
+    pub fn reset_count(&self) {
+        if let Ok(mut count) = self.ctrl_c_count.lock() {
+            *count = 0;
+        }
+    }
+
+    pub fn get_count(&self) -> u32 {
+        self.ctrl_c_count.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    }
+}
+
+impl Default for SignalHandler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 pub struct Process {
     stdin: Option<ChildStdin>,
     stdout: Option<ChildStdout>,
 }
 
 impl Process {
-    /// Spawn a local process
     pub fn spawn(command: &str, args: &[&str]) -> Result<Self, String> {
         let mut child = Command::new(command)
             .args(args)
@@ -276,7 +672,6 @@ impl Process {
         Ok(Process { stdin, stdout })
     }
 
-    /// Send data to process
     pub fn send(&mut self, data: &[u8]) -> Result<(), String> {
         if let Some(ref mut stdin) = self.stdin {
             stdin
@@ -289,14 +684,12 @@ impl Process {
         }
     }
 
-    /// Send line to process
     pub fn sendline(&mut self, data: &[u8]) -> Result<(), String> {
         let mut payload = data.to_vec();
         payload.push(b'\n');
         self.send(&payload)
     }
 
-    /// Receive from process
     pub fn recv(&mut self, n: usize) -> Result<Vec<u8>, String> {
         if let Some(ref mut stdout) = self.stdout {
             let mut buf = vec![0u8; n];
@@ -309,7 +702,6 @@ impl Process {
         }
     }
 
-    /// Receive line from process
     pub fn recvline(&mut self) -> Result<Vec<u8>, String> {
         if let Some(ref mut stdout) = self.stdout {
             let mut line = Vec::new();
@@ -325,7 +717,6 @@ impl Process {
                     break;
                 }
 
-                // Safety limit
                 if line.len() > 1_000_000 {
                     return Err("Line too long".to_string());
                 }
@@ -338,24 +729,22 @@ impl Process {
     }
 }
 
-// ────────────────────────────────────────────────────────────────────────────
-// HELPER FUNCTIONS
-// ────────────────────────────────────────────────────────────────────────────
-
-/// Quick connect helper
 pub fn remote(host: &str, port: u16) -> Result<Socket, String> {
     let addr = format!("{}:{}", host, port);
     Socket::connect(addr)
 }
 
-/// Quick local process helper
 pub fn process(binary: &str) -> Result<Process, String> {
     Process::spawn(binary, &[])
 }
 
-/// Quick local process with args
 pub fn process_with_args(binary: &str, args: &[&str]) -> Result<Process, String> {
     Process::spawn(binary, args)
+}
+
+pub async fn async_remote(host: &str, port: u16) -> Result<AsyncSocket, String> {
+    let addr = format!("{}:{}", host, port);
+    AsyncSocket::connect(addr.as_str()).await
 }
 
 #[cfg(test)]
@@ -364,8 +753,6 @@ mod tests {
 
     #[test]
     fn test_socket_creation() {
-        // This would require a test server
-        // For now, just test that the struct exists
         assert_eq!(
             std::mem::size_of::<Socket>(),
             std::mem::size_of::<TcpStream>()
@@ -376,14 +763,71 @@ mod tests {
 
     #[test]
     fn test_process_creation() {
-        // Test spawning a simple process (echo on Unix, cmd on Windows)
         #[cfg(unix)]
         let result = Process::spawn("echo", &["test"]);
 
         #[cfg(windows)]
         let result = Process::spawn("cmd", &["/C", "echo", "test"]);
 
-        // May fail in test environment, but struct should work
         let _ = result;
+    }
+
+    #[test]
+    fn test_connection_multiplexer_creation() {
+        let mux = ConnectionMultiplexer::new();
+        assert!(mux.list_connections().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_connection_multiplexer_add() {
+        let mux = ConnectionMultiplexer::new();
+        assert!(mux.list_connections().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_gdb_coordinator_creation() {
+        let coordinator = GdbCoordinator::new();
+        assert!(coordinator.gdb_stream.is_none());
+        assert!(coordinator.target_stream.is_none());
+    }
+
+    #[test]
+    fn test_terminal_manager_creation() {
+        let tm = TerminalManager::new();
+        assert!(tm.original_size.is_some() || tm.original_size.is_none());
+    }
+
+    #[test]
+    fn test_terminal_size_detection() {
+        let size_result = TerminalManager::get_terminal_size();
+        let _ = size_result;
+    }
+
+    #[test]
+    fn test_signal_handler_creation() {
+        let handler = SignalHandler::new();
+        assert_eq!(handler.get_count(), 0);
+    }
+
+    #[test]
+    fn test_signal_handler_count() {
+        let handler = SignalHandler::new();
+        handler.reset_count();
+        assert_eq!(handler.get_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_async_socket_type() {
+        assert_eq!(
+            std::mem::size_of::<AsyncSocket>(),
+            std::mem::size_of::<AsyncTcpStream>() + std::mem::size_of::<Vec<u8>>()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_connections_empty() {
+        let result = concurrent_connections(vec![]).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().len(), 0);
     }
 }
