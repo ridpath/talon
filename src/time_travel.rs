@@ -1,5 +1,28 @@
 #![allow(dead_code)]
 
+//! Time-Travel Debugging System
+//!
+//! Provides comprehensive debugging capabilities with state checkpointing, event recording,
+//! and integration with GDB for reverse debugging. This module enables:
+//!
+//! - State snapshots and restoration
+//! - Event recording and replay
+//! - GDB reverse debugging integration
+//! - Disk-based checkpoint persistence
+//! - Branch creation for parallel debugging paths
+//! - Send event rewinding for payload testing
+//!
+//! Integration with other modules:
+//! - `gdb_tools`: GDB session management and reverse debugging commands
+//! - `session_state`: Exploit session state management
+//! - `split_screen_debugger`: TUI for interactive debugging
+//! - `interpreter`: DSL-level debug() builtin function
+//!
+//! Performance considerations:
+//! - Event recording uses a bounded queue to prevent memory exhaustion
+//! - Checkpoints are stored with SHA256 hashing for integrity
+//! - Disk checkpoints support automatic cleanup of old checkpoints
+
 use crate::gdb_tools::GdbSession;
 use crate::session_state::{ExploitSession, SessionState};
 use serde::{Deserialize, Serialize};
@@ -548,6 +571,137 @@ impl TimeTravelDebugger {
         hasher.update(label.as_bytes());
         format!("{:x}", hasher.finalize())[..16].to_string()
     }
+
+    /// Get summary of all recorded events grouped by type
+    pub async fn get_event_summary(&self) -> EventSummary {
+        let recorder = self.recorder.read().await;
+        let mut summary = EventSummary::default();
+
+        for event in &recorder.events {
+            match &event.event_type {
+                EventType::MemoryWrite { .. } => summary.memory_writes += 1,
+                EventType::MemoryRead { .. } => summary.memory_reads += 1,
+                EventType::NetworkSend { .. } => summary.network_sends += 1,
+                EventType::NetworkReceive { .. } => summary.network_receives += 1,
+                EventType::RegisterModify { .. } => summary.register_modifies += 1,
+                EventType::FunctionCall { .. } => summary.function_calls += 1,
+                EventType::Checkpoint { .. } => summary.checkpoints += 1,
+                EventType::Custom { .. } => summary.custom_events += 1,
+            }
+        }
+
+        summary.total_events = recorder.events.len();
+        summary
+    }
+
+    /// Find all events of a specific type
+    pub async fn filter_events_by_type(&self, event_type_filter: EventTypeFilter) -> Vec<ExploitEvent> {
+        let recorder = self.recorder.read().await;
+        
+        recorder.events.iter()
+            .filter(|e| match (event_type_filter, &e.event_type) {
+                (EventTypeFilter::MemoryWrite, EventType::MemoryWrite { .. }) => true,
+                (EventTypeFilter::MemoryRead, EventType::MemoryRead { .. }) => true,
+                (EventTypeFilter::NetworkSend, EventType::NetworkSend { .. }) => true,
+                (EventTypeFilter::NetworkReceive, EventType::NetworkReceive { .. }) => true,
+                (EventTypeFilter::RegisterModify, EventType::RegisterModify { .. }) => true,
+                (EventTypeFilter::FunctionCall, EventType::FunctionCall { .. }) => true,
+                (EventTypeFilter::Checkpoint, EventType::Checkpoint { .. }) => true,
+                (EventTypeFilter::Custom, EventType::Custom { .. }) => true,
+                _ => false,
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Get the current recording status
+    pub async fn is_recording(&self) -> bool {
+        let recorder = self.recorder.read().await;
+        recorder.is_recording()
+    }
+
+    /// Get total number of events recorded
+    pub async fn event_count(&self) -> usize {
+        let recorder = self.recorder.read().await;
+        recorder.events.len()
+    }
+
+    /// Get checkpoint directory path
+    pub fn get_checkpoint_dir(&self) -> &Path {
+        &self.checkpoint_dir
+    }
+
+    /// Fast forward to the most recent state
+    pub async fn fast_forward_to_latest(&self) -> Result<(), String> {
+        let recorder = self.recorder.read().await;
+        
+        if let Some(last_event) = recorder.events.back() {
+            if let Some(state) = &last_event.state_after {
+                let state_clone = state.clone();
+                drop(recorder);
+                self.session.update_state(|s| {
+                    *s = state_clone;
+                    Ok(())
+                }).await?;
+                println!("[Time-Travel] Fast-forwarded to latest state");
+                Ok(())
+            } else {
+                Err("Last event has no state_after recorded".to_string())
+            }
+        } else {
+            Err("No events recorded".to_string())
+        }
+    }
+
+    /// Find events that modified a specific memory address
+    pub async fn find_memory_modifications(&self, address: u64) -> Vec<ExploitEvent> {
+        let recorder = self.recorder.read().await;
+        
+        recorder.events.iter()
+            .filter(|e| {
+                matches!(&e.event_type, 
+                    EventType::MemoryWrite { address: addr, .. } 
+                    if *addr == address
+                )
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Find events that modified a specific register
+    pub async fn find_register_modifications(&self, register: &str) -> Vec<ExploitEvent> {
+        let recorder = self.recorder.read().await;
+        
+        recorder.events.iter()
+            .filter(|e| {
+                matches!(&e.event_type, 
+                    EventType::RegisterModify { register: reg, .. } 
+                    if reg == register
+                )
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Create a named snapshot for later comparison
+    pub async fn create_snapshot(&self, name: String) -> Result<u64, String> {
+        self.session.checkpoint_labeled(format!("snapshot_{}", name)).await
+    }
+
+    /// Compare two checkpoints and return differences
+    pub async fn diff_checkpoints(&self, checkpoint_a: u64, checkpoint_b: u64) -> Result<StateDiff, String> {
+        let history = self.session.list_checkpoints().await;
+        
+        let state_a = history.iter()
+            .find(|s| s.id == checkpoint_a)
+            .ok_or("Checkpoint A not found")?;
+        
+        let state_b = history.iter()
+            .find(|s| s.id == checkpoint_b)
+            .ok_or("Checkpoint B not found")?;
+        
+        Ok(StateDiff::compute(&state_a.state, &state_b.state))
+    }
 }
 
 impl EventRecorder {
@@ -685,6 +839,123 @@ pub struct TimelineCheckpoint {
     pub event_id: u64,
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct EventSummary {
+    pub total_events: usize,
+    pub memory_writes: usize,
+    pub memory_reads: usize,
+    pub network_sends: usize,
+    pub network_receives: usize,
+    pub register_modifies: usize,
+    pub function_calls: usize,
+    pub checkpoints: usize,
+    pub custom_events: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum EventTypeFilter {
+    MemoryWrite,
+    MemoryRead,
+    NetworkSend,
+    NetworkReceive,
+    RegisterModify,
+    FunctionCall,
+    Checkpoint,
+    Custom,
+}
+
+#[derive(Debug, Clone)]
+pub struct StateDiff {
+    pub libc_base_changed: bool,
+    pub libc_base_diff: Option<(Option<u64>, Option<u64>)>,
+    pub heap_base_changed: bool,
+    pub heap_base_diff: Option<(Option<u64>, Option<u64>)>,
+    pub register_changes: Vec<RegisterChange>,
+    pub symbol_changes: Vec<SymbolChange>,
+    pub variable_changes: Vec<String>,
+}
+
+#[derive(Debug, Clone)]
+pub struct RegisterChange {
+    pub register: String,
+    pub old_value: Option<u64>,
+    pub new_value: Option<u64>,
+}
+
+#[derive(Debug, Clone)]
+pub struct SymbolChange {
+    pub symbol: String,
+    pub old_address: Option<u64>,
+    pub new_address: Option<u64>,
+}
+
+impl StateDiff {
+    pub fn compute(state_a: &SessionState, state_b: &SessionState) -> Self {
+        let libc_base_changed = state_a.addresses.libc_base != state_b.addresses.libc_base;
+        let libc_base_diff = if libc_base_changed {
+            Some((state_a.addresses.libc_base, state_b.addresses.libc_base))
+        } else {
+            None
+        };
+
+        let heap_base_changed = state_a.addresses.heap_base != state_b.addresses.heap_base;
+        let heap_base_diff = if heap_base_changed {
+            Some((state_a.addresses.heap_base, state_b.addresses.heap_base))
+        } else {
+            None
+        };
+
+        let mut register_changes = Vec::new();
+        for (reg, &val_b) in &state_b.memory.registers {
+            let val_a = state_a.memory.registers.get(reg).copied();
+            if val_a != Some(val_b) {
+                register_changes.push(RegisterChange {
+                    register: reg.clone(),
+                    old_value: val_a,
+                    new_value: Some(val_b),
+                });
+            }
+        }
+
+        let mut symbol_changes = Vec::new();
+        for (sym, &addr_b) in &state_b.addresses.symbols {
+            let addr_a = state_a.addresses.symbols.get(sym).copied();
+            if addr_a != Some(addr_b) {
+                symbol_changes.push(SymbolChange {
+                    symbol: sym.clone(),
+                    old_address: addr_a,
+                    new_address: Some(addr_b),
+                });
+            }
+        }
+
+        let variable_changes: Vec<String> = state_b.variables.keys()
+            .filter(|k| {
+                state_a.variables.get(*k) != state_b.variables.get(*k)
+            })
+            .cloned()
+            .collect();
+
+        StateDiff {
+            libc_base_changed,
+            libc_base_diff,
+            heap_base_changed,
+            heap_base_diff,
+            register_changes,
+            symbol_changes,
+            variable_changes,
+        }
+    }
+
+    pub fn has_changes(&self) -> bool {
+        self.libc_base_changed || 
+        self.heap_base_changed || 
+        !self.register_changes.is_empty() || 
+        !self.symbol_changes.is_empty() || 
+        !self.variable_changes.is_empty()
+    }
+}
+
 pub async fn record_and_replay_exploit<F, T>(
     session: &ExploitSession,
     exploit_fn: F,
@@ -746,6 +1017,408 @@ mod tests {
         assert_eq!(session.get_libc_base().await, Some(0x2000));
 
         debugger.switch_to_branch(&branch).await.unwrap();
+        assert_eq!(session.get_libc_base().await, Some(0x1000));
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_creation_and_rewind() {
+        let session = Arc::new(ExploitSession::new());
+        let _debugger = TimeTravelDebugger::new(session.clone());
+
+        session.set_libc_base(0x7ffff7a00000).await;
+        session.set_register("rip".to_string(), 0x401000).await;
+
+        let checkpoint_id = session.checkpoint_labeled("exploit_start".to_string()).await.unwrap();
+
+        session.set_libc_base(0x7ffff7b00000).await;
+        session.set_register("rip".to_string(), 0x401234).await;
+
+        assert_eq!(session.get_libc_base().await, Some(0x7ffff7b00000));
+        assert_eq!(session.get_register("rip").await, Some(0x401234));
+
+        session.rewind(checkpoint_id).await.unwrap();
+
+        assert_eq!(session.get_libc_base().await, Some(0x7ffff7a00000));
+        assert_eq!(session.get_register("rip").await, Some(0x401000));
+    }
+
+    #[tokio::test]
+    async fn test_event_replay() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session.clone());
+
+        debugger.start_recording().await;
+
+        debugger.record_event(EventType::MemoryWrite {
+            address: 0x401000,
+            data: vec![0x90, 0x90, 0x90],
+        }).await.unwrap();
+
+        debugger.record_event(EventType::RegisterModify {
+            register: "rax".to_string(),
+            old_value: 0,
+            new_value: 42,
+        }).await.unwrap();
+
+        debugger.record_event(EventType::NetworkSend {
+            data: b"payload".to_vec(),
+        }).await.unwrap();
+
+        let events = debugger.get_events().await;
+        assert_eq!(events.len(), 3);
+
+        debugger.replay_events(1, 2).await.unwrap();
+        assert_eq!(session.get_register("rax").await, Some(42));
+    }
+
+    #[tokio::test]
+    async fn test_disk_checkpoint_persistence() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session.clone());
+
+        session.set_libc_base(0x1234000).await;
+        session.set_symbol("main".to_string(), 0x401000).await;
+
+        debugger.start_recording().await;
+        debugger.record_event(EventType::Checkpoint {
+            label: "test_checkpoint".to_string(),
+        }).await.unwrap();
+
+        let result = debugger.save_checkpoint_to_disk(1, "test_checkpoint").await;
+        assert!(result.is_ok());
+
+        session.set_libc_base(0x5678000).await;
+
+        let load_result = debugger.load_checkpoint_from_disk("test_checkpoint").await;
+        assert!(load_result.is_ok());
+
+        assert_eq!(session.get_libc_base().await, Some(0x1234000));
+        assert_eq!(session.get_symbol("main").await, Some(0x401000));
+    }
+
+    #[tokio::test]
+    async fn test_send_event_rewinding() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session.clone());
+
+        debugger.start_recording().await;
+
+        session.set_libc_base(0x1000).await;
+        debugger.record_event(EventType::NetworkSend {
+            data: b"payload1".to_vec(),
+        }).await.unwrap();
+
+        session.set_libc_base(0x2000).await;
+        debugger.record_event(EventType::NetworkSend {
+            data: b"payload2".to_vec(),
+        }).await.unwrap();
+
+        session.set_libc_base(0x3000).await;
+        debugger.record_event(EventType::NetworkSend {
+            data: b"payload3".to_vec(),
+        }).await.unwrap();
+
+        let send_events = debugger.list_send_events().await;
+        assert_eq!(send_events.len(), 3);
+
+        debugger.rewind_to_send(1).await.unwrap();
+        assert_eq!(session.get_libc_base().await, Some(0x2000));
+
+        debugger.rewind_to_send(0).await.unwrap();
+        assert_eq!(session.get_libc_base().await, Some(0x1000));
+    }
+
+    #[tokio::test]
+    async fn test_timeline_export() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session.clone());
+
+        debugger.start_recording().await;
+
+        for i in 0..5 {
+            debugger.record_event(EventType::MemoryWrite {
+                address: 0x401000 + i * 4,
+                data: vec![i as u8; 4],
+            }).await.unwrap();
+        }
+
+        session.checkpoint_labeled("mid_exploit".to_string()).await.unwrap();
+
+        for i in 5..10 {
+            debugger.record_event(EventType::MemoryWrite {
+                address: 0x401000 + i * 4,
+                data: vec![i as u8; 4],
+            }).await.unwrap();
+        }
+
+        let timeline = debugger.export_timeline().await;
+        assert_eq!(timeline.events.len(), 10);
+        assert_eq!(timeline.checkpoints.len(), 1);
+        assert!(timeline.duration.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_playback_engine() {
+        let mut playback = PlaybackEngine::new();
+
+        let events = vec![
+            ExploitEvent {
+                id: 1,
+                timestamp: std::time::Instant::now(),
+                event_type: EventType::MemoryWrite {
+                    address: 0x1000,
+                    data: vec![0x90],
+                },
+                state_before: None,
+                state_after: None,
+            },
+            ExploitEvent {
+                id: 2,
+                timestamp: std::time::Instant::now(),
+                event_type: EventType::MemoryWrite {
+                    address: 0x2000,
+                    data: vec![0x90],
+                },
+                state_before: None,
+                state_after: None,
+            },
+        ];
+
+        playback.load_events(events);
+        playback.play();
+
+        assert!(playback.step_forward().is_some());
+        assert!(playback.step_forward().is_some());
+        assert!(playback.step_forward().is_none());
+
+        assert!(playback.step_backward().is_some());
+        assert!(playback.step_backward().is_some());
+        assert!(playback.step_backward().is_none());
+
+        playback.seek_to(0).unwrap();
+        assert_eq!(playback.current_index, 0);
+    }
+
+    #[tokio::test]
+    async fn test_event_recorder_max_capacity() {
+        let mut recorder = EventRecorder::new(3);
+        recorder.start();
+
+        for i in 0..5 {
+            recorder.add_event(ExploitEvent {
+                id: i,
+                timestamp: std::time::Instant::now(),
+                event_type: EventType::Custom {
+                    description: format!("Event {}", i),
+                },
+                state_before: None,
+                state_after: None,
+            });
+        }
+
+        let events = recorder.get_events();
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0].id, 2);
+        assert_eq!(events[2].id, 4);
+    }
+
+    #[tokio::test]
+    async fn test_gdb_integration() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        let result = debugger.attach_gdb(12345).await;
+        assert!(result.is_ok());
+
+        let detach_result = debugger.detach_gdb().await;
+        assert!(detach_result.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_multiple_event_types() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        debugger.start_recording().await;
+
+        let event_types = vec![
+            EventType::MemoryWrite { address: 0x1000, data: vec![0x90] },
+            EventType::MemoryRead { address: 0x2000, size: 8 },
+            EventType::NetworkSend { data: b"test".to_vec() },
+            EventType::NetworkReceive { data: b"response".to_vec() },
+            EventType::RegisterModify { register: "rax".to_string(), old_value: 0, new_value: 1 },
+            EventType::FunctionCall { name: "main".to_string(), args: vec![] },
+            EventType::Checkpoint { label: "test".to_string() },
+            EventType::Custom { description: "custom event".to_string() },
+        ];
+
+        for event_type in event_types {
+            debugger.record_event(event_type).await.unwrap();
+        }
+
+        let events = debugger.get_events().await;
+        assert_eq!(events.len(), 8);
+    }
+
+    #[tokio::test]
+    async fn test_clear_history() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session.clone());
+
+        debugger.start_recording().await;
+        for _ in 0..10 {
+            debugger.record_event(EventType::Custom {
+                description: "test".to_string(),
+            }).await.unwrap();
+        }
+
+        session.checkpoint().await.unwrap();
+        session.checkpoint().await.unwrap();
+
+        assert_eq!(debugger.get_events().await.len(), 10);
+        assert_eq!(session.list_checkpoints().await.len(), 2);
+
+        debugger.clear_history().await;
+
+        assert_eq!(debugger.get_events().await.len(), 0);
+        assert_eq!(session.list_checkpoints().await.len(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_event_summary() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        debugger.start_recording().await;
+
+        debugger.record_event(EventType::MemoryWrite { address: 0x1000, data: vec![0x90] }).await.unwrap();
+        debugger.record_event(EventType::MemoryWrite { address: 0x2000, data: vec![0x90] }).await.unwrap();
+        debugger.record_event(EventType::NetworkSend { data: b"test".to_vec() }).await.unwrap();
+        debugger.record_event(EventType::RegisterModify { register: "rax".to_string(), old_value: 0, new_value: 1 }).await.unwrap();
+
+        let summary = debugger.get_event_summary().await;
+        assert_eq!(summary.total_events, 4);
+        assert_eq!(summary.memory_writes, 2);
+        assert_eq!(summary.network_sends, 1);
+        assert_eq!(summary.register_modifies, 1);
+    }
+
+    #[tokio::test]
+    async fn test_filter_events_by_type() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        debugger.start_recording().await;
+
+        debugger.record_event(EventType::MemoryWrite { address: 0x1000, data: vec![0x90] }).await.unwrap();
+        debugger.record_event(EventType::NetworkSend { data: b"test".to_vec() }).await.unwrap();
+        debugger.record_event(EventType::MemoryWrite { address: 0x2000, data: vec![0x90] }).await.unwrap();
+
+        let memory_writes = debugger.filter_events_by_type(EventTypeFilter::MemoryWrite).await;
+        assert_eq!(memory_writes.len(), 2);
+
+        let network_sends = debugger.filter_events_by_type(EventTypeFilter::NetworkSend).await;
+        assert_eq!(network_sends.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_find_memory_modifications() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        debugger.start_recording().await;
+
+        debugger.record_event(EventType::MemoryWrite { address: 0x401000, data: vec![0x90] }).await.unwrap();
+        debugger.record_event(EventType::MemoryWrite { address: 0x402000, data: vec![0x90] }).await.unwrap();
+        debugger.record_event(EventType::MemoryWrite { address: 0x401000, data: vec![0xcc] }).await.unwrap();
+
+        let mods = debugger.find_memory_modifications(0x401000).await;
+        assert_eq!(mods.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_find_register_modifications() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        debugger.start_recording().await;
+
+        debugger.record_event(EventType::RegisterModify { register: "rax".to_string(), old_value: 0, new_value: 1 }).await.unwrap();
+        debugger.record_event(EventType::RegisterModify { register: "rbx".to_string(), old_value: 0, new_value: 2 }).await.unwrap();
+        debugger.record_event(EventType::RegisterModify { register: "rax".to_string(), old_value: 1, new_value: 42 }).await.unwrap();
+
+        let rax_mods = debugger.find_register_modifications("rax").await;
+        assert_eq!(rax_mods.len(), 2);
+
+        let rbx_mods = debugger.find_register_modifications("rbx").await;
+        assert_eq!(rbx_mods.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_diff() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session.clone());
+
+        session.set_libc_base(0x1000).await;
+        session.set_register("rax".to_string(), 0).await;
+        let checkpoint_a = session.checkpoint().await.unwrap();
+
+        session.set_libc_base(0x2000).await;
+        session.set_register("rax".to_string(), 42).await;
+        session.set_symbol("main".to_string(), 0x401000).await;
+        let checkpoint_b = session.checkpoint().await.unwrap();
+
+        let diff = debugger.diff_checkpoints(checkpoint_a, checkpoint_b).await.unwrap();
+        
+        assert!(diff.has_changes());
+        assert!(diff.libc_base_changed);
+        assert_eq!(diff.register_changes.len(), 1);
+        assert_eq!(diff.symbol_changes.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_recording_status() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        assert!(!debugger.is_recording().await);
+
+        debugger.start_recording().await;
+        assert!(debugger.is_recording().await);
+
+        debugger.stop_recording().await;
+        assert!(!debugger.is_recording().await);
+    }
+
+    #[tokio::test]
+    async fn test_event_count() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session);
+
+        assert_eq!(debugger.event_count().await, 0);
+
+        debugger.start_recording().await;
+
+        for i in 0..5 {
+            debugger.record_event(EventType::Custom {
+                description: format!("Event {}", i),
+            }).await.unwrap();
+        }
+
+        assert_eq!(debugger.event_count().await, 5);
+    }
+
+    #[tokio::test]
+    async fn test_create_snapshot() {
+        let session = Arc::new(ExploitSession::new());
+        let debugger = TimeTravelDebugger::new(session.clone());
+
+        session.set_libc_base(0x1000).await;
+        let snapshot_id = debugger.create_snapshot("before_exploit".to_string()).await.unwrap();
+
+        session.set_libc_base(0x2000).await;
+
+        session.rewind(snapshot_id).await.unwrap();
         assert_eq!(session.get_libc_base().await, Some(0x1000));
     }
 }

@@ -113,7 +113,7 @@ pub enum ConnectionStatus {
     Error,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum SessionValue {
     Integer(i64),
     String(String),
