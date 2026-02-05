@@ -58,6 +58,7 @@ pub mod socket_tools;
 pub mod session_state;
 pub mod split_screen_debugger;
 pub mod ssh_bridge;
+#[cfg(feature = "symbolic-execution")]
 pub mod symbolic_engine;
 pub mod time_travel;
 pub mod web_tools;

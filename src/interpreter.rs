@@ -4588,6 +4588,7 @@ fn eval_expr<'a>(
                             ),
                         }
                     }
+                    #[cfg(feature = "symbolic-execution")]
                     "symbolic_solve" => {
                         use crate::symbolic_engine::SymbolicExecutor;
                         let mut executor = SymbolicExecutor::new();
@@ -4597,6 +4598,10 @@ fn eval_expr<'a>(
                             }
                             Err(e) => Err(format!("Symbolic solve failed: {}", e)),
                         }
+                    }
+                    #[cfg(not(feature = "symbolic-execution"))]
+                    "symbolic_solve" => {
+                        Err("Symbolic execution feature not enabled. Rebuild with --features symbolic-execution".to_string())
                     }
                     "pool_spray" => {
                         if arg_values.len() < 2 {

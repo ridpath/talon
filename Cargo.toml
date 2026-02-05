@@ -39,6 +39,7 @@ yara = { version = "0.25", optional = true }
 pelite = "0.10"
 goblin = "0.7"
 statrs = "0.16"
+z3 = { version = "0.19", features = ["static-link-z3"], optional = true }
 
 # Threads / IO
 byteorder = "1.5"
@@ -110,6 +111,7 @@ default = []
 llvm = ["inkwell"]
 malware-analysis = ["yara"]
 binary-patching = ["keystone-engine"]
+symbolic-execution = ["z3"]
 game-hacking = ["retour"]
 game-hacking-windows = ["windows", "game-hacking"]
 game-hacking-linux = ["procfs", "game-hacking"]

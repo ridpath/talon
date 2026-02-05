@@ -2,6 +2,8 @@ use crate::binary_analyzer::{BinaryAnalysis, BinaryAnalyzer};
 use crate::elf_tools::ElfContext;
 use crate::rop_tools::RopChain;
 use crate::shellcode_db::{ShellcodeDatabase, ShellcodeEntry};
+#[cfg(feature = "symbolic-execution")]
+use crate::symbolic_engine::{SymbolicExecutor, SymbolicType, Constraint};
 use serde::{Deserialize, Serialize};
 use std::fs;
 
@@ -678,6 +680,147 @@ impl VulnerabilityOracle {
         }
 
         summary
+    }
+
+    // ═══════════════════════════════════════════════════════════════════════
+    // SYMBOLIC EXECUTION INTEGRATION
+    // ═══════════════════════════════════════════════════════════════════════
+
+    #[cfg(feature = "symbolic-execution")]
+    pub fn symbolic_find_offset(&mut self) -> Result<usize, String> {
+        log::info!("Using symbolic execution to find buffer overflow offset");
+        
+        let mut executor = SymbolicExecutor::new();
+        executor.load_binary(&self.binary_path)?;
+        
+        let offset = executor.find_buffer_overflow_offset("main")?;
+        
+        log::info!("Symbolic execution found offset: {}", offset);
+        Ok(offset)
+    }
+
+    #[cfg(feature = "symbolic-execution")]
+    pub fn symbolic_solve_constraints(
+        &mut self,
+        badchars: &[u8],
+        max_size: Option<usize>,
+    ) -> Result<Vec<u8>, String> {
+        log::info!("Using symbolic execution to solve payload constraints");
+        
+        let mut executor = SymbolicExecutor::new();
+        
+        let payload_size = max_size.unwrap_or(256);
+        executor.add_symbolic_var("payload".to_string(), SymbolicType::Bytes, payload_size);
+        
+        executor.add_constraint("payload", Constraint::NoNullBytes)?;
+        
+        for &badchar in badchars {
+            if badchar != 0 {
+                executor.add_constraint(
+                    "payload",
+                    Constraint::NotEqual(vec![badchar; payload_size]),
+                )?;
+            }
+        }
+        
+        let solution = executor.solve()?;
+        let payload = solution.get("payload")
+            .ok_or_else(|| "No payload solution found".to_string())?
+            .clone();
+        
+        log::info!("Symbolic execution generated payload: {} bytes", payload.len());
+        Ok(payload)
+    }
+
+    #[cfg(feature = "symbolic-execution")]
+    pub fn symbolic_find_rop_gadgets(&mut self, patterns: &[&str]) -> Result<Vec<u64>, String> {
+        log::info!("Using symbolic execution to find ROP gadgets");
+        
+        let mut executor = SymbolicExecutor::new();
+        executor.load_binary(&self.binary_path)?;
+        
+        let addresses = executor.find_gadget_addresses(patterns)?;
+        
+        log::info!("Found {} gadget addresses", addresses.len());
+        Ok(addresses)
+    }
+
+    #[cfg(feature = "symbolic-execution")]
+    pub fn symbolic_generate_exploit_strategy(&mut self) -> Result<String, String> {
+        log::info!("Using symbolic execution to generate exploit strategy");
+        
+        let mut executor = SymbolicExecutor::new();
+        executor.load_binary(&self.binary_path)?;
+        
+        let analysis = self.analysis.as_ref()
+            .ok_or_else(|| "Binary not analyzed. Run analyze_flow() first.".to_string())?;
+        
+        let mut strategy = String::new();
+        strategy.push_str("Automatic Exploit Strategy\n");
+        strategy.push_str(&"=".repeat(60));
+        strategy.push('\n');
+        
+        if analysis.protections.canary {
+            strategy.push_str("\n1. Leak stack canary (required)\n");
+            strategy.push_str("   Use format string or info leak to obtain canary value\n");
+        }
+        
+        if analysis.protections.pie || analysis.protections.aslr {
+            strategy.push_str("\n2. Leak base address (required)\n");
+            strategy.push_str("   Use info leak to defeat ASLR/PIE\n");
+        }
+        
+        let offset = executor.find_buffer_overflow_offset("main")?;
+        strategy.push_str(&format!("\n3. Buffer overflow offset: {} bytes\n", offset));
+        
+        if analysis.protections.nx {
+            strategy.push_str("\n4. ROP chain required (NX enabled)\n");
+            let rop_gadgets = executor.find_gadget_addresses(&["pop rdi", "pop rsi", "syscall"])?;
+            strategy.push_str(&format!("   Found {} ROP gadgets\n", rop_gadgets.len()));
+            
+            for (i, addr) in rop_gadgets.iter().enumerate() {
+                strategy.push_str(&format!("   Gadget {}: 0x{:x}\n", i + 1, addr));
+            }
+        } else {
+            strategy.push_str("\n4. Shellcode injection possible (NX disabled)\n");
+            strategy.push_str("   Direct shellcode execution on stack\n");
+        }
+        
+        strategy.push_str("\n5. Payload structure:\n");
+        strategy.push_str(&format!("   [padding: {} bytes]\n", offset));
+        
+        if analysis.protections.canary {
+            strategy.push_str("   [leaked canary: 8 bytes]\n");
+        }
+        
+        strategy.push_str("   [saved rbp: 8 bytes]\n");
+        
+        if analysis.protections.nx {
+            strategy.push_str("   [ROP chain]\n");
+        } else {
+            strategy.push_str("   [shellcode address]\n");
+        }
+        
+        Ok(strategy)
+    }
+
+    #[cfg(feature = "symbolic-execution")]
+    pub fn symbolic_verify_exploit_params(
+        &mut self,
+        offset: usize,
+        target_address: u64,
+    ) -> Result<bool, String> {
+        log::info!("Verifying exploit parameters with symbolic execution");
+        
+        let mut executor = SymbolicExecutor::new();
+        executor.load_binary(&self.binary_path)?;
+        
+        executor.add_symbolic_var("payload".to_string(), SymbolicType::Bytes, offset + 8);
+        executor.add_constraint("payload", Constraint::NoNullBytes)?;
+        
+        let solution = executor.solve_to_reach(target_address)?;
+        
+        Ok(solution.contains_key("payload"))
     }
 }
 

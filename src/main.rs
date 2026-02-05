@@ -72,9 +72,11 @@ mod advanced_fuzzer; // Protocol-aware coverage-guided fuzzing
 mod ai_exploit; // AI-powered exploit generation (LM Studio)
 mod debugger_bridge; // Live debugging DSL (GDB/LLDB/WinDbg)
 mod gdb_mi; // GDB Machine Interface protocol
-mod natural_language;
+mod natural_language; // Natural language to Talon DSL
+#[cfg(feature = "symbolic-execution")]
 mod symbolic_engine; // Symbolic execution & constraint solving (Z3)
-mod z3_solver; // Z3 constraint solver bindings // Natural language to Talon DSL
+#[cfg(feature = "symbolic-execution")]
+mod z3_solver; // Z3 constraint solver bindings
 
 // PHASE 11 - USABILITY & USER EXPERIENCE
 mod cheatsheet; // Topic-specific exploitation cheat sheets
