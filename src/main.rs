@@ -217,8 +217,9 @@ fn main() {
 
             let dev_mode = args.contains(&"--dev".to_string());
             let dry_run = args.contains(&"--dry-run".to_string());
+            let production = args.contains(&"--production".to_string());
 
-            if let Err(e) = run_script(&args[2], dev_mode, dry_run) {
+            if let Err(e) = run_script(&args[2], dev_mode, dry_run, production) {
                 eprintln!("{} {}", "[ERROR]".red(), e);
                 std::process::exit(1);
             }
@@ -263,12 +264,28 @@ fn main() {
 }
 
 /// Handles running a .talon script file
-fn run_script(path: &str, dev_mode: bool, dry_run: bool) -> Result<(), String> {
+fn run_script(path: &str, dev_mode: bool, dry_run: bool, production: bool) -> Result<(), String> {
     let script =
         fs::read_to_string(path).map_err(|e| format!("Failed to read script '{}': {}", path, e))?;
 
     if script.trim().is_empty() {
         return Err("Script is empty".into());
+    }
+
+    if production {
+        let log_path = dirs::home_dir()
+            .map(|home| home.join(".talon").join("error.log"));
+        let log_path_display = log_path.as_ref().map(|p| p.display().to_string());
+        
+        error_context::enable_production_mode(log_path);
+        println!("[PRODUCTION] Error obfuscation enabled");
+        
+        let key = error_context::export_verifying_key_base64();
+        println!("[PRODUCTION] Verifying key: {}", key);
+        
+        if let Some(log_path_str) = log_path_display {
+            println!("[PRODUCTION] Encrypted error log: {}", log_path_str);
+        }
     }
 
     if dry_run {
@@ -285,6 +302,10 @@ fn run_script(path: &str, dev_mode: bool, dry_run: bool) -> Result<(), String> {
         } else {
             rt.block_on(interpreter::interpret(&commands))?;
         }
+    }
+    
+    if production {
+        error_context::disable_production_mode();
     }
     
     Ok(())
@@ -920,6 +941,8 @@ COMMANDS:
     run <file>            Execute a Talon script file
                           Flags: --dev (fast interpreter mode, <500ms startup)
                                  --verbose (enable debug logging)
+                                 --dry-run (validate without execution)
+                                 --production (enable error obfuscation)
     repl                  Start an interactive REPL shell
 
   {}
