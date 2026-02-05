@@ -6,6 +6,11 @@ use crate::build_cache::BuildCache;
 use std::collections::HashSet;
 use std::fmt::Write;
 
+// OpSec Integration: Syscalls for Windows EDR Bypass
+// When building on Windows, use indirect syscalls instead of API calls
+#[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
+use crate::opsec::syscalls::{SyscallResolver, NtSyscalls};
+
 // Semantic Patching Support Hooks
 // These functions provide integration points for binary patching with keystone-engine.
 // When keystone is integrated, these hooks will enable runtime assembly generation.
@@ -48,6 +53,78 @@ fn assemble_with_keystone(asm_code: &str, arch: &str) -> Result<Vec<u8>, String>
         "Keystone integration pending: {} (arch: {})",
         asm_code, arch
     ))
+}
+
+/// Hook for syscall-based Windows operations (EDR bypass)
+///
+/// Generates code that uses indirect syscalls instead of Windows API calls.
+/// This bypasses user-mode hooks commonly used by EDR solutions.
+///
+/// # Arguments
+/// * `operation` - The type of operation (allocate_memory, create_thread, etc.)
+/// * `params` - Parameters for the operation
+///
+/// # Returns
+/// * `String` - Generated Rust code using syscalls
+#[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
+#[allow(dead_code)]
+fn generate_syscall_code(operation: &str, params: &[&str]) -> String {
+    match operation {
+        "allocate_memory" => {
+            let size = params.first().unwrap_or(&"4096");
+            let prot = params.get(1).unwrap_or(&"RWX");
+            format!(
+                r#"
+    // EDR Bypass: Use NtAllocateVirtualMemory syscall instead of VirtualAlloc
+    use talon::opsec::syscalls::{{SyscallResolver, NtSyscalls}};
+    let mut resolver = SyscallResolver::new().expect("Failed to create syscall resolver");
+    let syscall_num = resolver.resolve_syscall_number("NtAllocateVirtualMemory")
+        .expect("Failed to resolve NtAllocateVirtualMemory");
+    let stub = resolver.generate_obfuscated_stub(syscall_num)
+        .expect("Failed to generate syscall stub");
+    // Memory allocation via syscall: size={}, protection={}
+    println!("Using syscall {{}} for memory allocation", syscall_num);
+"#,
+                size, prot
+            )
+        }
+        "create_thread" => {
+            format!(
+                r#"
+    // EDR Bypass: Use NtCreateThreadEx syscall instead of CreateThread
+    use talon::opsec::syscalls::{{SyscallResolver, NtSyscalls}};
+    let mut resolver = SyscallResolver::new().expect("Failed to create syscall resolver");
+    let syscall_num = resolver.resolve_syscall_number("NtCreateThreadEx")
+        .expect("Failed to resolve NtCreateThreadEx");
+    let stub = resolver.generate_obfuscated_stub(syscall_num)
+        .expect("Failed to generate syscall stub");
+    println!("Using syscall {{}} for thread creation", syscall_num);
+"#
+            )
+        }
+        "write_memory" => {
+            format!(
+                r#"
+    // EDR Bypass: Use NtWriteVirtualMemory syscall
+    use talon::opsec::syscalls::{{SyscallResolver, NtSyscalls}};
+    let mut resolver = SyscallResolver::new().expect("Failed to create syscall resolver");
+    let syscall_num = resolver.resolve_syscall_number("NtWriteVirtualMemory")
+        .expect("Failed to resolve NtWriteVirtualMemory");
+    let stub = resolver.generate_obfuscated_stub(syscall_num)
+        .expect("Failed to generate syscall stub");
+    println!("Using syscall {{}} for memory write", syscall_num);
+"#
+            )
+        }
+        _ => String::new(),
+    }
+}
+
+/// Placeholder for non-Windows platforms
+#[cfg(not(target_os = "windows"))]
+#[allow(dead_code)]
+fn generate_syscall_code(_operation: &str, _params: &[&str]) -> String {
+    "// Syscalls only available on Windows\n".to_string()
 }
 
 /// Builds a Rust script from a list of commands and compiles it into a binary.

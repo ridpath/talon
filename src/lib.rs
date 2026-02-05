@@ -69,3 +69,7 @@ pub mod mitigation_detector;
 pub mod oracle;
 pub mod output_utils;
 pub mod registry;
+
+// OpSec & EDR Evasion
+#[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
+pub mod opsec;
