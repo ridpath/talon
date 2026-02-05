@@ -45,6 +45,7 @@ pub mod gdb_tools;
 pub mod interactive_io;
 pub mod interactive_shell;
 pub mod kernel_exploiter;
+pub mod pty;
 pub mod libc_database;
 pub mod libc_db;
 pub mod parallel_exploit;
