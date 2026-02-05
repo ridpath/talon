@@ -4,8 +4,10 @@
 use std::collections::HashMap;
 use std::io;
 
-#[cfg(any(target_os = "linux", target_os = "windows"))]
-use std::fs;
+#[cfg(target_os = "linux")]
+use std::{fs, path::Path};
+
+
 
 #[derive(Debug, Clone)]
 pub enum ForensicsError {

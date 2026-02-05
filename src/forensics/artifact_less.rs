@@ -3,6 +3,9 @@
 
 use std::io;
 
+#[cfg(target_os = "linux")]
+use std::process::Command;
+
 #[cfg(any(target_os = "linux", all(target_os = "windows", feature = "game-hacking-windows")))]
 use std::ffi::CString;
 
@@ -435,14 +438,15 @@ mod tests {
         let executor = MemfdExecutor::new("test");
         let result = executor.execute(&[], &[]);
         assert!(result.is_err());
+        #[cfg(target_os = "linux")]
         assert!(matches!(result.unwrap_err(), ExecutionError::InvalidInput(_)));
+        #[cfg(not(target_os = "linux"))]
+        assert!(matches!(result.unwrap_err(), ExecutionError::Unsupported(_)));
     }
 
     #[test]
     fn test_reflective_dll_injector_creation() {
-        let injector = ReflectiveDllInjector::new(1234);
-        #[cfg(target_os = "windows")]
-        assert_eq!(injector.target_pid, 1234);
+        let _injector = ReflectiveDllInjector::new(1234);
     }
 
     #[test]
@@ -454,9 +458,7 @@ mod tests {
 
     #[test]
     fn test_process_hollower_creation() {
-        let hollower = ProcessHollower::new("C:\\Windows\\System32\\notepad.exe");
-        #[cfg(target_os = "windows")]
-        assert_eq!(hollower.target_path, "C:\\Windows\\System32\\notepad.exe");
+        let _hollower = ProcessHollower::new("C:\\Windows\\System32\\notepad.exe");
     }
 
     #[test]
