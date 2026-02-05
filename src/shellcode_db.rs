@@ -3,6 +3,10 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 use std::collections::HashMap;
+use crate::opsec::polymorphic::{
+    PolymorphicEngine, PolymorphicError, Architecture as PolymorphicArchitecture,
+    MutationStrategy,
+};
 
 /// Shellcode entry in database
 #[derive(Debug, Clone)]
@@ -23,6 +27,51 @@ impl ShellcodeEntry {
             description: description.to_string(),
             bytes,
             size,
+        }
+    }
+
+    /// Generate polymorphic variant of this shellcode
+    pub fn generate_polymorphic_variant(&self) -> Result<Vec<u8>, PolymorphicError> {
+        let arch = self.map_architecture();
+        let engine = PolymorphicEngine::new(arch);
+        engine.mutate(&self.bytes)
+    }
+
+    /// Generate multiple unique polymorphic variants
+    pub fn generate_variants(&self, count: usize) -> Result<Vec<Vec<u8>>, PolymorphicError> {
+        let arch = self.map_architecture();
+        let mut variants = Vec::new();
+
+        for i in 0..count {
+            let engine = PolymorphicEngine::new(arch).with_seed(i as u64);
+            let variant = engine.mutate(&self.bytes)?;
+            variants.push(variant);
+        }
+
+        Ok(variants)
+    }
+
+    /// Generate polymorphic variant with custom strategies
+    pub fn generate_custom_variant(
+        &self,
+        strategies: Vec<MutationStrategy>,
+        junk_density: f32,
+    ) -> Result<Vec<u8>, PolymorphicError> {
+        let arch = self.map_architecture();
+        let engine = PolymorphicEngine::new(arch)
+            .with_strategies(strategies)
+            .with_junk_density(junk_density);
+        engine.mutate(&self.bytes)
+    }
+
+    /// Map string architecture to PolymorphicArchitecture enum
+    fn map_architecture(&self) -> PolymorphicArchitecture {
+        match self.arch.as_str() {
+            "x86-64" => PolymorphicArchitecture::X64,
+            "i386" => PolymorphicArchitecture::X86,
+            "arm" => PolymorphicArchitecture::ARM,
+            "aarch64" => PolymorphicArchitecture::ARM64,
+            _ => PolymorphicArchitecture::X64, // Default to x64
         }
     }
 }
@@ -75,6 +124,26 @@ impl ShellcodeDatabase {
             .values()
             .filter(|sc| sc.arch == arch)
             .collect()
+    }
+
+    /// Get polymorphic variant of shellcode by name
+    pub fn get_polymorphic(&self, name: &str) -> Option<Result<Vec<u8>, PolymorphicError>> {
+        self.get(name).map(|entry| entry.generate_polymorphic_variant())
+    }
+
+    /// Get multiple unique variants of shellcode by name
+    pub fn get_variants(&self, name: &str, count: usize) -> Option<Result<Vec<Vec<u8>>, PolymorphicError>> {
+        self.get(name).map(|entry| entry.generate_variants(count))
+    }
+
+    /// Get polymorphic variant with custom settings
+    pub fn get_custom_polymorphic(
+        &self,
+        name: &str,
+        strategies: Vec<MutationStrategy>,
+        junk_density: f32,
+    ) -> Option<Result<Vec<u8>, PolymorphicError>> {
+        self.get(name).map(|entry| entry.generate_custom_variant(strategies, junk_density))
     }
 
     // ────────────────────────────────────────────────────────────────────────
@@ -392,5 +461,85 @@ mod tests {
         let shellcode = get_shellcode("x64_execve_sh");
         assert!(shellcode.is_some());
         assert!(shellcode.unwrap().len() > 0);
+    }
+
+    #[test]
+    fn test_polymorphic_variant_generation() {
+        let db = ShellcodeDatabase::new();
+        let entry = db.get("x64_execve_sh").unwrap();
+        let variant = entry.generate_polymorphic_variant();
+        assert!(variant.is_ok());
+        let mutated = variant.unwrap();
+        // Polymorphic variant should be different (usually larger due to junk)
+        assert!(mutated.len() >= entry.bytes.len());
+    }
+
+    #[test]
+    fn test_multiple_variants_unique() {
+        let db = ShellcodeDatabase::new();
+        let entry = db.get("x64_execve_sh").unwrap();
+        let variants = entry.generate_variants(3);
+        assert!(variants.is_ok());
+        let variants = variants.unwrap();
+        assert_eq!(variants.len(), 3);
+        // Variants should differ (at least some of them)
+        assert!(variants[0] != variants[1] || variants[1] != variants[2]);
+    }
+
+    #[test]
+    fn test_custom_polymorphic_variant() {
+        let db = ShellcodeDatabase::new();
+        let entry = db.get("x64_execve_sh").unwrap();
+        let variant = entry.generate_custom_variant(
+            vec![MutationStrategy::JunkCodeInsertion],
+            0.5, // 50% junk density
+        );
+        assert!(variant.is_ok());
+        let mutated = variant.unwrap();
+        // Should have more bytes due to 50% junk insertion
+        assert!(mutated.len() > entry.bytes.len());
+    }
+
+    #[test]
+    fn test_db_get_polymorphic() {
+        let db = ShellcodeDatabase::new();
+        let result = db.get_polymorphic("x64_execve_sh");
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+    }
+
+    #[test]
+    fn test_db_get_variants() {
+        let db = ShellcodeDatabase::new();
+        let result = db.get_variants("x64_execve_sh", 5);
+        assert!(result.is_some());
+        let variants = result.unwrap();
+        assert!(variants.is_ok());
+        assert_eq!(variants.unwrap().len(), 5);
+    }
+
+    #[test]
+    fn test_db_get_custom_polymorphic() {
+        let db = ShellcodeDatabase::new();
+        let result = db.get_custom_polymorphic(
+            "x64_execve_sh",
+            vec![MutationStrategy::InstructionEquivalence],
+            0.1,
+        );
+        assert!(result.is_some());
+        assert!(result.unwrap().is_ok());
+    }
+
+    #[test]
+    fn test_architecture_mapping() {
+        let db = ShellcodeDatabase::new();
+        
+        // Test x64 mapping
+        let x64_entry = db.get("x64_execve_sh").unwrap();
+        assert_eq!(x64_entry.map_architecture(), PolymorphicArchitecture::X64);
+        
+        // Test x86 mapping
+        let x86_entry = db.get("x86_execve_sh").unwrap();
+        assert_eq!(x86_entry.map_architecture(), PolymorphicArchitecture::X86);
     }
 }

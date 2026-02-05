@@ -4,6 +4,7 @@
 pub mod syscalls;
 
 pub mod memory_scrub;
+pub mod polymorphic;
 
 // Re-export main types for convenience
 #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
@@ -15,3 +16,8 @@ pub use memory_scrub::{
 
 #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
 pub use memory_scrub::DpapiProtector;
+
+pub use polymorphic::{
+    PolymorphicEngine, PolymorphicError, MutationStrategy, Architecture as PolymorphicArchitecture,
+    generate_polymorphic_shellcode, generate_variants, calculate_entropy,
+};
