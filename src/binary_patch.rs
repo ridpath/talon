@@ -11,6 +11,17 @@ use keystone_engine::{Keystone, Arch, Mode, OptionType, OptionValue};
 // ═══════════════════════════════════════════════════════════════════════════
 // BINARY PATCHING TOOLKIT - PRODUCTION READY
 // ═══════════════════════════════════════════════════════════════════════════
+// 
+// Comprehensive binary modification toolkit with:
+// - High-level semantic API (Patch struct)
+// - Low-level byte patching (BinaryPatcher)
+// - Assembly integration via keystone-engine (optional feature)
+// - Automatic checksum verification
+// - Operation rollback and undo
+// - Dry-run mode for safe preview
+// - ELF/PE header recalculation
+// - Cross-platform support (x86/x64/ARM/ARM64/MIPS/MIPS64)
+// ═══════════════════════════════════════════════════════════════════════════
 
 // ────────────────────────────────────────────────────────────────────────────
 // HIGH-LEVEL PATCH INTERFACE (Semantic API)
@@ -27,11 +38,11 @@ pub enum Architecture {
 }
 
 #[derive(Debug, Clone)]
-struct PatchOperation {
-    offset: usize,
-    original_bytes: Vec<u8>,
-    new_bytes: Vec<u8>,
-    description: String,
+pub struct PatchOperation {
+    pub offset: usize,
+    pub original_bytes: Vec<u8>,
+    pub new_bytes: Vec<u8>,
+    pub description: String,
 }
 
 pub struct Patch {
@@ -389,6 +400,232 @@ impl Patch {
         } else {
             Ok(current_checksum != self.original_checksum)
         }
+    }
+    
+    pub fn patch_bytes(&mut self, offset: usize, bytes: &[u8]) -> Result<(), String> {
+        if offset + bytes.len() > self.binary_data.len() {
+            return Err("Patch extends beyond binary size".to_string());
+        }
+        
+        let original_bytes = self.binary_data[offset..offset + bytes.len()].to_vec();
+        
+        self.operations.push(PatchOperation {
+            offset,
+            original_bytes: original_bytes.clone(),
+            new_bytes: bytes.to_vec(),
+            description: format!("Patch {} bytes at 0x{:x}", bytes.len(), offset),
+        });
+        
+        if !self.dry_run {
+            self.binary_data[offset..offset + bytes.len()].copy_from_slice(bytes);
+        }
+        
+        println!("[PATCH] {} {} bytes at 0x{:x}",
+                 if self.dry_run { "Would patch" } else { "Patched" },
+                 bytes.len(), offset);
+        
+        Ok(())
+    }
+    
+    pub fn recalculate_headers(&mut self) -> Result<(), String> {
+        if self.is_elf {
+            self.recalculate_elf_headers()?;
+        } else if self.is_pe {
+            self.recalculate_pe_headers()?;
+        }
+        
+        println!("[PATCH] Headers recalculated successfully");
+        Ok(())
+    }
+    
+    fn recalculate_elf_headers(&mut self) -> Result<(), String> {
+        let elf = Elf::parse(&self.binary_data)
+            .map_err(|e| format!("Failed to parse ELF for header update: {}", e))?;
+        
+        if elf.is_64 {
+            let e_shoff_offset = 40;
+            if self.binary_data.len() >= e_shoff_offset + 8 {
+                let new_shoff = (self.binary_data.len() as u64).to_le_bytes();
+                if !self.dry_run {
+                    self.binary_data[e_shoff_offset..e_shoff_offset + 8].copy_from_slice(&new_shoff);
+                }
+                println!("[PATCH] {} ELF section header offset",
+                         if self.dry_run { "Would update" } else { "Updated" });
+            }
+        } else {
+            let e_shoff_offset = 32;
+            if self.binary_data.len() >= e_shoff_offset + 4 {
+                let new_shoff = (self.binary_data.len() as u32).to_le_bytes();
+                if !self.dry_run {
+                    self.binary_data[e_shoff_offset..e_shoff_offset + 4].copy_from_slice(&new_shoff);
+                }
+                println!("[PATCH] {} ELF section header offset",
+                         if self.dry_run { "Would update" } else { "Updated" });
+            }
+        }
+        
+        Ok(())
+    }
+    
+    fn recalculate_pe_headers(&mut self) -> Result<(), String> {
+        if !self.binary_data.starts_with(b"MZ") {
+            return Err("Not a valid PE file".to_string());
+        }
+        
+        let e_lfanew_offset = 0x3C;
+        if self.binary_data.len() < e_lfanew_offset + 4 {
+            return Err("PE file too small".to_string());
+        }
+        
+        let e_lfanew = u32::from_le_bytes([
+            self.binary_data[e_lfanew_offset],
+            self.binary_data[e_lfanew_offset + 1],
+            self.binary_data[e_lfanew_offset + 2],
+            self.binary_data[e_lfanew_offset + 3],
+        ]) as usize;
+        
+        let checksum_offset = e_lfanew + 0x58;
+        if self.binary_data.len() < checksum_offset + 4 {
+            return Err("PE checksum offset invalid".to_string());
+        }
+        
+        let mut checksum: u32 = 0;
+        for i in (0..self.binary_data.len()).step_by(2) {
+            if i == checksum_offset {
+                continue;
+            }
+            
+            let word = if i + 1 < self.binary_data.len() {
+                u16::from_le_bytes([self.binary_data[i], self.binary_data[i + 1]]) as u32
+            } else {
+                self.binary_data[i] as u32
+            };
+            
+            checksum = checksum.wrapping_add(word);
+            checksum = (checksum & 0xFFFF) + (checksum >> 16);
+        }
+        
+        checksum = (checksum & 0xFFFF) + (checksum >> 16);
+        checksum = checksum.wrapping_add(self.binary_data.len() as u32);
+        
+        if !self.dry_run {
+            let checksum_bytes = checksum.to_le_bytes();
+            self.binary_data[checksum_offset..checksum_offset + 4].copy_from_slice(&checksum_bytes);
+        }
+        
+        println!("[PATCH] {} PE checksum: 0x{:08x}",
+                 if self.dry_run { "Would set" } else { "Set" }, checksum);
+        
+        Ok(())
+    }
+    
+    pub fn find_pattern(&self, pattern: &[u8]) -> Vec<usize> {
+        let mut offsets = Vec::new();
+        
+        for (i, window) in self.binary_data.windows(pattern.len()).enumerate() {
+            if window == pattern {
+                offsets.push(i);
+            }
+        }
+        
+        println!("[PATCH] Found {} matches for pattern", offsets.len());
+        for (idx, offset) in offsets.iter().take(10).enumerate() {
+            println!("[PATCH]   {}. 0x{:x}", idx + 1, offset);
+        }
+        
+        offsets
+    }
+    
+    pub fn patch_string(&mut self, old_str: &str, new_str: &str) -> Result<usize, String> {
+        if new_str.len() > old_str.len() {
+            return Err("New string longer than old string - use null padding or extend binary".to_string());
+        }
+        
+        let old_bytes = old_str.as_bytes();
+        let offsets = self.find_pattern(old_bytes);
+        
+        if offsets.is_empty() {
+            return Err(format!("String '{}' not found in binary", old_str));
+        }
+        
+        let mut new_bytes = new_str.as_bytes().to_vec();
+        while new_bytes.len() < old_bytes.len() {
+            new_bytes.push(0);
+        }
+        
+        let mut patched = 0;
+        for &offset in &offsets {
+            self.patch_bytes(offset, &new_bytes)?;
+            patched += 1;
+        }
+        
+        println!("[PATCH] {} {} occurrences of '{}'",
+                 if self.dry_run { "Would patch" } else { "Patched" },
+                 patched, old_str);
+        
+        Ok(patched)
+    }
+    
+    pub fn inject_shellcode(&mut self, shellcode: &[u8]) -> Result<usize, String> {
+        let injection_offset = self.binary_data.len();
+        
+        if !self.dry_run {
+            self.binary_data.extend_from_slice(shellcode);
+        }
+        
+        self.operations.push(PatchOperation {
+            offset: injection_offset,
+            original_bytes: vec![],
+            new_bytes: shellcode.to_vec(),
+            description: format!("Inject {} bytes of shellcode at end", shellcode.len()),
+        });
+        
+        println!("[PATCH] {} {} bytes of shellcode at 0x{:x}",
+                 if self.dry_run { "Would inject" } else { "Injected" },
+                 shellcode.len(), injection_offset);
+        
+        Ok(injection_offset)
+    }
+    
+    pub fn create_code_cave(&mut self, size: usize) -> Result<usize, String> {
+        let cave_offset = self.binary_data.len();
+        let nop_byte = match self.architecture {
+            Architecture::X86 | Architecture::X64 => 0x90,
+            Architecture::ARM => 0x00,
+            Architecture::ARM64 => 0x1f,
+            Architecture::MIPS | Architecture::MIPS64 => 0x00,
+        };
+        
+        let cave = vec![nop_byte; size];
+        
+        if !self.dry_run {
+            self.binary_data.extend_from_slice(&cave);
+        }
+        
+        self.operations.push(PatchOperation {
+            offset: cave_offset,
+            original_bytes: vec![],
+            new_bytes: cave.clone(),
+            description: format!("Create {} byte code cave", size),
+        });
+        
+        println!("[PATCH] {} {} byte code cave at 0x{:x}",
+                 if self.dry_run { "Would create" } else { "Created" },
+                 size, cave_offset);
+        
+        Ok(cave_offset)
+    }
+    
+    pub fn get_operations(&self) -> &[PatchOperation] {
+        &self.operations
+    }
+    
+    pub fn get_architecture(&self) -> Architecture {
+        self.architecture
+    }
+    
+    pub fn is_dry_run(&self) -> bool {
+        self.dry_run
     }
 }
 
@@ -1197,5 +1434,130 @@ mod tests {
         
         let diff = patch.preview_diff();
         assert!(diff.contains("Total operations: 2"));
+    }
+    
+    #[test]
+    fn test_patch_bytes() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let new_bytes = vec![0x41, 0x42, 0x43, 0x44];
+        let result = patch.patch_bytes(100, &new_bytes);
+        assert!(result.is_ok());
+        
+        assert_eq!(patch.binary_data[100..104], new_bytes[..]);
+        assert_eq!(patch.operations.len(), 1);
+    }
+    
+    #[test]
+    fn test_recalculate_headers_elf() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.recalculate_headers();
+        assert!(result.is_ok());
+    }
+    
+    #[test]
+    fn test_recalculate_headers_pe() {
+        let test_file = create_test_pe();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        let result = patch.recalculate_headers();
+        assert!(result.is_ok());
+    }
+    
+    #[test]
+    fn test_find_pattern() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let patch = Patch::new(path).unwrap();
+        
+        let pattern = vec![0x90, 0x90, 0x90];
+        let offsets = patch.find_pattern(&pattern);
+        
+        assert!(!offsets.is_empty());
+    }
+    
+    #[test]
+    fn test_inject_shellcode() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        let original_len = patch.binary_data.len();
+        
+        let shellcode = vec![0x31, 0xc0, 0x48, 0x89, 0xc7];
+        let result = patch.inject_shellcode(&shellcode);
+        
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), original_len);
+        assert_eq!(patch.binary_data.len(), original_len + shellcode.len());
+    }
+    
+    #[test]
+    fn test_create_code_cave() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        let original_len = patch.binary_data.len();
+        
+        let cave_size = 256;
+        let result = patch.create_code_cave(cave_size);
+        
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), original_len);
+        assert_eq!(patch.binary_data.len(), original_len + cave_size);
+        
+        for i in 0..cave_size {
+            assert_eq!(patch.binary_data[original_len + i], 0x90);
+        }
+    }
+    
+    #[test]
+    fn test_get_architecture() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let patch = Patch::new(path).unwrap();
+        
+        assert_eq!(patch.get_architecture(), Architecture::X64);
+    }
+    
+    #[test]
+    fn test_get_operations() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        patch.nop_out(50, 5).unwrap();
+        patch.nop_out(100, 10).unwrap();
+        
+        let ops = patch.get_operations();
+        assert_eq!(ops.len(), 2);
+        assert_eq!(ops[0].offset, 50);
+        assert_eq!(ops[1].offset, 100);
+    }
+    
+    #[test]
+    fn test_is_dry_run() {
+        let test_file = create_test_elf();
+        let path = test_file.path().to_str().unwrap();
+        
+        let mut patch = Patch::new(path).unwrap();
+        
+        assert_eq!(patch.is_dry_run(), false);
+        
+        patch.set_dry_run(true);
+        assert_eq!(patch.is_dry_run(), true);
     }
 }
