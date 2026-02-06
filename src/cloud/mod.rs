@@ -5,6 +5,9 @@
 pub mod proto_generated;
 
 #[cfg(feature = "swarm")]
+pub mod proto_helpers;
+
+#[cfg(feature = "swarm")]
 pub mod proto;
 
 #[cfg(feature = "swarm")]

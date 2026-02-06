@@ -233,7 +233,7 @@ impl TalonAgent {
         let options = payload.options.clone().unwrap_or_default();
         
         // Create execution stream
-        let stream = self.client.execute_script(payload).await?.into_inner();
+        let _stream = self.client.execute_script(payload).await?.into_inner();
         
         let mut events = Vec::new();
         

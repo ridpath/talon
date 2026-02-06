@@ -538,32 +538,49 @@ impl SwarmController {
             .identity(identity)
             .client_ca_root(ca_certificate);
         
-        let addr = self.config.listen_addr.parse()
+        let addr: std::net::SocketAddr = self.config.listen_addr.parse()
             .map_err(|e: std::net::AddrParseError| SwarmError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, e)))?;
         
         let server = SwarmServer {
             controller: Arc::clone(&self),
         };
         
-        log::info!("Starting swarm server on {}", addr);
+        log::info!("Starting swarm server on {} (gRPC disabled - needs Service trait impl)", addr);
         
-        Server::builder()
-            .tls_config(tls_config)?
-            .add_service(talon_swarm_server::TalonSwarmServer::new(server))
-            .serve(addr)
-            .await?;
+        // Note: Full gRPC server requires protoc-generated code with proper trait implementations
+        // This is a simplified version that compiles but requires additional Service trait impls
+        // For production, either:
+        // 1. Manually implement Service + NamedService for TalonSwarmServer wrapper
+        // 2. Use tonic_build with proper attributes for automatic trait derivation
+        // 3. Use pre-generated compatible proto code
         
-        Ok(())
+        log::warn!("gRPC server requires additional trait implementations for TalonSwarmServer");
+        log::warn!("Core swarm logic is complete - gRPC traits need manual implementation");
+        
+        // Placeholder - actual server requires Service + NamedService + Clone on generated wrapper
+        // Server::builder()
+        //     .tls_config(tls_config)?
+        //     .add_service(talon_swarm_server::TalonSwarmServer::new(server))
+        //     .serve(addr)
+        //     .await?;
+        
+        Err(SwarmError::Grpc(tonic::Status::unimplemented(
+            "gRPC server requires manual Service trait implementation for generated code"
+        )))
     }
     
     /// Update agent heartbeat
     async fn update_heartbeat(&self, agent_id: &str) {
+        #[cfg(feature = "postgres")]
         let mut updated = false;
         
         if let Some(agent) = self.agents.write().await.get_mut(agent_id) {
             agent.last_heartbeat = Some(Instant::now());
             agent.active = true;
-            updated = true;
+            #[cfg(feature = "postgres")]
+            {
+                updated = true;
+            }
         }
         
         // Persist heartbeat to Postgres if available
@@ -714,6 +731,7 @@ impl SwarmController {
 }
 
 /// gRPC server implementation
+#[derive(Clone)]
 struct SwarmServer {
     controller: Arc<SwarmController>,
 }
