@@ -9,6 +9,9 @@ fn main() {
             tonic_build::configure()
                 .build_server(true)
                 .build_client(true)
+                .type_attribute(".", "#[derive(serde::Serialize, serde::Deserialize)]")
+                .enum_attribute(".", "#[derive(Default)]")
+                .server_mod_attribute("talon_swarm_server", "#[derive(Clone)]")
                 .compile(
                     &["proto/swarm.proto"],
                     &["proto/"],

@@ -110,7 +110,14 @@ impl RegistrySync {
     
     /// Apply update from remote agent
     pub async fn apply_update(&self, update: RegistryUpdate) {
-        let update_type = UpdateType::try_from(update.update_type).ok();
+        // Convert i32 to UpdateType enum variant
+        let update_type = match update.update_type {
+            0 => Some(UpdateType::UpdateGadget),
+            1 => Some(UpdateType::UpdateLibcOffset),
+            2 => Some(UpdateType::UpdateShellcode),
+            3 => Some(UpdateType::UpdateTarget),
+            _ => None,
+        };
         
         match update_type {
             Some(UpdateType::UpdateGadget) => {

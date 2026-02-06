@@ -169,6 +169,10 @@ tests/integration/output/
 .talon_cache/
 .talon_history
 
+# Local protoc installation (temporary)
+protoc_local/
+*.zip
+
 # Security-sensitive files (CRITICAL)
 *.key
 *.pem
