@@ -53,6 +53,7 @@ impl FunctionCategory {
         }
     }
 
+    #[allow(clippy::should_implement_trait)]
     pub fn from_str(s: &str) -> Option<Self> {
         match s {
             "Network" => Some(FunctionCategory::Network),
@@ -157,7 +158,7 @@ impl FunctionRegistry {
             if let Some(category) = FunctionCategory::from_str(&func.category) {
                 category_index
                     .entry(category)
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(name.clone());
             }
         }
@@ -289,7 +290,7 @@ impl FunctionRegistry {
     pub fn count_by_category(&self) -> HashMap<FunctionCategory, usize> {
         self.category_index
             .iter()
-            .map(|(cat, names)| (cat.clone(), names.len()))
+            .map(|(cat, names)| (*cat, names.len()))
             .collect()
     }
 }
@@ -2015,5 +2016,151 @@ mod tests {
                 func.name
             );
         }
+    }
+
+    #[test]
+    fn test_phf_lookup_correctness() {
+        let registry = FunctionRegistry::new();
+        
+        // Test PHF lookups for known registered functions
+        let test_functions = vec![
+            "connect", "send", "recv", "process", "shellcode",
+            "cyclic", "p64", "u64", "connect_ssh", "oracle_analyze",
+            "flat", "analyze", "auto_offset", "print", "len",
+        ];
+        
+        for func_name in test_functions {
+            let result = registry.get(func_name);
+            assert!(result.is_some(), "PHF lookup for '{}' should succeed", func_name);
+            
+            let func = result.unwrap();
+            assert_eq!(func.name, func_name, "Function name should match");
+            assert!(!func.signature.is_empty(), "Function '{}' should have signature", func_name);
+            assert!(!func.description.is_empty(), "Function '{}' should have description", func_name);
+        }
+    }
+
+    #[test]
+    fn test_phf_vs_hashmap_consistency() {
+        let registry = FunctionRegistry::new();
+        
+        // Test that PHF and HashMap return identical results for registered functions
+        let test_functions = vec![
+            "connect", "cyclic", "p64", "connect_ssh", "oracle_analyze",
+            "rop_find", "parallel_exploit", "mitigation_analyze",
+            "flat", "analyze", "shellcode",
+        ];
+        
+        for func_name in test_functions {
+            let result1 = registry.get(func_name);
+            let result2 = registry.functions.get(func_name);
+            
+            assert_eq!(
+                result1.is_some(),
+                result2.is_some(),
+                "PHF and HashMap should have consistent results for '{}'",
+                func_name
+            );
+            
+            if let (Some(f1), Some(f2)) = (result1, result2) {
+                assert_eq!(f1.name, f2.name);
+                assert_eq!(f1.signature, f2.signature);
+                assert_eq!(f1.category, f2.category);
+            }
+        }
+    }
+
+    #[test]
+    fn test_phf_nonexistent_function() {
+        let registry = FunctionRegistry::new();
+        
+        let result = registry.get("nonexistent_function_12345");
+        assert!(result.is_none(), "PHF lookup for nonexistent function should return None");
+        
+        let result = registry.get("");
+        assert!(result.is_none(), "PHF lookup for empty string should return None");
+    }
+
+    #[test]
+    fn test_phf_registry_completeness() {
+        // Verify that the PHF registry contains all expected core functions
+        let expected_functions = vec![
+            "connect", "send", "sendline", "recv", "recvline", "recvuntil", "close",
+            "interactive", "connect_ssl", "process", "attach", "gdb", "disasm_at",
+            "shellcode", "cyclic", "cyclic_find", "flat", "analyze", "auto_offset",
+            "p8", "p16", "p32", "p64", "u8", "u16", "u32", "u64",
+            "oracle_analyze", "oracle_find_shellcode", "oracle_gadget_density",
+            "mitigation_analyze", "mitigation_auto_pivot", "mitigation_validate",
+            "rop_find", "parallel_exploit", "mass_connect",
+        ];
+        
+        for func_name in expected_functions {
+            assert!(
+                BUILTIN_REGISTRY.contains_key(func_name),
+                "PHF registry should contain '{}'",
+                func_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_builtin_count_matches() {
+        // Verify BUILTIN_COUNT matches actual registry size
+        let registry_map = register_builtins();
+        
+        assert_eq!(
+            BUILTIN_COUNT,
+            BUILTIN_REGISTRY.len(),
+            "BUILTIN_COUNT should match PHF registry size"
+        );
+        
+        // Verify all registered functions are in PHF
+        for name in registry_map.keys() {
+            assert!(
+                BUILTIN_REGISTRY.contains_key(name.as_str()),
+                "Function '{}' should be in PHF registry",
+                name
+            );
+        }
+    }
+
+    #[test]
+    fn test_get_fast_method() {
+        let registry = FunctionRegistry::new();
+        
+        // Test get_fast for existing registered functions
+        let test_cases = vec!["connect", "p64", "oracle_analyze", "flat", "analyze"];
+        
+        for func_name in test_cases {
+            let result = registry.get_fast(func_name);
+            assert!(result.is_some(), "get_fast('{}') should return Some", func_name);
+            
+            let func = result.unwrap();
+            assert_eq!(func.name, func_name);
+        }
+        
+        // Test get_fast for nonexistent function
+        let result = registry.get_fast("nonexistent_function");
+        assert!(result.is_none(), "get_fast for nonexistent function should return None");
+    }
+
+    #[test]
+    fn test_backward_compatibility() {
+        let registry = FunctionRegistry::new();
+        
+        // Verify all existing methods still work correctly
+        assert!(registry.all_functions().len() > 0);
+        
+        let network_funcs = registry.get_category(FunctionCategory::Network);
+        assert!(!network_funcs.is_empty());
+        
+        let search_results = registry.search("connect");
+        assert!(!search_results.is_empty());
+        
+        let related = registry.get_related("connect");
+        assert!(!related.is_empty());
+        
+        // Verify coverage validation still works
+        assert!(registry.validate_coverage().is_ok());
     }
 }
