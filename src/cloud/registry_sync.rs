@@ -73,17 +73,38 @@ pub struct RegistrySync {
     
     /// Synchronization subscribers (for real-time updates)
     subscribers: Arc<RwLock<Vec<tokio::sync::mpsc::Sender<RegistryUpdate>>>>,
+    
+    /// Optional Redis client for persistence
+    #[cfg(feature = "redis")]
+    redis_client: Option<redis::Client>,
 }
 
 impl RegistrySync {
     /// Create new registry sync instance
     pub fn new() -> Self {
+        #[cfg(feature = "redis")]
+        let redis_client = redis::Client::open("redis://127.0.0.1:6379").ok();
+        
         Self {
             gadgets: Arc::new(RwLock::new(HashMap::new())),
             libc_offsets: Arc::new(RwLock::new(HashMap::new())),
             shellcode: Arc::new(RwLock::new(HashMap::new())),
             targets: Arc::new(RwLock::new(HashMap::new())),
             subscribers: Arc::new(RwLock::new(Vec::new())),
+            #[cfg(feature = "redis")]
+            redis_client,
+        }
+    }
+    
+    /// Persist update to Redis
+    #[cfg(feature = "redis")]
+    async fn persist_to_redis(&self, key: &str, value: &[u8]) {
+        if let Some(ref redis_client) = self.redis_client {
+            if let Ok(mut conn) = redis_client.get_async_connection().await {
+                use redis::AsyncCommands;
+                let redis_key = format!("swarm:registry:{}", key);
+                let _: Result<(), _> = conn.set(&redis_key, value).await;
+            }
         }
     }
     
@@ -178,7 +199,13 @@ impl RegistrySync {
                 .unwrap_or_default(),
         };
         
-        self.broadcast_update(update).await;
+        self.broadcast_update(update.clone()).await;
+        
+        // Persist to Redis
+        #[cfg(feature = "redis")]
+        if let Ok(value) = serde_json::to_vec(&gadget) {
+            self.persist_to_redis(&key, &value).await;
+        }
         
         log::info!("Added gadget to registry: {} -> {}", key, instructions);
         key
@@ -217,7 +244,13 @@ impl RegistrySync {
                 .unwrap_or_default(),
         };
         
-        self.broadcast_update(update).await;
+        self.broadcast_update(update.clone()).await;
+        
+        // Persist to Redis
+        #[cfg(feature = "redis")]
+        if let Ok(value) = serde_json::to_vec(&offset_info) {
+            self.persist_to_redis(&key, &value).await;
+        }
         
         log::info!("Added libc offset to registry: {} -> 0x{:x}", key, offset);
         key
@@ -257,7 +290,13 @@ impl RegistrySync {
                 .unwrap_or_default(),
         };
         
-        self.broadcast_update(update).await;
+        self.broadcast_update(update.clone()).await;
+        
+        // Persist to Redis
+        #[cfg(feature = "redis")]
+        if let Ok(value) = serde_json::to_vec(&shellcode_info) {
+            self.persist_to_redis(&key, &value).await;
+        }
         
         log::info!("Added shellcode to registry: {} ({} bytes)", key, variant.len());
         key
@@ -300,7 +339,13 @@ impl RegistrySync {
                 .unwrap_or_default(),
         };
         
-        self.broadcast_update(update).await;
+        self.broadcast_update(update.clone()).await;
+        
+        // Persist to Redis
+        #[cfg(feature = "redis")]
+        if let Ok(value) = serde_json::to_vec(&target_info) {
+            self.persist_to_redis(&key, &value).await;
+        }
         
         log::info!("Added target to registry: {}", key);
         key

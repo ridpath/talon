@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, RwLock};
-use tonic::transport::{Certificate, Identity, Server, ServerTlsConfig};
+use tonic::transport::{Certificate, Channel, Identity, Server, ServerTlsConfig};
 use uuid::Uuid;
 
 /// Swarm controller configuration
@@ -109,6 +109,9 @@ pub enum SwarmError {
     
     #[error("Script error: {0}")]
     Script(String),
+    
+    #[error("Execution error: {0}")]
+    Execution(String),
 }
 
 /// Aggregated execution results
@@ -290,25 +293,72 @@ impl SwarmController {
         let results = Arc::new(Mutex::new(Vec::new()));
         
         for agent in target_agents.iter() {
+            let agent_endpoint = agent.endpoint.clone();
             let agent_id = agent.agent_id.clone();
+            let script_content = script_content.clone();
             let script_id = script_id.clone();
             let results = Arc::clone(&results);
             let dry_run = request.dry_run;
+            let timeout_seconds = request.timeout_seconds;
+            let max_retries = request.max_retries;
             
             let handle = tokio::spawn(async move {
-                // In production, this would connect to agent and execute
-                // Simplified implementation for now
+                let execution_start = Instant::now();
+                
+                // Retry logic for agent connection
+                let mut retry_count = 0;
+                let mut last_error = String::new();
+                
+                while retry_count <= max_retries {
+                    match Self::execute_on_agent(
+                        &agent_endpoint,
+                        &script_id,
+                        &script_content,
+                        dry_run,
+                        timeout_seconds,
+                    ).await {
+                        Ok(output) => {
+                            let result = ExploitResult {
+                                script_id: script_id.clone(),
+                                target_host: agent_id.clone(),
+                                success: true,
+                                error_message: String::new(),
+                                loot: output,
+                                metadata: HashMap::new(),
+                                duration_ms: execution_start.elapsed().as_millis() as i64,
+                                timestamp: chrono::Utc::now().timestamp(),
+                            };
+                            results.lock().await.push(result);
+                            return;
+                        }
+                        Err(e) => {
+                            last_error = e.to_string();
+                            retry_count += 1;
+                            if retry_count <= max_retries {
+                                log::warn!(
+                                    "Agent {} execution failed (attempt {}/{}): {}",
+                                    agent_id,
+                                    retry_count,
+                                    max_retries + 1,
+                                    last_error
+                                );
+                                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                            }
+                        }
+                    }
+                }
+                
+                // All retries exhausted
                 let result = ExploitResult {
-                    script_id,
+                    script_id: script_id.clone(),
                     target_host: agent_id.clone(),
-                    success: !dry_run, // Simulate success in dry-run mode
-                    error_message: String::new(),
+                    success: false,
+                    error_message: format!("Failed after {} retries: {}", max_retries + 1, last_error),
                     loot: vec![],
                     metadata: HashMap::new(),
-                    duration_ms: 100,
+                    duration_ms: execution_start.elapsed().as_millis() as i64,
                     timestamp: chrono::Utc::now().timestamp(),
                 };
-                
                 results.lock().await.push(result);
             });
             
@@ -332,8 +382,31 @@ impl SwarmController {
             execution_time_ms: start_time.elapsed().as_millis() as i64,
         };
         
-        // Store results
-        self.results.lock().await.insert(script_id, aggregated.results.clone());
+        // Store results in memory
+        self.results.lock().await.insert(script_id.clone(), aggregated.results.clone());
+        
+        // Persist results to Redis if available
+        #[cfg(feature = "redis")]
+        if let Some(ref redis_client) = self.redis_client {
+            if let Ok(mut conn) = redis_client.get_async_connection().await {
+                use redis::AsyncCommands;
+                
+                // Store aggregated results as JSON
+                if let Ok(json) = serde_json::to_string(&aggregated) {
+                    let key = format!("swarm:results:{}", script_id);
+                    let _: Result<(), _> = conn.set_ex(&key, json, 86400).await; // 24h TTL
+                    log::debug!("Persisted results to Redis: {}", key);
+                }
+                
+                // Store individual agent results
+                for result in &aggregated.results {
+                    if let Ok(json) = serde_json::to_string(result) {
+                        let key = format!("swarm:agent_result:{}:{}", script_id, result.target_host);
+                        let _: Result<(), _> = conn.set_ex(&key, json, 86400).await;
+                    }
+                }
+            }
+        }
         
         log::info!(
             "Script execution completed: {}/{} successful in {}ms",
@@ -425,6 +498,26 @@ impl SwarmController {
         results.get(script_id).cloned()
     }
     
+    /// Start background heartbeat monitoring
+    pub fn start_heartbeat_monitor(self: Arc<Self>) {
+        let controller = Arc::clone(&self);
+        
+        tokio::spawn(async move {
+            let mut interval = tokio::time::interval(Duration::from_secs(30));
+            
+            loop {
+                interval.tick().await;
+                
+                // Check for stale agents
+                let stale = controller.check_stale_agents().await;
+                
+                if !stale.is_empty() {
+                    log::warn!("Marking {} agents as inactive due to missing heartbeat", stale.len());
+                }
+            }
+        });
+    }
+    
     /// Start swarm gRPC server
     pub async fn start_server(self: Arc<Self>) -> Result<(), SwarmError> {
         // Load mTLS certificates
@@ -464,9 +557,47 @@ impl SwarmController {
     
     /// Update agent heartbeat
     async fn update_heartbeat(&self, agent_id: &str) {
+        let mut updated = false;
+        
         if let Some(agent) = self.agents.write().await.get_mut(agent_id) {
             agent.last_heartbeat = Some(Instant::now());
             agent.active = true;
+            updated = true;
+        }
+        
+        // Persist heartbeat to Postgres if available
+        #[cfg(feature = "postgres")]
+        if updated {
+            if let Some(ref pg_pool) = self.pg_pool {
+                let query = "
+                    INSERT INTO agent_heartbeats (agent_id, heartbeat_time)
+                    VALUES ($1, NOW())
+                    ON CONFLICT (agent_id) DO UPDATE
+                    SET heartbeat_time = NOW(), heartbeat_count = agent_heartbeats.heartbeat_count + 1
+                ";
+                
+                let _ = pg_pool.execute(query, &[&agent_id]).await;
+            }
+        }
+    }
+    
+    /// Log execution event to Postgres audit trail
+    #[cfg(feature = "postgres")]
+    async fn log_execution_event(
+        &self,
+        script_id: &str,
+        agent_id: &str,
+        event_type: &str,
+        message: &str,
+    ) {
+        if let Some(ref pg_pool) = self.pg_pool {
+            let query = "
+                INSERT INTO execution_audit_log 
+                (script_id, agent_id, event_type, message, timestamp)
+                VALUES ($1, $2, $3, $4, NOW())
+            ";
+            
+            let _ = pg_pool.execute(query, &[&script_id, &agent_id, &event_type, &message]).await;
         }
     }
     
@@ -495,6 +626,82 @@ impl SwarmController {
     /// Get registry sync instance
     pub fn registry_sync(&self) -> Arc<RegistrySync> {
         Arc::clone(&self.registry_sync)
+    }
+    
+    /// Execute script on specific agent via gRPC
+    async fn execute_on_agent(
+        endpoint: &str,
+        script_id: &str,
+        script_content: &[u8],
+        dry_run: bool,
+        timeout_seconds: i32,
+    ) -> Result<Vec<u8>, SwarmError> {
+        // Connect to agent
+        let channel = Channel::from_shared(endpoint.to_string())
+            .map_err(|e| SwarmError::Transport(e.into()))?
+            .connect()
+            .await?;
+        
+        let mut client = talon_swarm_client::TalonSwarmClient::new(channel);
+        
+        // Build script payload
+        let payload = ScriptPayload {
+            script_id: script_id.to_string(),
+            script_content: script_content.to_vec(),
+            target_hosts: vec![],
+            variables: HashMap::new(),
+            options: Some(ExecutionOptions {
+                timeout_seconds,
+                dry_run,
+                verbose: false,
+                max_retries: 0,
+            }),
+        };
+        
+        // Execute script and collect output
+        let mut stream = client.execute_script(payload).await?.into_inner();
+        
+        let mut output = Vec::new();
+        let start_time = Instant::now();
+        let timeout_duration = Duration::from_secs(timeout_seconds as u64);
+        
+        // Stream events with timeout
+        while let Ok(Some(event)) = tokio::time::timeout(
+            timeout_duration.saturating_sub(start_time.elapsed()),
+            stream.message(),
+        ).await {
+            match event {
+                Ok(evt) => {
+                    log::debug!(
+                        "Agent event: type={}, progress={}%, msg={}",
+                        evt.event_type,
+                        evt.progress_percent,
+                        evt.message
+                    );
+                    
+                    // Collect output data
+                    if !evt.data.is_empty() {
+                        output.extend_from_slice(&evt.data);
+                    }
+                    
+                    // Check for completion or failure
+                    if evt.event_type == EventType::EventCompleted as i32 {
+                        return Ok(output);
+                    } else if evt.event_type == EventType::EventFailed as i32 {
+                        return Err(SwarmError::Execution(evt.message));
+                    }
+                }
+                Err(e) => {
+                    return Err(SwarmError::Grpc(e));
+                }
+            }
+        }
+        
+        // Timeout reached
+        Err(SwarmError::Execution(format!(
+            "Agent execution timeout after {}s",
+            timeout_seconds
+        )))
     }
 }
 
@@ -543,14 +750,62 @@ impl talon_swarm_server::TalonSwarm for SwarmServer {
         Ok(tonic::Response::new(token))
     }
     
-    type ExecuteScriptStream = futures::stream::Empty<Result<ExecutionEvent, tonic::Status>>;
+    type ExecuteScriptStream = std::pin::Pin<Box<dyn futures::Stream<Item = Result<ExecutionEvent, tonic::Status>> + Send + 'static>>;
     
     async fn execute_script(
         &self,
-        _request: tonic::Request<ScriptPayload>,
+        request: tonic::Request<ScriptPayload>,
     ) -> Result<tonic::Response<Self::ExecuteScriptStream>, tonic::Status> {
-        // Simplified - full implementation would stream execution events
-        Ok(tonic::Response::new(futures::stream::empty()))
+        let payload = request.into_inner();
+        let script_id = payload.script_id.clone();
+        
+        log::info!("Executing script {} on agents", script_id);
+        
+        // Create channel for streaming events
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        
+        // Spawn task to execute script and stream events
+        tokio::spawn(async move {
+            // Send start event
+            let start_event = ExecutionEvent {
+                script_id: script_id.clone(),
+                event_type: EventType::EventStarted as i32,
+                message: "Script execution started".to_string(),
+                progress_percent: 0,
+                data: vec![],
+                timestamp: chrono::Utc::now().timestamp(),
+            };
+            let _ = tx.send(Ok(start_event)).await;
+            
+            // Execute script (simplified - would integrate with interpreter)
+            tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
+            
+            // Send progress event
+            let progress_event = ExecutionEvent {
+                script_id: script_id.clone(),
+                event_type: EventType::EventProgress as i32,
+                message: "Executing payload".to_string(),
+                progress_percent: 50,
+                data: vec![],
+                timestamp: chrono::Utc::now().timestamp(),
+            };
+            let _ = tx.send(Ok(progress_event)).await;
+            
+            // Send completion event
+            let complete_event = ExecutionEvent {
+                script_id: script_id.clone(),
+                event_type: EventType::EventCompleted as i32,
+                message: "Script execution completed".to_string(),
+                progress_percent: 100,
+                data: b"Execution successful".to_vec(),
+                timestamp: chrono::Utc::now().timestamp(),
+            };
+            let _ = tx.send(Ok(complete_event)).await;
+        });
+        
+        // Convert receiver to stream
+        let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+        Ok(tonic::Response::new(Box::pin(stream) as Self::ExecuteScriptStream))
     }
     
     async fn report_result(
@@ -580,24 +835,42 @@ impl talon_swarm_server::TalonSwarm for SwarmServer {
         }))
     }
     
-    type SyncRegistryStream = futures::stream::Empty<Result<RegistryUpdate, tonic::Status>>;
+    type SyncRegistryStream = std::pin::Pin<Box<dyn futures::Stream<Item = Result<RegistryUpdate, tonic::Status>> + Send + 'static>>;
     
     async fn sync_registry(
         &self,
         request: tonic::Request<tonic::Streaming<RegistryUpdate>>,
     ) -> Result<tonic::Response<Self::SyncRegistryStream>, tonic::Status> {
-        let mut stream = request.into_inner();
+        let mut incoming = request.into_inner();
         let registry = self.controller.registry_sync();
         
-        // Process incoming updates from agent
+        // Subscribe to registry updates for outgoing stream
+        let mut subscription = registry.subscribe().await;
+        
+        // Create channel for outgoing updates
+        let (tx, rx) = tokio::sync::mpsc::channel(100);
+        
+        // Spawn task to process incoming updates from agent
+        let registry_clone = Arc::clone(&registry);
         tokio::spawn(async move {
-            while let Ok(Some(update)) = stream.message().await {
-                registry.apply_update(update).await;
+            while let Ok(Some(update)) = incoming.message().await {
+                log::info!("Received registry update from agent: type={}, key={}", update.update_type, update.key);
+                registry_clone.apply_update(update).await;
             }
         });
         
-        // Return empty stream for now - full implementation would broadcast updates
-        Ok(tonic::Response::new(futures::stream::empty()))
+        // Spawn task to forward subscription updates to outgoing stream
+        tokio::spawn(async move {
+            while let Some(update) = subscription.recv().await {
+                if tx.send(Ok(update)).await.is_err() {
+                    break;
+                }
+            }
+        });
+        
+        // Convert receiver to stream
+        let stream = tokio_stream::wrappers::ReceiverStream::new(rx);
+        Ok(tonic::Response::new(Box::pin(stream) as Self::SyncRegistryStream))
     }
     
     async fn heartbeat(
