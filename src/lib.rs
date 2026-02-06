@@ -77,3 +77,6 @@ pub mod opsec;
 
 // Forensics & Anti-Sandbox (Phase 5.5)
 pub mod forensics;
+
+// Distributed Swarm Mode (Phase 6)
+pub mod cloud;

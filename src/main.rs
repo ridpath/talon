@@ -50,6 +50,9 @@ mod opsec;
 // Forensics & Anti-Sandbox (Phase 5.5)
 mod forensics;
 
+// Distributed Swarm Mode (Phase 6)
+mod cloud;
+
 // EXPLOIT DEVELOPMENT MODULES (Phase 7+)
 mod cyclic_tools; // De Bruijn sequences for offset finding
 mod elf_tools; // ELF symbol resolution (symbols, plt, got) + string search

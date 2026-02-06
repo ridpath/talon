@@ -106,6 +106,19 @@ retour = { version = "0.3", optional = true }
 # Requires: aya = { version = "0.11", optional = true }
 # Current implementation provides interface stubs ready for aya integration
 
+# DISTRIBUTED SWARM (Phase 6)
+tonic = { version = "0.11", features = ["tls"], optional = true }
+prost = { version = "0.12", optional = true }
+chacha20poly1305 = "0.10"
+uuid = { version = "1.6", features = ["v4", "serde"] }
+thiserror = "1.0"
+hostname = "0.3"
+tokio-stream = { version = "0.1", features = ["sync"] }
+
+[build-dependencies]
+tonic-build = { version = "0.11", optional = true }
+which = "6.0"
+
 [features]
 default = []
 llvm = ["inkwell"]
@@ -116,3 +129,13 @@ game-hacking = ["retour"]
 game-hacking-windows = ["windows", "game-hacking"]
 game-hacking-linux = ["procfs", "game-hacking"]
 game-hacking-macos = ["mach2", "game-hacking"]
+swarm = ["tonic", "prost", "tonic-build"]
+
+[[bin]]
+name = "talon"
+path = "src/main.rs"
+
+[[bin]]
+name = "talon-agent"
+path = "src/bin/agent.rs"
+required-features = ["swarm"]

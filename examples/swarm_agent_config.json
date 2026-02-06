@@ -1,0 +1,17 @@
+{
+  "primary_endpoint": "https://controller.example.com:50051",
+  "agent_id": "agent-001",
+  "client_cert_path": "certs/agent.crt",
+  "client_key_path": "certs/agent.key",
+  "ca_cert_path": "certs/ca.crt",
+  "heartbeat_interval": 30,
+  "max_concurrent_tasks": 4,
+  "capabilities": [
+    "binary_analysis",
+    "network_exploit",
+    "rop_chain",
+    "shellcode_generation",
+    "format_string",
+    "heap_exploitation"
+  ]
+}

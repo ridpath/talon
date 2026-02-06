@@ -1,0 +1,144 @@
+syntax = "proto3";
+
+package talon.swarm;
+
+// Swarm RPC service for distributed exploitation
+service TalonSwarm {
+  // Agent registration and authentication
+  rpc RegisterAgent(AgentInfo) returns (AgentToken);
+  
+  // Execute TALON script on agent
+  rpc ExecuteScript(ScriptPayload) returns (stream ExecutionEvent);
+  
+  // Report exploitation results
+  rpc ReportResult(ExploitResult) returns (Acknowledgment);
+  
+  // Sync discovered gadgets/offsets to swarm
+  rpc SyncRegistry(stream RegistryUpdate) returns (stream RegistryUpdate);
+  
+  // Heartbeat to maintain connection
+  rpc Heartbeat(AgentStatus) returns (Acknowledgment);
+  
+  // Terminate agent (shutdown command)
+  rpc Terminate(TerminateRequest) returns (Acknowledgment);
+  
+  // Request agent auto-update
+  rpc RequestUpdate(UpdateRequest) returns (stream UpdateChunk);
+}
+
+// Agent information for registration
+message AgentInfo {
+  string hostname = 1;
+  string os = 2;
+  string arch = 3;
+  string version = 4;
+  repeated string capabilities = 5;
+  bytes csr = 6; // Certificate Signing Request
+}
+
+// Agent authentication token (signed certificate)
+message AgentToken {
+  string agent_id = 1;
+  bytes certificate = 2;
+  bytes ca_certificate = 3;
+  int64 expiry_timestamp = 4;
+}
+
+// Script execution payload
+message ScriptPayload {
+  string script_id = 1;
+  bytes script_content = 2;
+  repeated string target_hosts = 3;
+  map<string, string> variables = 4;
+  ExecutionOptions options = 5;
+}
+
+// Execution options
+message ExecutionOptions {
+  int32 timeout_seconds = 1;
+  bool dry_run = 2;
+  bool verbose = 3;
+  int32 max_retries = 4;
+}
+
+// Execution event stream
+message ExecutionEvent {
+  string script_id = 1;
+  EventType event_type = 2;
+  string message = 3;
+  int32 progress_percent = 4;
+  bytes data = 5;
+  int64 timestamp = 6;
+}
+
+enum EventType {
+  EVENT_STARTED = 0;
+  EVENT_PROGRESS = 1;
+  EVENT_OUTPUT = 2;
+  EVENT_ERROR = 3;
+  EVENT_COMPLETED = 4;
+  EVENT_FAILED = 5;
+}
+
+// Exploitation result
+message ExploitResult {
+  string script_id = 1;
+  string target_host = 2;
+  bool success = 3;
+  string error_message = 4;
+  bytes loot = 5;
+  map<string, string> metadata = 6;
+  int64 duration_ms = 7;
+  int64 timestamp = 8;
+}
+
+// Registry update (gadgets, libc offsets, etc.)
+message RegistryUpdate {
+  UpdateType update_type = 1;
+  string key = 2;
+  bytes value = 3;
+  map<string, string> metadata = 4;
+}
+
+enum UpdateType {
+  UPDATE_GADGET = 0;
+  UPDATE_LIBC_OFFSET = 1;
+  UPDATE_SHELLCODE = 2;
+  UPDATE_TARGET = 3;
+}
+
+// Agent status (heartbeat)
+message AgentStatus {
+  string agent_id = 1;
+  bool active = 2;
+  int32 cpu_percent = 3;
+  int32 memory_mb = 4;
+  int32 running_tasks = 5;
+  int64 uptime_seconds = 6;
+}
+
+// Acknowledgment
+message Acknowledgment {
+  bool success = 1;
+  string message = 2;
+}
+
+// Terminate request
+message TerminateRequest {
+  string agent_id = 1;
+  bool force = 2;
+}
+
+// Update request
+message UpdateRequest {
+  string agent_id = 1;
+  string target_version = 2;
+}
+
+// Update chunk (streamed binary)
+message UpdateChunk {
+  bytes data = 1;
+  int32 chunk_index = 2;
+  int32 total_chunks = 3;
+  bytes checksum = 4;
+}
