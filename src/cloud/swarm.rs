@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{Mutex, RwLock};
-use tonic::transport::{Certificate, Channel, Identity, Server, ServerTlsConfig};
+use tonic::transport::{Certificate, Channel, Identity, ServerTlsConfig};
 use uuid::Uuid;
 
 /// Swarm controller configuration
@@ -534,7 +534,7 @@ impl SwarmController {
         let identity = Identity::from_pem(&server_cert, &server_key);
         let ca_certificate = Certificate::from_pem(&ca_cert);
         
-        let tls_config = ServerTlsConfig::new()
+        let _tls_config = ServerTlsConfig::new()
             .identity(identity)
             .client_ca_root(ca_certificate);
         

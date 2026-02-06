@@ -272,6 +272,7 @@ pub mod talon_swarm_client {
 }
 
 pub mod talon_swarm_server {
+    #![allow(unused_imports)]
     use super::*;
     
     #[tonic::async_trait]

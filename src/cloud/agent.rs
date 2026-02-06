@@ -81,7 +81,7 @@ pub enum AgentError {
 
 /// Agent state
 #[derive(Debug, Clone)]
-struct AgentState {
+pub(crate) struct AgentState {
     active: bool,
     cpu_percent: i32,
     memory_mb: i32,
@@ -471,7 +471,7 @@ impl TalonAgent {
     }
     
     /// Get current agent state
-    pub async fn get_state(&self) -> AgentState {
+    pub(crate) async fn get_state(&self) -> AgentState {
         self.state.lock().await.clone()
     }
 }
