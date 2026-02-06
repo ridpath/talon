@@ -1,0 +1,33 @@
+# TALON Configuration File
+# Place this file at ~/.talon/config.toml
+
+[ai]
+# AI backend selection: "lm_studio", "local_gguf", or "disabled"
+backend = "lm_studio"
+
+# LM Studio endpoint (WSL setup uses Windows host IP)
+# Default: http://10.5.0.2:1234/v1
+endpoint = "http://10.5.0.2:1234/v1"
+
+# Model name (must match model loaded in LM Studio)
+# Recommended models:
+#   - deepseek-coder-6.7b-instruct (primary, best balance)
+#   - codellama-13b-instruct (secondary, larger context)
+#   - llama-3-8b-instruct (tertiary, general purpose)
+model = "deepseek-coder-6.7b-instruct"
+
+# Inference temperature (0.0-1.0, higher = more creative)
+temperature = 0.7
+
+# Maximum tokens per response
+max_tokens = 2048
+
+# Environment Variables (alternative to config file):
+# TALON_AI_BACKEND=lm_studio
+# TALON_LM_STUDIO_ENDPOINT=http://10.5.0.2:1234/v1
+
+# Notes:
+# - LM Studio auto-detection checks endpoint availability on startup
+# - If LM Studio unavailable, falls back to local GGUF (if available)
+# - If no models available, AI features gracefully disable
+# - Local GGUF models should be placed in ~/.talon/models/

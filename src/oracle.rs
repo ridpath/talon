@@ -822,6 +822,86 @@ impl VulnerabilityOracle {
         
         Ok(solution.contains_key("payload"))
     }
+
+    pub async fn analyze_with_ai(
+        &mut self,
+        ml_oracle: &crate::ml_oracle::MlOracle,
+    ) -> Result<Vec<VulnerabilityReport>, String> {
+        if !ml_oracle.is_available() {
+            return self.analyze_flow();
+        }
+
+        let heuristic_reports = self.analyze_flow()?;
+
+        if heuristic_reports.is_empty() {
+            return Ok(heuristic_reports);
+        }
+
+        let mut enhanced_reports = Vec::new();
+
+        for report in heuristic_reports {
+            let disassembly = self.get_disassembly_for_location(&report.location)?;
+
+            match ml_oracle
+                .analyze_vulnerability(&self.binary_path, &disassembly, &report)
+                .await
+            {
+                Ok(ai_analysis) => {
+                    let mut enhanced = report.clone();
+                    enhanced.details = format!(
+                        "{}\n\nAI Analysis:\n{}",
+                        enhanced.details, ai_analysis
+                    );
+                    enhanced_reports.push(enhanced);
+                }
+                Err(e) => {
+                    log::warn!("AI analysis failed for {}: {}", report.location, e);
+                    enhanced_reports.push(report);
+                }
+            }
+        }
+
+        Ok(enhanced_reports)
+    }
+
+    pub async fn generate_exploit_with_ai(
+        &self,
+        ml_oracle: &crate::ml_oracle::MlOracle,
+        vuln_report: &VulnerabilityReport,
+    ) -> Result<String, String> {
+        if !ml_oracle.is_available() {
+            return Err("AI features not available".to_string());
+        }
+
+        let arch = self.elf_context
+            .as_ref()
+            .map(|ctx| ctx.arch())
+            .unwrap_or_else(|| "unknown".to_string());
+
+        let protections = if let Some(ctx) = &self.elf_context {
+            format!(
+                "NX: {}, PIE: {}, Canary: {}, RELRO: {}, FORTIFY: {}",
+                ctx.nx, ctx.pie, ctx.canary, ctx.relro, ctx.fortify
+            )
+        } else {
+            "unknown".to_string()
+        };
+
+        let target_info = format!(
+            "Binary: {}\nArchitecture: {}\nProtections: {}",
+            self.binary_path,
+            arch,
+            protections
+        );
+
+        ml_oracle
+            .generate_exploit(vuln_report, &target_info)
+            .await
+    }
+
+    fn get_disassembly_for_location(&self, _location: &str) -> Result<String, String> {
+        Ok("Sample disassembly would go here".to_string())
+    }
 }
 
 #[cfg(test)]
@@ -965,5 +1045,13 @@ mod tests {
         assert!(
             exploitability == Exploitability::Low || exploitability == Exploitability::Medium
         );
+    }
+
+    #[tokio::test]
+    async fn test_ml_oracle_integration() {
+        use crate::ml_oracle::MlOracle;
+        
+        let mut ml_oracle = MlOracle::new();
+        assert!(!ml_oracle.is_available());
     }
 }

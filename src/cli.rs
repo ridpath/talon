@@ -631,6 +631,109 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
             }
         }
 
+        [_, "audit", "--ai", binary] | [_, "audit", binary, "--ai"] => {
+            println!("{}", "[AI] Initializing ML Oracle...".cyan());
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async {
+                let mut ml_oracle = crate::ml_oracle::MlOracle::new();
+                match ml_oracle.initialize().await {
+                    Ok(_) => {
+                        println!("{}", "[AI] ML Oracle available".green());
+                        match crate::oracle::VulnerabilityOracle::new(binary) {
+                            Ok(mut oracle) => {
+                                match oracle.analyze_with_ai(&ml_oracle).await {
+                                    Ok(reports) => {
+                                        println!("\n{} Found {} vulnerabilities", "[AUDIT]".green(), reports.len());
+                                        for report in reports {
+                                            println!("\n{}", "=".repeat(70));
+                                            println!("{}: {}", "Type".bold(), report.vuln_type);
+                                            println!("{}: {}", "Location".bold(), report.location);
+                                            println!("{}: {:.2}", "Confidence".bold(), report.confidence);
+                                            println!("{}: {:?}", "Exploitability".bold(), report.exploitability);
+                                            println!("\n{}", report.details);
+                                        }
+                                    }
+                                    Err(e) => eprintln!("{} Analysis failed: {}", "[ERROR]".red(), e),
+                                }
+                            }
+                            Err(e) => eprintln!("{} Failed to create oracle: {}", "[ERROR]".red(), e),
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("{} AI features unavailable: {}", "[WARNING]".yellow(), e);
+                        eprintln!("Running heuristic analysis only...");
+                        match crate::oracle::VulnerabilityOracle::new(binary) {
+                            Ok(mut oracle) => {
+                                match oracle.analyze_flow() {
+                                    Ok(reports) => {
+                                        println!("\n{} Found {} vulnerabilities", "[AUDIT]".green(), reports.len());
+                                        for report in reports {
+                                            println!("\n{}", "=".repeat(70));
+                                            println!("{}: {}", "Type".bold(), report.vuln_type);
+                                            println!("{}: {}", "Location".bold(), report.location);
+                                            println!("{}: {:.2}", "Confidence".bold(), report.confidence);
+                                        }
+                                    }
+                                    Err(e) => eprintln!("{} Analysis failed: {}", "[ERROR]".red(), e),
+                                }
+                            }
+                            Err(e) => eprintln!("{} Failed to create oracle: {}", "[ERROR]".red(), e),
+                        }
+                    }
+                }
+            });
+        }
+
+        [_, "explain", "--ai", error_msg] => {
+            println!("{}", "[AI] Initializing ML Oracle...".cyan());
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async {
+                let mut ml_oracle = crate::ml_oracle::MlOracle::new();
+                match ml_oracle.initialize().await {
+                    Ok(_) => {
+                        println!("{}", "[AI] ML Oracle available".green());
+                        match ml_oracle.explain_error(error_msg, "").await {
+                            Ok(explanation) => {
+                                println!("\n{}", "=".repeat(70));
+                                println!("{}", "Error Explanation".bold().cyan());
+                                println!("{}", "=".repeat(70));
+                                println!("\n{}", explanation);
+                            }
+                            Err(e) => eprintln!("{} Explanation failed: {}", "[ERROR]".red(), e),
+                        }
+                    }
+                    Err(e) => eprintln!("{} AI features unavailable: {}", "[ERROR]".red(), e),
+                }
+            });
+        }
+
+        [_, "suggest", "--ai", script_file] => {
+            println!("{}", "[AI] Initializing ML Oracle...".cyan());
+            if let Ok(script) = fs::read_to_string(script_file) {
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(async {
+                    let mut ml_oracle = crate::ml_oracle::MlOracle::new();
+                    match ml_oracle.initialize().await {
+                        Ok(_) => {
+                            println!("{}", "[AI] ML Oracle available".green());
+                            match ml_oracle.suggest_code_improvements(&script).await {
+                                Ok(suggestions) => {
+                                    println!("\n{}", "=".repeat(70));
+                                    println!("{}", "Code Review Suggestions".bold().cyan());
+                                    println!("{}", "=".repeat(70));
+                                    println!("\n{}", suggestions);
+                                }
+                                Err(e) => eprintln!("{} Review failed: {}", "[ERROR]".red(), e),
+                            }
+                        }
+                        Err(e) => eprintln!("{} AI features unavailable: {}", "[ERROR]".red(), e),
+                    }
+                });
+            } else {
+                eprintln!("{} Failed to read file: {}", "[ERROR]".red(), script_file);
+            }
+        }
+
         [_, "oneliner", "get-shell", target, port] => {
             let port_num: u16 = port.parse().unwrap_or(1337);
             println!("{}", OneLinerLibrary::get_shell(target, port_num));
