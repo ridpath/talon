@@ -73,6 +73,65 @@ pub fn run(args: Vec<String>) {
             }
         }
 
+        [_, "build", file, "--evasion-level", level] => {
+            let script = fs::read_to_string(file).expect("Unable to read script file");
+            let cmds = crate::parser::parse_script(&script).expect("Parse failed");
+            
+            let evasion_level = match level {
+                "low" | "medium" | "high" => level,
+                _ => {
+                    eprintln!("{} Invalid evasion level. Use: low, medium, or high", "[ERROR]".red());
+                    return;
+                }
+            };
+            
+            println!("{} Building with {} evasion level...", "[BUILD]".blue(), evasion_level.yellow());
+            
+            crate::codegen::build_script(&cmds, static_build).expect("Build failed");
+            
+            let binary_path = "./talon_build/target/release/talon_script";
+            
+            if let Ok(shellcode) = fs::read(binary_path) {
+                use crate::opsec::polymorphic::PolymorphicEngine;
+                use crate::opsec::polymorphic::MutationStrategy;
+                
+                let strategies = match evasion_level {
+                    "low" => vec![MutationStrategy::JunkCodeInsertion],
+                    "medium" => vec![
+                        MutationStrategy::JunkCodeInsertion,
+                        MutationStrategy::InstructionEquivalence,
+                    ],
+                    "high" => vec![
+                        MutationStrategy::JunkCodeInsertion,
+                        MutationStrategy::InstructionEquivalence,
+                        MutationStrategy::StringEncryption,
+                        MutationStrategy::RegisterPermutation,
+                    ],
+                    _ => vec![],
+                };
+                
+                let junk_density = match evasion_level {
+                    "low" => 0.1,
+                    "medium" => 0.3,
+                    "high" => 0.5,
+                    _ => 0.1,
+                };
+                
+                let mut engine = PolymorphicEngine::new(strategies);
+                engine.set_junk_density(junk_density);
+                
+                match engine.mutate(&shellcode) {
+                    Ok(mutated) => {
+                        let output_path = format!("{}.polymorphic", binary_path);
+                        fs::write(&output_path, mutated).expect("Failed to write polymorphic binary");
+                        println!("{} Polymorphic binary: {}", "[OK]".green(), output_path);
+                        println!("{} Evasion techniques applied: {}", "[INFO]".blue(), engine.strategies.len());
+                    }
+                    Err(e) => eprintln!("{} Polymorphic transformation failed: {}", "[ERROR]".red(), e),
+                }
+            }
+        }
+
         [_, "run", file] => {
             let script = fs::read_to_string(file).expect("Unable to read script file");
             let cmds = crate::parser::parse_script(&script).expect("Parse failed");
@@ -246,10 +305,81 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
         }
 
         [_, "debug", file] => {
+            println!("{} Time-travel debugging mode for: {}", "[DEBUG]".cyan(), file);
             let script = fs::read_to_string(file).expect("Unable to read file");
             let cmds = crate::parser::parse_script(&script).expect("Parse failed");
-            for (i, cmd) in cmds.iter().enumerate() {
-                println!("[{}] {:?}", i, cmd);
+            
+            println!("\n{}", "Time-Travel Debugger".bold().cyan());
+            println!("{}", "═".repeat(70));
+            println!("\nLoaded script with {} commands", cmds.len());
+            println!("\nAST Preview:");
+            for (i, cmd) in cmds.iter().take(5).enumerate() {
+                println!("  [{}] {:?}", i, cmd);
+            }
+            if cmds.len() > 5 {
+                println!("  ... and {} more commands", cmds.len() - 5);
+            }
+            
+            println!("\n{}", "Debugger Commands:".bold());
+            println!("  run           - Execute script with time-travel recording");
+            println!("  checkpoints   - List saved checkpoints");
+            println!("  ast           - Show full AST");
+            println!("  exit          - Exit debugger");
+            
+            use std::io::{self, Write};
+            loop {
+                print!("\nDebug> ");
+                io::stdout().flush().unwrap();
+                
+                let mut input = String::new();
+                io::stdin().read_line(&mut input).unwrap();
+                let choice = input.trim();
+                
+                match choice {
+                    "run" => {
+                        println!("{} Executing script with time-travel recording...", "[DEBUG]".blue());
+                        let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                        match rt.block_on(crate::interpreter::interpret(&cmds)) {
+                            Ok(_) => println!("{} Execution completed", "[OK]".green()),
+                            Err(e) => eprintln!("{} Execution failed: {}", "[ERROR]".red(), e),
+                        }
+                    }
+                    "checkpoints" => {
+                        use crate::build_cache::BuildCache;
+                        if let Ok(cache) = BuildCache::new() {
+                            let checkpoint_dir = cache.cache_dir.join("checkpoints");
+                            if checkpoint_dir.exists() {
+                                match fs::read_dir(&checkpoint_dir) {
+                                    Ok(entries) => {
+                                        let checkpoints: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+                                        if checkpoints.is_empty() {
+                                            println!("No checkpoints found");
+                                        } else {
+                                            println!("\n{} Saved checkpoints:", "[INFO]".blue());
+                                            for (idx, entry) in checkpoints.iter().enumerate() {
+                                                println!("  {}. {}", idx + 1, entry.file_name().to_string_lossy());
+                                            }
+                                        }
+                                    }
+                                    Err(e) => eprintln!("{} Failed to list checkpoints: {}", "[ERROR]".red(), e),
+                                }
+                            } else {
+                                println!("No checkpoints directory found");
+                            }
+                        }
+                    }
+                    "ast" => {
+                        println!("\n{} Full AST:", "[INFO]".blue());
+                        for (i, cmd) in cmds.iter().enumerate() {
+                            println!("  [{}] {:?}", i, cmd);
+                        }
+                    }
+                    "exit" => {
+                        println!("Exiting debugger...");
+                        break;
+                    }
+                    _ => println!("Unknown command. Use: run, checkpoints, ast, exit"),
+                }
             }
         }
 
@@ -376,6 +506,155 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
             Ok(info) => TargetDetector::print_analysis(&info),
             Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
         },
+
+        [_, "oracle", binary_path] => {
+            println!("{} Analyzing binary for vulnerabilities...", "[ORACLE]".cyan());
+            match crate::oracle::VulnerabilityOracle::new(binary_path) {
+                Ok(mut oracle) => {
+                    match oracle.analyze_flow() {
+                        Ok(reports) => {
+                            if reports.is_empty() {
+                                println!("{} No vulnerabilities detected", "[ORACLE]".green());
+                            } else {
+                                println!("\n{} Found {} potential vulnerabilities:\n", "[ORACLE]".yellow(), reports.len());
+                                for (idx, report) in reports.iter().enumerate() {
+                                    println!("{}. {}", (idx + 1).to_string().yellow().bold(), report.vuln_type.cyan().bold());
+                                    println!("   Location: {}", report.location);
+                                    println!("   Confidence: {:.1}%", report.confidence * 100.0);
+                                    println!("   Exploitability: {:?}", report.exploitability);
+                                    println!("   Details: {}", report.details.bright_black());
+                                    
+                                    if let Some(ref mitigation) = report.mitigation {
+                                        println!("   Mitigation: {}", mitigation.bright_black());
+                                    }
+                                    println!();
+                                }
+                            }
+                        }
+                        Err(e) => eprintln!("{} Analysis failed: {}", "[ERROR]".red(), e),
+                    }
+                }
+                Err(e) => eprintln!("{} Failed to create oracle: {}", "[ERROR]".red(), e),
+            }
+        }
+
+        [_, "patch", binary_path] => {
+            println!("{} Interactive binary patching for: {}", "[PATCH]".cyan(), binary_path);
+            use crate::binary_patch::Patch;
+            
+            match Patch::new(binary_path) {
+                Ok(mut patcher) => {
+                    patcher.set_dry_run(true);
+                    
+                    println!("\n{}", "Binary Patcher - Interactive Mode".bold().cyan());
+                    println!("{}", "═".repeat(70));
+                    println!("\nOptions:");
+                    println!("  1. NOP out function call");
+                    println!("  2. Replace function call");
+                    println!("  3. Insert assembly");
+                    println!("  4. Patch bytes");
+                    println!("  5. Inject shellcode");
+                    println!("  6. Create code cave");
+                    println!("  7. Find pattern");
+                    println!("  8. Apply patches (disable dry-run)");
+                    println!("  9. Show patch history");
+                    println!("  0. Exit");
+                    
+                    use std::io::{self, Write};
+                    loop {
+                        print!("\nPatch> ");
+                        io::stdout().flush().unwrap();
+                        
+                        let mut input = String::new();
+                        io::stdin().read_line(&mut input).unwrap();
+                        let choice = input.trim();
+                        
+                        match choice {
+                            "1" => {
+                                print!("Offset (hex): ");
+                                io::stdout().flush().unwrap();
+                                input.clear();
+                                io::stdin().read_line(&mut input).unwrap();
+                                if let Ok(offset) = usize::from_str_radix(input.trim().trim_start_matches("0x"), 16) {
+                                    print!("Length: ");
+                                    io::stdout().flush().unwrap();
+                                    input.clear();
+                                    io::stdin().read_line(&mut input).unwrap();
+                                    if let Ok(length) = input.trim().parse::<usize>() {
+                                        match patcher.nop_out(offset, length) {
+                                            Ok(_) => println!("{} NOPs inserted", "[OK]".green()),
+                                            Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                                        }
+                                    }
+                                }
+                            }
+                            "2" => {
+                                print!("Old function name: ");
+                                io::stdout().flush().unwrap();
+                                input.clear();
+                                io::stdin().read_line(&mut input).unwrap();
+                                let old_fn = input.trim().to_string();
+                                
+                                print!("New function name: ");
+                                io::stdout().flush().unwrap();
+                                input.clear();
+                                io::stdin().read_line(&mut input).unwrap();
+                                let new_fn = input.trim().to_string();
+                                
+                                match patcher.replace_call(&old_fn, &new_fn) {
+                                    Ok(_) => println!("{} Call replaced", "[OK]".green()),
+                                    Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                                }
+                            }
+                            "7" => {
+                                print!("Pattern (hex bytes, space-separated): ");
+                                io::stdout().flush().unwrap();
+                                input.clear();
+                                io::stdin().read_line(&mut input).unwrap();
+                                
+                                let pattern: Result<Vec<u8>, _> = input.trim()
+                                    .split_whitespace()
+                                    .map(|b| u8::from_str_radix(b, 16))
+                                    .collect();
+                                
+                                if let Ok(pattern) = pattern {
+                                    match patcher.find_pattern(&pattern) {
+                                        Ok(offsets) => {
+                                            println!("{} Found {} occurrence(s):", "[OK]".green(), offsets.len());
+                                            for offset in offsets {
+                                                println!("  0x{:x}", offset);
+                                            }
+                                        }
+                                        Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                                    }
+                                }
+                            }
+                            "8" => {
+                                patcher.set_dry_run(false);
+                                println!("{} Dry-run mode disabled. Patches will be applied to file.", "[WARNING]".yellow());
+                            }
+                            "9" => {
+                                let ops = patcher.get_operations();
+                                if ops.is_empty() {
+                                    println!("No patches queued");
+                                } else {
+                                    println!("\n{} Queued patches:", "[INFO]".blue());
+                                    for (idx, op) in ops.iter().enumerate() {
+                                        println!("  {}. {:?}", idx + 1, op);
+                                    }
+                                }
+                            }
+                            "0" => {
+                                println!("Exiting...");
+                                break;
+                            }
+                            _ => println!("Invalid option"),
+                        }
+                    }
+                }
+                Err(e) => eprintln!("{} Failed to create patcher: {}", "[ERROR]".red(), e),
+            }
+        }
 
         [_, "diff", file1, file2] => match EnhancedBinaryDiffer::diff(file1, file2) {
             Ok(result) => EnhancedBinaryDiffer::print_analysis(&result),
@@ -1011,6 +1290,65 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
         #[cfg(not(feature = "swarm"))]
         [_, "swarm", ..] => {
             eprintln!("{}", "[ERROR] Swarm mode not enabled. Rebuild with --features swarm".red());
+        }
+
+        #[cfg(feature = "swarm")]
+        [_, "agent", "--connect", primary_endpoint] => {
+            use crate::cloud::{Agent, AgentConfig};
+            use std::path::PathBuf;
+            
+            println!("{} Starting agent and connecting to: {}", "[AGENT]".cyan(), primary_endpoint);
+            
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async {
+                let config = AgentConfig {
+                    primary_endpoint: primary_endpoint.to_string(),
+                    agent_id: format!("agent-{}", uuid::Uuid::new_v4()),
+                    capabilities: vec![
+                        "binary_analysis".to_string(),
+                        "network_exploit".to_string(),
+                        "rop_chain".to_string(),
+                    ],
+                    max_concurrent_scripts: 4,
+                    heartbeat_interval_secs: 30,
+                    reconnect_delay_secs: 5,
+                    max_reconnect_attempts: 10,
+                };
+                
+                match Agent::new(config).await {
+                    Ok(mut agent) => {
+                        println!("{} Agent initialized: {}", "[OK]".green(), agent.agent_id);
+                        println!("{} Capabilities: {:?}", "[INFO]".blue(), agent.capabilities);
+                        println!("{} Connecting to primary...", "[AGENT]".cyan());
+                        
+                        match agent.connect().await {
+                            Ok(_) => {
+                                println!("{} Connected to swarm controller", "[CONNECTED]".green());
+                                println!("{} Agent is ready to receive scripts", "[READY]".green());
+                                
+                                println!("\nPress Ctrl+C to stop agent");
+                                
+                                match agent.start_heartbeat().await {
+                                    Ok(_) => {
+                                        println!("{} Agent running. Waiting for scripts...", "[AGENT]".cyan());
+                                        
+                                        tokio::signal::ctrl_c().await.ok();
+                                        println!("\n{} Shutting down agent...", "[AGENT]".yellow());
+                                    }
+                                    Err(e) => eprintln!("{} Heartbeat failed: {}", "[ERROR]".red(), e),
+                                }
+                            }
+                            Err(e) => eprintln!("{} Connection failed: {}", "[ERROR]".red(), e),
+                        }
+                    }
+                    Err(e) => eprintln!("{} Failed to create agent: {}", "[ERROR]".red(), e),
+                }
+            });
+        }
+
+        #[cfg(not(feature = "swarm"))]
+        [_, "agent", ..] => {
+            eprintln!("{}", "[ERROR] Agent mode not enabled. Rebuild with --features swarm".red());
         }
 
         _ => {

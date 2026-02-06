@@ -53,11 +53,15 @@ _talon_completions() {
     cur="${COMP_WORDS[COMP_CWORD]}"
     prev="${COMP_WORDS[COMP_CWORD-1]}"
     
-    commands="run repl new build wasm analyze db config man completion ctf diff_fuzz taint_analysis auto_rop heap_exploit kernel_exploit scan_cve find_similar_to chain safety help version"
+    commands="run repl new build wasm analyze oracle patch debug db config man completion audit explain suggest fix document swarm agent ctf diff_fuzz taint_analysis auto_rop heap_exploit kernel_exploit scan_cve find_similar_to chain safety cache help version"
     template_types="buffer-overflow rop format-string heap kernel ret2libc use-after-free race-condition shellcode web-sqli smart-contract basic"
     db_commands="search list show type platform"
     config_commands="init show edit"
     ctf_commands="new_session add_challenge set_connection add_note set_status submit_flag save_session load_session show_stats list_challenges"
+    swarm_commands="deploy run status results"
+    cache_commands="stats clean"
+    build_flags="--evasion-level --static --run"
+    evasion_levels="low medium high"
     
     case "${prev}" in
         talon)
@@ -80,11 +84,36 @@ _talon_completions() {
             COMPREPLY=( $(compgen -W "${ctf_commands}" -- ${cur}) )
             return 0
             ;;
+        swarm)
+            COMPREPLY=( $(compgen -W "${swarm_commands}" -- ${cur}) )
+            return 0
+            ;;
+        cache)
+            COMPREPLY=( $(compgen -W "${cache_commands}" -- ${cur}) )
+            return 0
+            ;;
+        build)
+            COMPREPLY=( $(compgen -W "${build_flags}" -- ${cur}) )
+            COMPREPLY+=( $(compgen -f -X '!*.tal' -- ${cur}) )
+            return 0
+            ;;
+        --evasion-level)
+            COMPREPLY=( $(compgen -W "${evasion_levels}" -- ${cur}) )
+            return 0
+            ;;
+        agent)
+            COMPREPLY=( $(compgen -W "--connect" -- ${cur}) )
+            return 0
+            ;;
+        audit|explain|suggest|fix|document)
+            COMPREPLY=( $(compgen -W "--ai" -- ${cur}) )
+            return 0
+            ;;
         completion)
             COMPREPLY=( $(compgen -W "bash zsh fish powershell" -- ${cur}) )
             return 0
             ;;
-        run|build|wasm|analyze)
+        run|wasm|analyze|oracle|patch|debug)
             COMPREPLY=( $(compgen -f -X '!*.tal' -- ${cur}) )
             return 0
             ;;
@@ -109,10 +138,21 @@ _talon() {
         'build:Compile to native binary'
         'wasm:Compile to WebAssembly'
         'analyze:Analyze binary for vulnerabilities'
+        'oracle:Vulnerability detection and analysis'
+        'patch:Interactive binary patching'
+        'debug:Time-travel debugging mode'
         'db:Query exploit database'
         'config:Manage configuration'
         'man:Display manual pages'
         'completion:Generate shell completions'
+        'audit:AI-powered vulnerability analysis'
+        'explain:AI-powered error explanation'
+        'suggest:AI code review and suggestions'
+        'fix:AI-powered automatic script fixing'
+        'document:AI-powered documentation generation'
+        'swarm:Distributed swarm operations'
+        'agent:Agent mode for swarm'
+        'cache:Build cache management'
         'ctf:CTF session management'
         'diff_fuzz:Differential fuzzing'
         'taint_analysis:Taint analysis for info leak detection'
@@ -169,6 +209,18 @@ _talon() {
         'list_challenges:List all challenges'
     )
     
+    swarm_cmds=(
+        'deploy:Deploy agents from inventory'
+        'run:Execute script on swarm'
+        'status:Show agent status'
+        'results:Show execution results'
+    )
+    
+    cache_cmds=(
+        'stats:Display cache statistics'
+        'clean:Clean old cache entries'
+    )
+    
     case $words[2] in
         new)
             _describe 'template type' template_types
@@ -182,10 +234,29 @@ _talon() {
         ctf)
             _describe 'ctf command' ctf_cmds
             ;;
+        swarm)
+            _describe 'swarm command' swarm_cmds
+            ;;
+        cache)
+            _describe 'cache command' cache_cmds
+            ;;
+        build)
+            _arguments \
+                '--evasion-level[Evasion level]:level:(low medium high)' \
+                '--static[Static build]' \
+                '--run[Run after build]' \
+                '*:script:_files -g "*.tal"'
+            ;;
+        agent)
+            _arguments '--connect[Primary endpoint]:endpoint:'
+            ;;
+        audit|explain|suggest|fix|document)
+            _arguments '--ai[Enable AI features]' '*:file:_files'
+            ;;
         completion)
             compadd bash zsh fish powershell
             ;;
-        run|build|wasm|analyze)
+        run|wasm|analyze|oracle|patch|debug)
             _files -g '*.tal'
             ;;
         *)
@@ -207,10 +278,21 @@ complete -c talon -n "__fish_use_subcommand" -a "new" -d "Generate exploit templ
 complete -c talon -n "__fish_use_subcommand" -a "build" -d "Compile to native binary"
 complete -c talon -n "__fish_use_subcommand" -a "wasm" -d "Compile to WebAssembly"
 complete -c talon -n "__fish_use_subcommand" -a "analyze" -d "Analyze binary"
+complete -c talon -n "__fish_use_subcommand" -a "oracle" -d "Vulnerability detection"
+complete -c talon -n "__fish_use_subcommand" -a "patch" -d "Interactive binary patching"
+complete -c talon -n "__fish_use_subcommand" -a "debug" -d "Time-travel debugging"
 complete -c talon -n "__fish_use_subcommand" -a "db" -d "Query exploit database"
 complete -c talon -n "__fish_use_subcommand" -a "config" -d "Manage configuration"
 complete -c talon -n "__fish_use_subcommand" -a "man" -d "Display manual"
 complete -c talon -n "__fish_use_subcommand" -a "completion" -d "Generate completions"
+complete -c talon -n "__fish_use_subcommand" -a "audit" -d "AI vulnerability analysis"
+complete -c talon -n "__fish_use_subcommand" -a "explain" -d "AI error explanation"
+complete -c talon -n "__fish_use_subcommand" -a "suggest" -d "AI code review"
+complete -c talon -n "__fish_use_subcommand" -a "fix" -d "AI automatic fixing"
+complete -c talon -n "__fish_use_subcommand" -a "document" -d "AI documentation"
+complete -c talon -n "__fish_use_subcommand" -a "swarm" -d "Distributed swarm operations"
+complete -c talon -n "__fish_use_subcommand" -a "agent" -d "Agent mode"
+complete -c talon -n "__fish_use_subcommand" -a "cache" -d "Build cache management"
 complete -c talon -n "__fish_use_subcommand" -a "ctf" -d "CTF session management"
 complete -c talon -n "__fish_use_subcommand" -a "diff_fuzz" -d "Differential fuzzing"
 complete -c talon -n "__fish_use_subcommand" -a "taint_analysis" -d "Taint analysis"
@@ -262,11 +344,32 @@ complete -c talon -n "__fish_seen_subcommand_from ctf" -a "load_session" -d "Loa
 complete -c talon -n "__fish_seen_subcommand_from ctf" -a "show_stats" -d "Show session statistics"
 complete -c talon -n "__fish_seen_subcommand_from ctf" -a "list_challenges" -d "List all challenges"
 
+# Swarm subcommands
+complete -c talon -n "__fish_seen_subcommand_from swarm" -a "deploy" -d "Deploy agents from inventory"
+complete -c talon -n "__fish_seen_subcommand_from swarm" -a "run" -d "Execute script on swarm"
+complete -c talon -n "__fish_seen_subcommand_from swarm" -a "status" -d "Show agent status"
+complete -c talon -n "__fish_seen_subcommand_from swarm" -a "results" -d "Show execution results"
+
+# Cache subcommands
+complete -c talon -n "__fish_seen_subcommand_from cache" -a "stats" -d "Display cache statistics"
+complete -c talon -n "__fish_seen_subcommand_from cache" -a "clean" -d "Clean old cache entries"
+
+# Build flags
+complete -c talon -n "__fish_seen_subcommand_from build" -l evasion-level -d "Evasion level" -a "low medium high"
+complete -c talon -n "__fish_seen_subcommand_from build" -l static -d "Static build"
+complete -c talon -n "__fish_seen_subcommand_from build" -l run -d "Run after build"
+
+# Agent flags
+complete -c talon -n "__fish_seen_subcommand_from agent" -l connect -d "Primary endpoint"
+
+# AI flags
+complete -c talon -n "__fish_seen_subcommand_from audit explain suggest fix document" -l ai -d "Enable AI features"
+
 # Completion shells
 complete -c talon -n "__fish_seen_subcommand_from completion" -a "bash zsh fish powershell"
 
 # File completions for script commands
-complete -c talon -n "__fish_seen_subcommand_from run build wasm analyze" -a "(__fish_complete_suffix .tal)"
+complete -c talon -n "__fish_seen_subcommand_from run build wasm analyze oracle patch debug" -a "(__fish_complete_suffix .tal)"
 
 # Options
 complete -c talon -s h -l help -d "Show help"
@@ -287,6 +390,23 @@ Register-ArgumentCompleter -Native -CommandName talon -ScriptBlock {
         'repl' = 'Start interactive REPL'
         'new' = 'Generate exploit template'
         'build' = 'Compile to native binary'
+        'wasm' = 'Compile to WebAssembly'
+        'analyze' = 'Analyze binary for vulnerabilities'
+        'oracle' = 'Vulnerability detection and analysis'
+        'patch' = 'Interactive binary patching'
+        'debug' = 'Time-travel debugging mode'
+        'db' = 'Query exploit database'
+        'config' = 'Manage configuration'
+        'man' = 'Display manual pages'
+        'completion' = 'Generate shell completions'
+        'audit' = 'AI-powered vulnerability analysis'
+        'explain' = 'AI-powered error explanation'
+        'suggest' = 'AI code review and suggestions'
+        'fix' = 'AI-powered automatic script fixing'
+        'document' = 'AI-powered documentation generation'
+        'swarm' = 'Distributed swarm operations'
+        'agent' = 'Agent mode for swarm'
+        'cache' = 'Build cache management'
         'ctf' = 'CTF session management'
         'diff_fuzz' = 'Differential fuzzing'
         'taint_analysis' = 'Taint analysis for info leak detection'
@@ -295,12 +415,8 @@ Register-ArgumentCompleter -Native -CommandName talon -ScriptBlock {
         'kernel_exploit' = 'Automated kernel exploitation with CVE detection'
         'scan_cve' = 'CVE scanner with exploit-db.com integration'
         'find_similar_to' = 'Binary similarity analysis with function embedding'
-        'wasm' = 'Compile to WebAssembly'
-        'analyze' = 'Analyze binary for vulnerabilities'
-        'db' = 'Query exploit database'
-        'config' = 'Manage configuration'
-        'man' = 'Display manual pages'
-        'completion' = 'Generate shell completions'
+        'chain' = 'Multi-stage exploit chaining'
+        'safety' = 'Runtime safety and resource management'
         'help' = 'Show help information'
         'version' = 'Display version'
     }
@@ -342,12 +458,42 @@ Register-ArgumentCompleter -Native -CommandName talon -ScriptBlock {
             [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
         }
     }
+    elseif ($parts[1] -eq 'swarm') {
+        @('deploy', 'run', 'status', 'results') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    }
+    elseif ($parts[1] -eq 'cache') {
+        @('stats', 'clean') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    }
+    elseif ($parts[1] -eq 'build' -and $parts.Length -eq 3) {
+        @('--evasion-level', '--static', '--run') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    }
+    elseif ($parts[1] -eq 'build' -and $parts[2] -eq '--evasion-level') {
+        @('low', 'medium', 'high') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    }
+    elseif ($parts[1] -eq 'agent') {
+        @('--connect') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    }
+    elseif ($parts[1] -match '^(audit|explain|suggest|fix|document)$') {
+        @('--ai') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
+            [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
+        }
+    }
     elseif ($parts[1] -eq 'completion') {
         @('bash', 'zsh', 'fish', 'powershell') | Where-Object { $_ -like "$wordToComplete*" } | ForEach-Object {
             [System.Management.Automation.CompletionResult]::new($_, $_, 'ParameterValue', $_)
         }
     }
-    elseif ($parts[1] -match '^(run|build|wasm|analyze)$') {
+    elseif ($parts[1] -match '^(run|build|wasm|analyze|oracle|patch|debug)$') {
         Get-ChildItem -Filter "*.tal" | Where-Object { $_.Name -like "$wordToComplete*" } | ForEach-Object {
             [System.Management.Automation.CompletionResult]::new($_.Name, $_.Name, 'ParameterValue', $_.Name)
         }

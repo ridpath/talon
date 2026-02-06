@@ -972,8 +972,14 @@ COMMANDS:
 
   {}
     build <file>          Compile script to native binary
+                          Flags: --evasion-level <low|medium|high> (polymorphic wrapping)
+                                 --static (static linking)
+                                 --run (execute after build)
     wasm <file>           Compile script to WebAssembly
     analyze <binary>      Detect protections and vulnerabilities
+    oracle <binary>       Vulnerability detection and analysis
+    patch <binary>        Interactive binary patching mode
+    debug <script>        Time-travel debugging with checkpoints
     diff <file1> <file2>  Compare binaries and find exploits
 
   {}
@@ -991,6 +997,18 @@ COMMANDS:
     document --ai <script> AI-powered documentation generation
 
   {}
+    swarm deploy <inv>    Deploy agents from inventory file
+    swarm run <script>    Execute script on swarm agents
+                          Flags: --agents-from <inventory>
+    swarm status          Show agent status
+    swarm results <id>    Show execution results
+    agent --connect <url> Start agent and connect to swarm controller
+
+  {}
+    cache stats           Display build cache statistics
+    cache clean [days]    Clean cache entries older than N days (default: 30)
+
+  {}
     config init           Create default configuration
     config show           Display current configuration
     config edit           Open config file in editor
@@ -1006,17 +1024,38 @@ EXAMPLES:
   Generate ROP template:
     $ talon new rop my_exploit
 
+  Build with evasion:
+    $ talon build exploit.tal --evasion-level high
+
   Analyze binary protections:
     $ talon analyze ./vulnerable_app
 
+  Detect vulnerabilities:
+    $ talon oracle ./target_binary
+
+  Interactive patching:
+    $ talon patch ./binary
+
+  Time-travel debugging:
+    $ talon debug exploit.tal
+
   Search for CVE:
     $ talon db search CVE-2021-44228
+
+  AI-powered audit:
+    $ talon audit --ai ./vulnerable_app
 
   Start interactive session:
     $ talon repl
 
   Diff binaries for exploits:
     $ talon diff original.bin patched.bin
+
+  Deploy swarm agents:
+    $ talon swarm deploy inventory.ini
+
+  Start agent mode:
+    $ talon agent --connect http://primary:8080
 
   Generate shell completion:
     $ talon completion bash > /etc/bash_completion.d/talon
