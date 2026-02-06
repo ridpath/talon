@@ -3,8 +3,8 @@
 
 use super::proto::*;
 use chacha20poly1305::{
-    aead::{Aead, KeyInit, OsRng},
-    ChaCha20Poly1305, Nonce,
+    aead::{KeyInit, OsRng},
+    ChaCha20Poly1305,
 };
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -104,7 +104,7 @@ impl Default for AgentState {
 /// TALON Distributed Agent
 pub struct TalonAgent {
     config: AgentConfig,
-    client: talon_swarm_client::TalonSwarmClient<Channel>,
+    client: talon_swarm_client::TalonSwarmClient,
     state: Arc<Mutex<AgentState>>,
     cipher: ChaCha20Poly1305,
 }

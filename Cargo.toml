@@ -57,6 +57,7 @@ ssh2 = "0.9"
 # JSON / Logging
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_bytes = "0.11"
 log = "0.4"
 env_logger = "0.10"
 colored = "2.1"
@@ -114,6 +115,8 @@ uuid = { version = "1.6", features = ["v4", "serde"] }
 thiserror = "1.0"
 hostname = "0.3"
 tokio-stream = { version = "0.1", features = ["sync"] }
+redis = { version = "0.24", optional = true }
+tokio-postgres = { version = "0.7", optional = true }
 
 [build-dependencies]
 tonic-build = { version = "0.11", optional = true }
@@ -130,6 +133,8 @@ game-hacking-windows = ["windows", "game-hacking"]
 game-hacking-linux = ["procfs", "game-hacking"]
 game-hacking-macos = ["mach2", "game-hacking"]
 swarm = ["tonic", "prost", "tonic-build"]
+redis = ["dep:redis"]
+postgres = ["tokio-postgres"]
 
 [[bin]]
 name = "talon"

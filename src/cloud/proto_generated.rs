@@ -89,6 +89,7 @@ pub enum EventType {
 }
 
 #[derive(Clone, PartialEq, Message)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct ExploitResult {
     #[prost(string, tag = "1")]
     pub script_id: String,
@@ -99,6 +100,7 @@ pub struct ExploitResult {
     #[prost(string, tag = "4")]
     pub error_message: String,
     #[prost(bytes, tag = "5")]
+    #[serde(with = "serde_bytes")]
     pub loot: Vec<u8>,
     #[prost(map = "string, string", tag = "6")]
     pub metadata: std::collections::HashMap<String, String>,
@@ -183,7 +185,6 @@ pub struct UpdateChunk {
 
 // gRPC client and server stubs
 pub mod talon_swarm_client {
-    use super::*;
     use tonic::transport::Channel;
     
     #[derive(Clone)]
@@ -202,6 +203,7 @@ pub mod talon_swarm_client {
             &mut self,
             request: super::AgentInfo,
         ) -> Result<tonic::Response<super::AgentToken>, tonic::Status> {
+            let request = tonic::Request::new(request);
             self.inner
                 .unary(request, "/talon.swarm.TalonSwarm/RegisterAgent".parse().expect("invalid path"), tonic::codec::ProstCodec::default())
                 .await
@@ -211,6 +213,7 @@ pub mod talon_swarm_client {
             &mut self,
             request: super::ScriptPayload,
         ) -> Result<tonic::Response<tonic::codec::Streaming<super::ExecutionEvent>>, tonic::Status> {
+            let request = tonic::Request::new(request);
             self.inner
                 .server_streaming(request, "/talon.swarm.TalonSwarm/ExecuteScript".parse().expect("invalid path"), tonic::codec::ProstCodec::default())
                 .await
@@ -220,6 +223,7 @@ pub mod talon_swarm_client {
             &mut self,
             request: super::ExploitResult,
         ) -> Result<tonic::Response<super::Acknowledgment>, tonic::Status> {
+            let request = tonic::Request::new(request);
             self.inner
                 .unary(request, "/talon.swarm.TalonSwarm/ReportResult".parse().expect("invalid path"), tonic::codec::ProstCodec::default())
                 .await
@@ -229,6 +233,7 @@ pub mod talon_swarm_client {
             &mut self,
             request: impl tonic::IntoStreamingRequest<Message = super::RegistryUpdate>,
         ) -> Result<tonic::Response<tonic::codec::Streaming<super::RegistryUpdate>>, tonic::Status> {
+            let request = request.into_streaming_request();
             self.inner
                 .streaming(request, "/talon.swarm.TalonSwarm/SyncRegistry".parse().expect("invalid path"), tonic::codec::ProstCodec::default())
                 .await
@@ -238,6 +243,7 @@ pub mod talon_swarm_client {
             &mut self,
             request: super::AgentStatus,
         ) -> Result<tonic::Response<super::Acknowledgment>, tonic::Status> {
+            let request = tonic::Request::new(request);
             self.inner
                 .unary(request, "/talon.swarm.TalonSwarm/Heartbeat".parse().expect("invalid path"), tonic::codec::ProstCodec::default())
                 .await
@@ -247,6 +253,7 @@ pub mod talon_swarm_client {
             &mut self,
             request: super::TerminateRequest,
         ) -> Result<tonic::Response<super::Acknowledgment>, tonic::Status> {
+            let request = tonic::Request::new(request);
             self.inner
                 .unary(request, "/talon.swarm.TalonSwarm/Terminate".parse().expect("invalid path"), tonic::codec::ProstCodec::default())
                 .await
@@ -256,6 +263,7 @@ pub mod talon_swarm_client {
             &mut self,
             request: super::UpdateRequest,
         ) -> Result<tonic::Response<tonic::codec::Streaming<super::UpdateChunk>>, tonic::Status> {
+            let request = tonic::Request::new(request);
             self.inner
                 .server_streaming(request, "/talon.swarm.TalonSwarm/RequestUpdate".parse().expect("invalid path"), tonic::codec::ProstCodec::default())
                 .await

@@ -2,10 +2,19 @@
 // Provides gRPC-based distributed exploitation capabilities with mTLS authentication
 
 #[cfg(feature = "swarm")]
+pub mod proto_generated;
+
+#[cfg(feature = "swarm")]
 pub mod proto;
 
 #[cfg(feature = "swarm")]
 pub mod agent;
+
+#[cfg(feature = "swarm")]
+pub mod swarm;
+
+#[cfg(feature = "swarm")]
+pub mod registry_sync;
 
 #[cfg(not(feature = "swarm"))]
 pub mod stub {
@@ -18,6 +27,12 @@ pub mod stub {
 
 #[cfg(feature = "swarm")]
 pub use agent::{TalonAgent, AgentConfig, AgentError};
+
+#[cfg(feature = "swarm")]
+pub use swarm::{SwarmController, SwarmConfig, SwarmError, ExecutionRequest, TargetAgents, AggregatedResults};
+
+#[cfg(feature = "swarm")]
+pub use registry_sync::{RegistrySync, GadgetInfo, LibcOffsetInfo, ShellcodeInfo, TargetInfo, RegistryStats};
 
 #[cfg(feature = "swarm")]
 pub use proto::talon_swarm_client::TalonSwarmClient;

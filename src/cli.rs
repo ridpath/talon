@@ -811,6 +811,150 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
             }
         }
 
+        #[cfg(feature = "swarm")]
+        [_, "swarm", "deploy", inventory_path] => {
+            use crate::cloud::{SwarmController, SwarmConfig};
+            use std::path::PathBuf;
+            
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async {
+                let config = SwarmConfig::default();
+                let controller = SwarmController::new(config).await
+                    .expect("Failed to create swarm controller");
+                
+                let inventory_path = PathBuf::from(inventory_path);
+                match controller.load_inventory(&inventory_path).await {
+                    Ok(count) => {
+                        println!("{} Deployed to {} agents from {}", 
+                            "[SWARM]".blue(), count, inventory_path.display());
+                    }
+                    Err(e) => eprintln!("{} Failed to load inventory: {}", "[ERROR]".red(), e),
+                }
+            });
+        }
+
+        #[cfg(feature = "swarm")]
+        [_, "swarm", "run", script_path, "--agents-from", inventory_path] => {
+            use crate::cloud::{SwarmController, SwarmConfig, ExecutionRequest, TargetAgents};
+            use std::path::PathBuf;
+            
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async {
+                let config = SwarmConfig::default();
+                let controller = SwarmController::new(config).await
+                    .expect("Failed to create swarm controller");
+                
+                controller.load_inventory(&PathBuf::from(inventory_path)).await
+                    .expect("Failed to load inventory");
+                
+                let request = ExecutionRequest {
+                    script_path: PathBuf::from(script_path),
+                    target_agents: TargetAgents::All,
+                    dry_run: false,
+                    timeout_seconds: 300,
+                    max_retries: 3,
+                };
+                
+                match controller.execute_script(request).await {
+                    Ok(results) => {
+                        println!("\n{}", "Swarm Execution Results:".bold().cyan());
+                        println!("  Total agents: {}", results.total_agents);
+                        println!("  Successful: {}", results.successful);
+                        println!("  Failed: {}", results.failed);
+                        println!("  Execution time: {}ms", results.execution_time_ms);
+                        
+                        if results.failed > 0 {
+                            println!("\n{}", "Failed Agents:".bold().red());
+                            for result in results.results.iter().filter(|r| !r.success) {
+                                println!("  - {}: {}", result.target_host, result.error_message);
+                            }
+                        }
+                    }
+                    Err(e) => eprintln!("{} Script execution failed: {}", "[ERROR]".red(), e),
+                }
+            });
+        }
+
+        #[cfg(feature = "swarm")]
+        [_, "swarm", "status"] => {
+            use crate::cloud::{SwarmController, SwarmConfig};
+            
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async {
+                let config = SwarmConfig::default();
+                let controller = SwarmController::new(config).await
+                    .expect("Failed to create swarm controller");
+                
+                let agents = controller.list_agents().await;
+                
+                println!("\n{}", "Swarm Agent Status:".bold().cyan());
+                println!("{}", "─".repeat(80));
+                
+                if agents.is_empty() {
+                    println!("No agents registered. Use 'talon swarm deploy' to load agents.");
+                } else {
+                    for agent in agents.iter() {
+                        let status = if agent.active { "ACTIVE".green() } else { "INACTIVE".red() };
+                        println!(
+                            "  {} {} ({}/{})",
+                            status,
+                            agent.hostname,
+                            agent.os,
+                            agent.arch
+                        );
+                        println!("    ID: {}", agent.agent_id);
+                        println!("    Capabilities: {}", agent.capabilities.join(", "));
+                        if !agent.tags.is_empty() {
+                            println!("    Tags: {}", agent.tags.join(", "));
+                        }
+                        println!();
+                    }
+                }
+            });
+        }
+
+        #[cfg(feature = "swarm")]
+        [_, "swarm", "results", script_id] => {
+            use crate::cloud::{SwarmController, SwarmConfig};
+            
+            let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+            rt.block_on(async {
+                let config = SwarmConfig::default();
+                let controller = SwarmController::new(config).await
+                    .expect("Failed to create swarm controller");
+                
+                match controller.get_results(script_id).await {
+                    Some(results) => {
+                        println!("\n{}", "Execution Results:".bold().cyan());
+                        println!("{}", "─".repeat(80));
+                        
+                        for result in results.iter() {
+                            let status = if result.success { "SUCCESS".green() } else { "FAILED".red() };
+                            println!("  {} {}", status, result.target_host);
+                            println!("    Duration: {}ms", result.duration_ms);
+                            
+                            if !result.success && !result.error_message.is_empty() {
+                                println!("    Error: {}", result.error_message);
+                            }
+                            
+                            if !result.loot.is_empty() {
+                                println!("    Loot: {} bytes", result.loot.len());
+                            }
+                            println!();
+                        }
+                    }
+                    None => {
+                        eprintln!("{} No results found for script ID: {}", "[ERROR]".red(), script_id);
+                    }
+                }
+            });
+        }
+
+        #[cfg(not(feature = "swarm"))]
+        [_, "swarm", ..] => {
+            eprintln!("{}", "[ERROR] Swarm mode not enabled. Rebuild with --features swarm".red());
+        }
+
         _ => {
             println!(
                 r#"
