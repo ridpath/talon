@@ -345,7 +345,6 @@ cargo bench --bench my_bench
 
 - Criterion.rs: https://bheisler.github.io/criterion.rs/book/
 - Rust Performance Book: https://nnethercote.github.io/perf-book/
-- TALON Benchmarking Summary: `.zenflow/tasks/new-task-7d4f/performance_benchmarking_summary.md`
 
 ### Tools
 

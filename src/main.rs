@@ -9,6 +9,7 @@ mod interpreter;
 #[cfg(feature = "llvm")]
 mod llvm_codegen;
 mod package_manager;
+mod panic_handler;
 mod parser;
 mod parser_utils;
 mod re_tools;
@@ -193,6 +194,10 @@ use std::env;
 use std::fs;
 
 fn main() {
+    // Install sanitized panic handler (OpSec - removes file paths from panic messages)
+    #[cfg(not(debug_assertions))]
+    panic_handler::install_sanitized_panic_handler();
+    
     error_context::init_error_system();
     
     env_logger::Builder::from_default_env()

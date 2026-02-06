@@ -7,6 +7,7 @@ pub mod error_context;
 pub mod interpreter;
 #[cfg(feature = "llvm")]
 pub mod llvm_codegen;
+pub mod panic_handler;
 pub mod parser;
 pub mod parser_utils;
 pub mod wasm_codegen;
