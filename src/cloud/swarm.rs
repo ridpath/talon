@@ -55,6 +55,7 @@ pub struct AgentEntry {
     pub arch: String,
     pub capabilities: Vec<String>,
     pub tags: Vec<String>,
+    #[serde(skip)]
     pub last_heartbeat: Option<Instant>,
     pub active: bool,
 }
@@ -538,7 +539,7 @@ impl SwarmController {
             .client_ca_root(ca_certificate);
         
         let addr = self.config.listen_addr.parse()
-            .map_err(|e| SwarmError::Transport(tonic::transport::Error::from_source(e)))?;
+            .map_err(|e: std::net::AddrParseError| SwarmError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, e)))?;
         
         let server = SwarmServer {
             controller: Arc::clone(&self),
@@ -638,7 +639,7 @@ impl SwarmController {
     ) -> Result<Vec<u8>, SwarmError> {
         // Connect to agent
         let channel = Channel::from_shared(endpoint.to_string())
-            .map_err(|e| SwarmError::Transport(e.into()))?
+            .map_err(|e| SwarmError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, e)))?
             .connect()
             .await?;
         
@@ -666,12 +667,11 @@ impl SwarmController {
         let timeout_duration = Duration::from_secs(timeout_seconds as u64);
         
         // Stream events with timeout
-        while let Ok(Some(event)) = tokio::time::timeout(
-            timeout_duration.saturating_sub(start_time.elapsed()),
-            stream.message(),
-        ).await {
-            match event {
-                Ok(evt) => {
+        loop {
+            let remaining = timeout_duration.saturating_sub(start_time.elapsed());
+            
+            match tokio::time::timeout(remaining, stream.message()).await {
+                Ok(Ok(Some(evt))) => {
                     log::debug!(
                         "Agent event: type={}, progress={}%, msg={}",
                         evt.event_type,
@@ -691,8 +691,16 @@ impl SwarmController {
                         return Err(SwarmError::Execution(evt.message));
                     }
                 }
-                Err(e) => {
+                Ok(Ok(None)) => {
+                    // Stream ended without completion
+                    break;
+                }
+                Ok(Err(e)) => {
                     return Err(SwarmError::Grpc(e));
+                }
+                Err(_) => {
+                    // Timeout
+                    break;
                 }
             }
         }

@@ -135,7 +135,7 @@ impl TalonAgent {
         
         // Create gRPC channel with mTLS
         let channel = Channel::from_shared(config.primary_endpoint.clone())
-            .map_err(|e| AgentError::Transport(e.into()))?
+            .map_err(|e| AgentError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, e)))?
             .tls_config(tls_config)?
             .connect()
             .await?;
@@ -229,11 +229,11 @@ impl TalonAgent {
         }
         
         let script_id = payload.script_id.clone();
-        let script_content = payload.script_content;
-        let options = payload.options.unwrap_or_default();
+        let script_content = payload.script_content.clone();
+        let options = payload.options.clone().unwrap_or_default();
         
         // Create execution stream
-        let mut stream = self.client.execute_script(payload).await?.into_inner();
+        let stream = self.client.execute_script(payload).await?.into_inner();
         
         let mut events = Vec::new();
         
