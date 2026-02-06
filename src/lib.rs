@@ -66,6 +66,7 @@ pub mod web_tools;
 pub mod ctf_helpers;
 pub mod ctf_quick_helpers;
 pub mod helpers;
+pub mod ai_integration;
 pub mod mitigation_detector;
 pub mod ml_oracle;
 pub mod oracle;

@@ -4327,6 +4327,38 @@ fn eval_expr<'a>(
                         
                         Ok(Value::Map(validation_map))
                     }
+                    "ai" => {
+                        use crate::ai_integration::AiIntegration;
+                        use colored::Colorize;
+                        
+                        if arg_values.is_empty() {
+                            return Err("ai() requires a query argument".to_string());
+                        }
+                        
+                        let query = arg_values[0].to_string();
+                        
+                        println!("{} Processing query...", "[AI]".cyan());
+                        
+                        let ai = AiIntegration::new(true);
+                        match ai.initialize().await {
+                            Ok(_) => {
+                                match ai.general_help(&query).await {
+                                    Ok(response) => {
+                                        println!("\n{}", response);
+                                        Ok(Value::String(response))
+                                    }
+                                    Err(e) => {
+                                        println!("{} {}", "[AI]".yellow(), format!("Query failed: {}", e).yellow());
+                                        Ok(Value::String(format!("AI query failed: {}", e)))
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!("{} {}", "[AI]".bright_black(), format!("AI not available: {}", e).bright_black());
+                                Ok(Value::String(format!("AI not available: {}", e)))
+                            }
+                        }
+                    }
                     "split" => {
                         if arg_values.len() < 2 {
                             return Err(
