@@ -324,6 +324,7 @@ pub mod talon_swarm_server {
         ) -> Result<tonic::Response<Self::RequestUpdateStream>, tonic::Status>;
     }
     
+    #[derive(Clone)]
     pub struct TalonSwarmServer<T: TalonSwarm> {
         inner: std::sync::Arc<T>,
     }
@@ -335,4 +336,17 @@ pub mod talon_swarm_server {
             }
         }
     }
+    
+    impl<T: TalonSwarm> tonic::server::NamedService for TalonSwarmServer<T> {
+        const NAME: &'static str = "talon.swarm.TalonSwarm";
+    }
+    
+    // Note: Full gRPC Service implementation requires tonic-build code generation
+    // This is a simplified stub that allows compilation without protoc
+    // For production use with live agents:
+    // 1. Install protoc from https://github.com/protocolbuffers/protobuf/releases
+    // 2. Run: cargo build --features swarm
+    // 3. tonic-build will generate the proper Service trait implementation
+    // 
+    // Current status: Core business logic complete, gRPC runtime requires protoc
 }
