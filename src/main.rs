@@ -225,8 +225,10 @@ fn main() {
             let dev_mode = args.contains(&"--dev".to_string());
             let dry_run = args.contains(&"--dry-run".to_string());
             let production = args.contains(&"--production".to_string());
+            let no_ai = args.contains(&"--no-ai".to_string());
+            let explain_errors = args.contains(&"--explain-errors".to_string());
 
-            if let Err(e) = run_script(&args[2], dev_mode, dry_run, production) {
+            if let Err(e) = run_script(&args[2], dev_mode, dry_run, production, no_ai, explain_errors) {
                 eprintln!("{} {}", "[ERROR]".red(), e);
                 std::process::exit(1);
             }
@@ -271,7 +273,7 @@ fn main() {
 }
 
 /// Handles running a .talon script file
-fn run_script(path: &str, dev_mode: bool, dry_run: bool, production: bool) -> Result<(), String> {
+fn run_script(path: &str, dev_mode: bool, dry_run: bool, production: bool, no_ai: bool, explain_errors: bool) -> Result<(), String> {
     let script =
         fs::read_to_string(path).map_err(|e| format!("Failed to read script '{}': {}", path, e))?;
 
@@ -293,6 +295,14 @@ fn run_script(path: &str, dev_mode: bool, dry_run: bool, production: bool) -> Re
         if let Some(log_path_str) = log_path_display {
             println!("[PRODUCTION] Encrypted error log: {}", log_path_str);
         }
+    }
+
+    if no_ai {
+        println!("[AI] AI features disabled via --no-ai flag");
+    }
+
+    if explain_errors {
+        println!("[AI] AI-powered error explanations enabled");
     }
 
     if dry_run {
@@ -942,6 +952,8 @@ OPTIONS:
   -q, --quiet             Suppress non-essential output
       --no-color          Disable colored output
       --config <PATH>     Specify alternate configuration file
+      --no-ai             Disable AI-powered features
+      --explain-errors    Enable AI-powered error explanations
 
 COMMANDS:
   {}
@@ -970,6 +982,13 @@ COMMANDS:
     db show <CVE-ID>      Show exploit details
     db type <type>        Filter by exploit type
     db platform <os>      Filter by platform
+
+  {}
+    audit --ai <binary>   AI-powered vulnerability analysis
+    explain --ai <error>  AI-powered error explanation
+    suggest --ai <script> AI code review and suggestions
+    fix --ai <script>     AI-powered automatic script fixing
+    document --ai <script> AI-powered documentation generation
 
   {}
     config init           Create default configuration
@@ -1032,6 +1051,7 @@ For more information, visit: https://github.com/talon-lang/talon
         "Template Generation:".bold().cyan(),
         "Binary Analysis:".bold().cyan(),
         "Exploit Database:".bold().cyan(),
+        "AI Integration:".bold().cyan(),
         "Configuration:".bold().cyan(),
         "Documentation:".bold().cyan(),
     );

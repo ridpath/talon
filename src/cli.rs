@@ -708,15 +708,15 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
         }
 
         [_, "suggest", "--ai", script_file] => {
-            println!("{}", "[AI] Initializing ML Oracle...".cyan());
+            println!("{}", "[AI] Initializing AI integration...".cyan());
             if let Ok(script) = fs::read_to_string(script_file) {
                 let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
                 rt.block_on(async {
-                    let mut ml_oracle = crate::ml_oracle::MlOracle::new();
-                    match ml_oracle.initialize().await {
+                    let ai = crate::ai_integration::AiIntegration::new(true);
+                    match ai.initialize().await {
                         Ok(_) => {
-                            println!("{}", "[AI] ML Oracle available".green());
-                            match ml_oracle.suggest_code_improvements(&script).await {
+                            println!("{}", "[AI] AI available".green());
+                            match ai.review_exploit(&script).await {
                                 Ok(suggestions) => {
                                     println!("\n{}", "=".repeat(70));
                                     println!("{}", "Code Review Suggestions".bold().cyan());
@@ -724,6 +724,64 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
                                     println!("\n{}", suggestions);
                                 }
                                 Err(e) => eprintln!("{} Review failed: {}", "[ERROR]".red(), e),
+                            }
+                        }
+                        Err(e) => eprintln!("{} AI features unavailable: {}", "[ERROR]".red(), e),
+                    }
+                });
+            } else {
+                eprintln!("{} Failed to read file: {}", "[ERROR]".red(), script_file);
+            }
+        }
+
+        [_, "fix", "--ai", script_file] => {
+            println!("{}", "[AI] Initializing AI integration for script fixing...".cyan());
+            if let Ok(script) = fs::read_to_string(script_file) {
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(async {
+                    let ai = crate::ai_integration::AiIntegration::new(true);
+                    match ai.initialize().await {
+                        Ok(_) => {
+                            println!("{}", "[AI] AI available".green());
+                            match ai.fix_script(&script, "User requested auto-fix").await {
+                                Ok(fixed_code) => {
+                                    println!("\n{}", "=".repeat(70));
+                                    println!("{}", "Fixed Script".bold().green());
+                                    println!("{}", "=".repeat(70));
+                                    println!("\n{}", fixed_code);
+                                    println!("\n{}", "=".repeat(70));
+                                    println!("{}", "Save the above code to your .talon file".yellow());
+                                }
+                                Err(e) => eprintln!("{} Fix failed: {}", "[ERROR]".red(), e),
+                            }
+                        }
+                        Err(e) => eprintln!("{} AI features unavailable: {}", "[ERROR]".red(), e),
+                    }
+                });
+            } else {
+                eprintln!("{} Failed to read file: {}", "[ERROR]".red(), script_file);
+            }
+        }
+
+        [_, "document", "--ai", script_file] => {
+            println!("{}", "[AI] Initializing AI integration for documentation generation...".cyan());
+            if let Ok(script) = fs::read_to_string(script_file) {
+                let rt = tokio::runtime::Runtime::new().expect("Failed to create runtime");
+                rt.block_on(async {
+                    let ai = crate::ai_integration::AiIntegration::new(true);
+                    match ai.initialize().await {
+                        Ok(_) => {
+                            println!("{}", "[AI] AI available".green());
+                            match ai.generate_documentation(&script).await {
+                                Ok(documented_code) => {
+                                    println!("\n{}", "=".repeat(70));
+                                    println!("{}", "Documented Script".bold().cyan());
+                                    println!("{}", "=".repeat(70));
+                                    println!("\n{}", documented_code);
+                                    println!("\n{}", "=".repeat(70));
+                                    println!("{}", "Save the above code to your .talon file".yellow());
+                                }
+                                Err(e) => eprintln!("{} Documentation generation failed: {}", "[ERROR]".red(), e),
                             }
                         }
                         Err(e) => eprintln!("{} AI features unavailable: {}", "[ERROR]".red(), e),
