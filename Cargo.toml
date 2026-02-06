@@ -155,3 +155,19 @@ path = "src/main.rs"
 name = "talon-agent"
 path = "src/bin/agent.rs"
 required-features = ["swarm"]
+
+# Profile optimizations for static builds
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true
+
+[profile.release-small]
+inherits = "release"
+opt-level = "z"
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+strip = true

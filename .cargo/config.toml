@@ -1,3 +1,38 @@
+# Cross-compilation configuration for TALON static builds
+
+# Linux musl (static linking)
+[target.x86_64-unknown-linux-musl]
+linker = "x86_64-linux-musl-gcc"
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-static"]
+
+[target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-musl-gcc"
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-static"]
+
+# Windows MSVC (static CRT)
+[target.x86_64-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+[target.i686-pc-windows-msvc]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# Windows GNU (MinGW static)
 [target.x86_64-pc-windows-gnu]
-linker = "C:\\msys64\\mingw64\\bin\\gcc.exe"
-ar = "C:\\msys64\\mingw64\\bin\\ar.exe"
+linker = "x86_64-w64-mingw32-gcc"
+rustflags = ["-C", "link-args=-static-libgcc -static"]
+
+# macOS universal binaries
+[target.x86_64-apple-darwin]
+rustflags = []
+
+[target.aarch64-apple-darwin]
+rustflags = []
+
+# Build configuration
+[build]
+incremental = true
+jobs = 4
+
+[term]
+verbose = false
+color = "auto"
