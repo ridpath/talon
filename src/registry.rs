@@ -1,4 +1,7 @@
 use std::collections::HashMap;
+use lazy_static::lazy_static;
+
+include!(concat!(env!("OUT_DIR"), "/registry_phf.rs"));
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum FunctionCategory {
@@ -125,6 +128,21 @@ impl BuiltinFunction {
     }
 }
 
+lazy_static! {
+    static ref BUILTIN_FUNCTIONS: Vec<BuiltinFunction> = {
+        let functions_map = register_builtins();
+        let mut functions_vec = vec![BuiltinFunction::new("", "", "", "", vec![]); BUILTIN_COUNT];
+        
+        for (name, func) in functions_map {
+            if let Some(&idx) = BUILTIN_REGISTRY.get(&name) {
+                functions_vec[idx] = func;
+            }
+        }
+        
+        functions_vec
+    };
+}
+
 pub struct FunctionRegistry {
     functions: HashMap<String, BuiltinFunction>,
     category_index: HashMap<FunctionCategory, Vec<String>>,
@@ -151,7 +169,25 @@ impl FunctionRegistry {
     }
 
     pub fn get(&self, name: &str) -> Option<&BuiltinFunction> {
+        // Use PHF for O(1) lookup if available, fallback to HashMap
+        if let Some(&idx) = BUILTIN_REGISTRY.get(name) {
+            let func = &BUILTIN_FUNCTIONS[idx];
+            if !func.name.is_empty() {
+                return Some(func);
+            }
+        }
         self.functions.get(name)
+    }
+    
+    pub fn get_fast(&self, name: &str) -> Option<&BuiltinFunction> {
+        BUILTIN_REGISTRY.get(name).and_then(|&idx| {
+            let func = &BUILTIN_FUNCTIONS[idx];
+            if !func.name.is_empty() {
+                Some(func)
+            } else {
+                None
+            }
+        })
     }
 
     pub fn get_category(&self, category: FunctionCategory) -> Vec<&BuiltinFunction> {
