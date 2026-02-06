@@ -95,6 +95,8 @@ arboard = "3.4"
 crossterm = "0.27"
 ctrlc = "3.4"
 phf = { version = "0.11", features = ["macros"] }
+crossbeam = "0.8"
+dashmap = "5.5"
 
 # GAME HACKING & EXPLOITATION (Phase 12)
 sysinfo = "0.30"
@@ -123,6 +125,13 @@ tokio-postgres = { version = "0.7", optional = true }
 tonic-build = { version = "0.11", optional = true }
 which = "6.0"
 phf_codegen = "0.11"
+
+[dev-dependencies]
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+[[bench]]
+name = "connection_registry_bench"
+harness = false
 
 [features]
 default = []

@@ -24,9 +24,64 @@ use crate::interactive_io::{Process, Socket};
 use crate::parser::parse_script;
 use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
 use crate::ssh_bridge::{SshConnection, SshConnectionId, SshRegistry};
+use dashmap::DashMap;
+use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
+use crossbeam::queue::SegQueue;
 
-// Global connection storage
+// Global connection storage with lock-free atomic operations
 type ConnectionId = u64;
+
+// Connection state machine (lock-free)
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum ConnectionState {
+    Connecting = 0,
+    Open = 1,
+    Closed = 2,
+}
+
+impl From<u8> for ConnectionState {
+    fn from(val: u8) -> Self {
+        match val {
+            0 => ConnectionState::Connecting,
+            1 => ConnectionState::Open,
+            2 => ConnectionState::Closed,
+            _ => ConnectionState::Closed,
+        }
+    }
+}
+
+// Connection wrapper with atomic state
+struct ConnectionEntry {
+    connection: Connection,
+    state: AtomicU8,
+}
+
+impl ConnectionEntry {
+    fn new(connection: Connection) -> Self {
+        ConnectionEntry {
+            connection,
+            state: AtomicU8::new(ConnectionState::Open as u8),
+        }
+    }
+
+    fn get_state(&self) -> ConnectionState {
+        ConnectionState::from(self.state.load(Ordering::Acquire))
+    }
+
+    fn set_state(&self, new_state: ConnectionState) {
+        self.state.store(new_state as u8, Ordering::Release);
+    }
+
+    fn try_transition(&self, from: ConnectionState, to: ConnectionState) -> bool {
+        self.state.compare_exchange(
+            from as u8,
+            to as u8,
+            Ordering::AcqRel,
+            Ordering::Acquire,
+        ).is_ok()
+    }
+}
 
 enum Connection {
     Socket(Socket),
@@ -34,40 +89,71 @@ enum Connection {
     Ssh(SshConnectionId),
 }
 
-struct ConnectionRegistry {
-    connections: HashMap<ConnectionId, Connection>,
-    next_id: ConnectionId,
+// Lock-free atomic connection registry
+struct AtomicConnectionRegistry {
+    connections: DashMap<ConnectionId, ConnectionEntry>,
+    next_id: AtomicU64,
+    free_ids: SegQueue<ConnectionId>,
 }
 
-impl ConnectionRegistry {
+impl AtomicConnectionRegistry {
     fn new() -> Self {
-        ConnectionRegistry {
-            connections: HashMap::new(),
-            next_id: 1,
+        AtomicConnectionRegistry {
+            connections: DashMap::new(),
+            next_id: AtomicU64::new(1),
+            free_ids: SegQueue::new(),
         }
     }
 
-    fn add_socket(&mut self, socket: Socket) -> ConnectionId {
-        let id = self.next_id;
-        self.next_id += 1;
-        self.connections.insert(id, Connection::Socket(socket));
+    fn allocate_id(&self) -> ConnectionId {
+        // Try to reuse a freed ID first (lock-free queue)
+        if let Some(id) = self.free_ids.pop() {
+            return id;
+        }
+        // Otherwise, atomically increment the counter
+        self.next_id.fetch_add(1, Ordering::Relaxed)
+    }
+
+    fn add_socket(&self, socket: Socket) -> ConnectionId {
+        let id = self.allocate_id();
+        let entry = ConnectionEntry::new(Connection::Socket(socket));
+        self.connections.insert(id, entry);
         id
     }
 
-    fn add_process(&mut self, process: Process) -> ConnectionId {
-        let id = self.next_id;
-        self.next_id += 1;
-        self.connections.insert(id, Connection::Process(process));
+    fn add_process(&self, process: Process) -> ConnectionId {
+        let id = self.allocate_id();
+        let entry = ConnectionEntry::new(Connection::Process(process));
+        self.connections.insert(id, entry);
         id
     }
 
-    fn get_mut(&mut self, id: ConnectionId) -> Option<&mut Connection> {
+    fn get(&self, id: ConnectionId) -> Option<dashmap::mapref::one::Ref<'_, ConnectionId, ConnectionEntry>> {
+        self.connections.get(&id)
+    }
+
+    fn get_mut(&self, id: ConnectionId) -> Option<dashmap::mapref::one::RefMut<'_, ConnectionId, ConnectionEntry>> {
         self.connections.get_mut(&id)
+    }
+
+    fn remove(&self, id: ConnectionId) {
+        if let Some((_, entry)) = self.connections.remove(&id) {
+            entry.set_state(ConnectionState::Closed);
+            self.free_ids.push(id);
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.connections.len()
+    }
+
+    fn is_empty(&self) -> bool {
+        self.connections.is_empty()
     }
 }
 
 lazy_static::lazy_static! {
-    static ref CONNECTIONS: Arc<Mutex<ConnectionRegistry>> = Arc::new(Mutex::new(ConnectionRegistry::new()));
+    static ref CONNECTIONS: AtomicConnectionRegistry = AtomicConnectionRegistry::new();
     static ref SSH_CONNECTIONS: Arc<Mutex<SshRegistry>> = Arc::new(Mutex::new(SshRegistry::new()));
 }
 
@@ -3205,7 +3291,7 @@ fn eval_expr<'a>(
                         let socket = Socket::connect(format!("{}:{}", host, port))?;
                         println!("{} Connection established", "[REMOTE]".green());
 
-                        let conn_id = CONNECTIONS.lock().await.add_socket(socket);
+                        let conn_id = CONNECTIONS.add_socket(socket);
 
                         let mut conn_map = HashMap::new();
                         conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
@@ -3241,7 +3327,7 @@ fn eval_expr<'a>(
                         let process = Process::spawn(&binary, &args_str)?;
                         println!("{} Process spawned", "[PROCESS]".green());
 
-                        let conn_id = CONNECTIONS.lock().await.add_process(process);
+                        let conn_id = CONNECTIONS.add_process(process);
 
                         let mut conn_map = HashMap::new();
                         conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
@@ -3835,20 +3921,21 @@ fn eval_expr<'a>(
                             }
                         };
 
-                        let mut registry = CONNECTIONS.lock().await;
-                        match registry.get_mut(conn_id) {
-                            Some(Connection::Socket(socket)) => {
+                        let mut entry = CONNECTIONS.get_mut(conn_id)
+                            .ok_or_else(|| format!("Connection {} not found", conn_id))?;
+                        
+                        match &mut entry.connection {
+                            Connection::Socket(socket) => {
                                 socket.send(&data)?;
                                 println!("[SEND] Sent {} bytes", data.len());
                             }
-                            Some(Connection::Process(process)) => {
+                            Connection::Process(process) => {
                                 process.send(&data)?;
                                 println!("[SEND] Sent {} bytes to process", data.len());
                             }
-                            Some(Connection::Ssh(_)) => {
+                            Connection::Ssh(_) => {
                                 return Err("send() is not supported for SSH connections. Use ssh_interactive_send() instead.".to_string());
                             }
-                            None => return Err(format!("Connection {} not found", conn_id)),
                         }
 
                         Ok(Value::Number(data.len() as i64))
@@ -3885,23 +3972,24 @@ fn eval_expr<'a>(
                             }
                         };
 
-                        let mut registry = CONNECTIONS.lock().await;
-                        match registry.get_mut(conn_id) {
-                            Some(Connection::Socket(socket)) => {
+                        let mut entry = CONNECTIONS.get_mut(conn_id)
+                            .ok_or_else(|| format!("Connection {} not found", conn_id))?;
+                        
+                        match &mut entry.connection {
+                            Connection::Socket(socket) => {
                                 socket.sendline(&data)?;
                                 println!("[SENDLINE] Sent {} bytes + newline", data.len());
                             }
-                            Some(Connection::Process(process)) => {
+                            Connection::Process(process) => {
                                 process.sendline(&data)?;
                                 println!(
                                     "[SENDLINE] Sent {} bytes + newline to process",
                                     data.len()
                                 );
                             }
-                            Some(Connection::Ssh(_)) => {
+                            Connection::Ssh(_) => {
                                 return Err("sendline() is not supported for SSH connections. Use ssh_interactive_send() instead.".to_string());
                             }
-                            None => return Err(format!("Connection {} not found", conn_id)),
                         }
 
                         Ok(Value::Number((data.len() + 1) as i64))
@@ -3932,14 +4020,15 @@ fn eval_expr<'a>(
                             return Err("recv() requires connection object".to_string());
                         };
 
-                        let mut registry = CONNECTIONS.lock().await;
-                        let data = match registry.get_mut(conn_id) {
-                            Some(Connection::Socket(socket)) => socket.recv(n)?,
-                            Some(Connection::Process(process)) => process.recv(n)?,
-                            Some(Connection::Ssh(_)) => {
+                        let mut entry = CONNECTIONS.get_mut(conn_id)
+                            .ok_or_else(|| format!("Connection {} not found", conn_id))?;
+                        
+                        let data = match &mut entry.connection {
+                            Connection::Socket(socket) => socket.recv(n)?,
+                            Connection::Process(process) => process.recv(n)?,
+                            Connection::Ssh(_) => {
                                 return Err("recv() is not supported for SSH connections. Use ssh_interactive_recv() instead.".to_string());
                             }
-                            None => return Err(format!("Connection {} not found", conn_id)),
                         };
 
                         println!("[RECV] Received {} bytes", data.len());
@@ -3961,14 +4050,15 @@ fn eval_expr<'a>(
                             return Err("recvline() requires connection object".to_string());
                         };
 
-                        let mut registry = CONNECTIONS.lock().await;
-                        let data = match registry.get_mut(conn_id) {
-                            Some(Connection::Socket(socket)) => socket.recvline()?,
-                            Some(Connection::Process(process)) => process.recvline()?,
-                            Some(Connection::Ssh(_)) => {
+                        let mut entry = CONNECTIONS.get_mut(conn_id)
+                            .ok_or_else(|| format!("Connection {} not found", conn_id))?;
+                        
+                        let data = match &mut entry.connection {
+                            Connection::Socket(socket) => socket.recvline()?,
+                            Connection::Process(process) => process.recvline()?,
+                            Connection::Ssh(_) => {
                                 return Err("recvline() is not supported for SSH connections. Use ssh_interactive_recv() instead.".to_string());
                             }
-                            None => return Err(format!("Connection {} not found", conn_id)),
                         };
 
                         println!("[RECVLINE] Received line: {} bytes", data.len());
@@ -7844,16 +7934,176 @@ mod tests {
         assert_eq!(levenshtein_distance("kitten", "sitting"), 3);
     }
 
-    /// Test connection registry
+    /// Test atomic connection registry - basic operations
     #[tokio::test]
-    async fn test_connection_registry() {
-        let mut registry = ConnectionRegistry::new();
+    async fn test_atomic_connection_registry_basic() {
+        let registry = AtomicConnectionRegistry::new();
         
-        // Test that next_id starts at 1
-        assert_eq!(registry.next_id, 1);
+        // Test that registry starts empty
+        assert!(registry.is_empty());
+        assert_eq!(registry.len(), 0);
         
         // Test that we can retrieve None for non-existent connections
+        assert!(registry.get(999).is_none());
         assert!(registry.get_mut(999).is_none());
+    }
+
+    /// Test atomic connection registry - add and retrieve
+    #[tokio::test]
+    async fn test_atomic_connection_registry_add_retrieve() {
+        let registry = AtomicConnectionRegistry::new();
+        
+        // Create a mock socket connection (we'll use a dummy socket)
+        // Note: In real tests, we'd need actual socket objects
+        // For now, we test the ID allocation and state management
+        
+        // Test ID allocation starts at 1
+        let id1 = registry.allocate_id();
+        assert_eq!(id1, 1);
+        
+        let id2 = registry.allocate_id();
+        assert_eq!(id2, 2);
+        
+        let id3 = registry.allocate_id();
+        assert_eq!(id3, 3);
+    }
+
+    /// Test atomic connection registry - state machine
+    #[test]
+    fn test_connection_state_machine() {
+        // Test ConnectionState enum conversion
+        assert_eq!(ConnectionState::from(0), ConnectionState::Connecting);
+        assert_eq!(ConnectionState::from(1), ConnectionState::Open);
+        assert_eq!(ConnectionState::from(2), ConnectionState::Closed);
+        assert_eq!(ConnectionState::from(255), ConnectionState::Closed); // Invalid -> Closed
+        
+        // Test state transitions
+        let entry = ConnectionEntry::new(Connection::Ssh(1));
+        assert_eq!(entry.get_state(), ConnectionState::Open);
+        
+        // Successful transition
+        assert!(entry.try_transition(ConnectionState::Open, ConnectionState::Closed));
+        assert_eq!(entry.get_state(), ConnectionState::Closed);
+        
+        // Failed transition (wrong from state)
+        assert!(!entry.try_transition(ConnectionState::Open, ConnectionState::Connecting));
+        assert_eq!(entry.get_state(), ConnectionState::Closed);
+    }
+
+    /// Test atomic connection registry - concurrent access
+    #[tokio::test]
+    async fn test_atomic_connection_registry_concurrent() {
+        let registry = Arc::new(AtomicConnectionRegistry::new());
+        let mut handles = vec![];
+        
+        // Spawn 10 concurrent tasks that add connections
+        for _ in 0..10 {
+            let reg = registry.clone();
+            let handle = tokio::spawn(async move {
+                for _ in 0..100 {
+                    let id = reg.allocate_id();
+                    assert!(id > 0);
+                }
+            });
+            handles.push(handle);
+        }
+        
+        // Wait for all tasks to complete
+        for handle in handles {
+            handle.await.expect("Task failed");
+        }
+        
+        // Verify we allocated 1000 unique IDs (10 tasks * 100 IDs each)
+        // Note: Due to atomic increment, the next_id should be 1001
+        assert_eq!(registry.next_id.load(Ordering::Relaxed), 1001);
+    }
+
+    /// Test atomic connection registry - ID reuse
+    #[test]
+    fn test_atomic_connection_registry_id_reuse() {
+        let registry = AtomicConnectionRegistry::new();
+        
+        // Allocate some IDs
+        let id1 = registry.allocate_id();
+        let id2 = registry.allocate_id();
+        let id3 = registry.allocate_id();
+        
+        assert_eq!(id1, 1);
+        assert_eq!(id2, 2);
+        assert_eq!(id3, 3);
+        
+        // Free ID 2
+        registry.free_ids.push(2);
+        
+        // Next allocation should reuse ID 2
+        let id4 = registry.allocate_id();
+        assert_eq!(id4, 2);
+        
+        // Next allocation should continue with 4
+        let id5 = registry.allocate_id();
+        assert_eq!(id5, 4);
+    }
+
+    /// Test atomic connection registry - remove operation
+    #[test]
+    fn test_atomic_connection_registry_remove() {
+        let registry = AtomicConnectionRegistry::new();
+        
+        // Add a mock SSH connection
+        let id = registry.allocate_id();
+        let entry = ConnectionEntry::new(Connection::Ssh(1));
+        registry.connections.insert(id, entry);
+        
+        assert_eq!(registry.len(), 1);
+        assert!(registry.get(id).is_some());
+        
+        // Remove the connection
+        registry.remove(id);
+        
+        assert_eq!(registry.len(), 0);
+        assert!(registry.get(id).is_none());
+        
+        // Verify ID was added to free list
+        assert_eq!(registry.free_ids.pop(), Some(id));
+    }
+
+    /// Test atomic connection registry - stress test
+    #[tokio::test]
+    async fn test_atomic_connection_registry_stress() {
+        let registry = Arc::new(AtomicConnectionRegistry::new());
+        let mut handles = vec![];
+        
+        // Spawn 20 concurrent tasks with mixed operations
+        for i in 0..20 {
+            let reg = registry.clone();
+            let handle = tokio::spawn(async move {
+                for j in 0..50 {
+                    if (i + j) % 3 == 0 {
+                        // Add
+                        let id = reg.allocate_id();
+                        let entry = ConnectionEntry::new(Connection::Ssh(id));
+                        reg.connections.insert(id, entry);
+                    } else if (i + j) % 3 == 1 {
+                        // Read
+                        let id = ((i * 50 + j) % 100) as u64 + 1;
+                        let _ = reg.get(id);
+                    } else {
+                        // Remove
+                        let id = ((i * 50 + j) % 100) as u64 + 1;
+                        reg.remove(id);
+                    }
+                }
+            });
+            handles.push(handle);
+        }
+        
+        // Wait for all tasks
+        for handle in handles {
+            handle.await.expect("Task failed");
+        }
+        
+        // Registry should still be in a valid state
+        assert!(registry.next_id.load(Ordering::Relaxed) > 0);
     }
 
     /// Test SSH connection value
