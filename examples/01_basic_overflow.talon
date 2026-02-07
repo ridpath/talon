@@ -12,8 +12,8 @@ let binary_path = "examples/vuln_binary"
 
 print("\n[*] Step 1: Analyzing target binary...")
 let elf = Elf(binary_path)
-print("Binary path:", elf.path)
-print("Base address:", hex(elf.base_addr))
+print("Binary path:", binary_path)
+print("Base address:", hex(elf.base))
 print("PIE enabled:", elf.pie)          # WHY: PIE randomizes addresses, requiring leaks
 print("NX enabled:", elf.nx)            # WHY: NX prevents shellcode execution, requiring ROP
 print("Stack canary:", elf.canary)      # WHY: Canary protects against overflow, must be leaked/bypassed

@@ -2,7 +2,7 @@
 # Demonstrates TALON's checkpoint/rewind debugging capabilities
 
 print("[*] Time-Travel Debugging Examples")
-print("=" * 50)
+print("==================================================")
 
 # ═══════════════════════════════════════════════════════════════
 # Example 1: Basic Checkpoint and Rewind

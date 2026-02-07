@@ -1,16 +1,16 @@
 print("[*] TALON Exploitation Framework Demo")
 print("[*] No binary required - showcasing API capabilities")
-print("=" * 50)
+print("==================================================")
 
 print("\n[1] Type Conversion Functions")
-print("-" * 50)
+print("--------------------------------------------------")
 let addr = 0xdeadbeef
 print("Address value:", hex(addr))
 print("Decimal:", addr)
 print("Parsed from string:", int("0x401000"))
 
 print("\n[2] Binary Packing Operations")
-print("-" * 50)
+print("--------------------------------------------------")
 let packed_64 = p64(0x401234567890)
 print("p64(0x401234567890) length:", len(packed_64), "bytes")
 let unpacked = u64(packed_64)
@@ -20,13 +20,13 @@ let packed_32 = p32(0xdeadbeef)
 print("p32(0xdeadbeef) length:", len(packed_32), "bytes")
 
 print("\n[3] Cyclic Pattern Generation")
-print("-" * 50)
+print("--------------------------------------------------")
 let pattern = cyclic(200)
 print("Generated cyclic pattern:", len(pattern), "bytes")
 print("Used for finding buffer overflow offsets")
 
 print("\n[4] Libc Database Lookup")
-print("-" * 50)
+print("--------------------------------------------------")
 let libc = Libc("ubuntu20.04")
 print("Loaded:", libc.name)
 print("Build ID:", libc.build_id)
@@ -41,7 +41,7 @@ print("")
 print("One-gadgets available:", len(libc.one_gadgets))
 
 print("\n[5] Libc with Base Address")
-print("-" * 50)
+print("--------------------------------------------------")
 let leaked_base = 0x7ffff7a00000
 print("Simulated leaked libc base:", hex(leaked_base))
 let libc_resolved = Libc({version: "ubuntu20.04", base: leaked_base})
@@ -49,7 +49,7 @@ print("Resolved system():", hex(libc_resolved.symbols.system))
 print("Resolved /bin/sh:", hex(libc_resolved.symbols.bin_sh))
 
 print("\n[6] Building ROP Payload")
-print("-" * 50)
+print("--------------------------------------------------")
 let offset = 264
 let pop_rdi_gadget = 0x401234
 let system_addr = libc_resolved.symbols.system
@@ -73,7 +73,7 @@ print("")
 print("Total payload size:", len(payload), "bytes")
 
 print("\n[7] File Operations")
-print("-" * 50)
+print("--------------------------------------------------")
 write("demo_payload.bin", payload)
 print("Written payload to: demo_payload.bin")
 let read_back = read("demo_payload.bin")

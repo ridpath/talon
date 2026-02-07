@@ -1,5 +1,5 @@
 print("[*] ROP Chain with Libc Attack")
-print("=" * 50)
+print("==================================================")
 
 let binary_path = "examples/vuln_binary"
 
@@ -7,7 +7,7 @@ print("\n[*] Step 1: Loading binary and libc database...")
 let elf = Elf(binary_path)
 let libc = Libc("ubuntu20.04")
 
-print("Binary:", elf.path)
+print("Binary:", binary_path)
 print("Libc version:", libc.name)
 print("Build ID:", libc.build_id)
 

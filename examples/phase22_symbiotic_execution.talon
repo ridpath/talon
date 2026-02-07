@@ -2,14 +2,14 @@
 # Demonstrates living scripts, goal-oriented planning, and autonomous exploit synthesis
 
 print("TALON Phase 22: The Exploit Organism")
-print("=" * 80)
+print("================================================================================")
 
 # ============================================================================
 # 1. SYMBIOTIC EXECUTION: LIVE BIDIRECTIONAL STATE BINDING
 # ============================================================================
 
 print("\n1. Symbiotic Execution - Live Memory Links")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 let session = connect("localhost", 9999)
 
@@ -34,7 +34,7 @@ print("system() address:", hex($system_addr))
 # ============================================================================
 
 print("\n2. Goal-Oriented Planning - Declare Goals, Not Steps")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 # Traditional approach: manually write ROP chain, find gadgets, build payload
 # Phase 22 approach: declare what you want, TALON synthesizes how
@@ -64,7 +64,7 @@ print("Exploit synthesized and executed!")
 # ============================================================================
 
 print("\n3. Strategy Definition - Self-Optimizing Parameters")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 # Define a strategy with tunable parameters
 # The strategy learns optimal values through execution feedback
@@ -102,7 +102,7 @@ print("  Success rate:", heap_spray_strategy.success_rate)
 # ============================================================================
 
 print("\n4. Speculative Execution - Test Futures Before Committing")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 # Execute commands in a sandboxed future
 # See outcomes without affecting real target
@@ -139,7 +139,7 @@ if future.outcome == "crash" {
 # ============================================================================
 
 print("\n5. Fractal Primitives - Auto-Assembling Exploit Constructs")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 # Define small primitives
 let primitive_write = primitive(address: 0x601050, value: 0xdeadbeef)
@@ -168,7 +168,7 @@ send(session, cyclic(112) + rop_chain.payload)
 # ============================================================================
 
 print("\n6. Vulnerability Forecasting - Risk Prediction")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 let forecast = analyze_target("./target_binary")
 
@@ -199,7 +199,7 @@ for rec in forecast.recommendations {
 # ============================================================================
 
 print("\n7. Defense Simulation - Adversarial Testing")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 # Prepare exploit commands
 let my_exploit = [
@@ -241,7 +241,7 @@ print("  Detection rate:", linux_result.detection_rate * 100, "%")
 # ============================================================================
 
 print("\n8. The Living Exploit - All Features Combined")
-print("-" * 80)
+print("--------------------------------------------------------------------------------")
 
 # Create symbiotic links
 symlink @libc!system to $system

@@ -2,7 +2,7 @@
 # Automates solving a typical CTF pwn challenge
 
 print("[*] CTF Challenge Solver")
-print("=" * 60)
+print("============================================================")
 
 let challenge_name = "baby_pwn"
 let remote_host = "ctf.challenge.com"
@@ -101,9 +101,9 @@ print("[*] Getting flag...")
 
 send(remote_session, "cat flag.txt\n")
 let flag = recv(remote_session, 1024)
-print("\n" + "=" * 60)
+print("\n" + "============================================================")
 print("FLAG: " + flag)
-print("=" * 60)
+print("============================================================")
 
 # Submit flag automatically
 if env("CTF_TOKEN")
