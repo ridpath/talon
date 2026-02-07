@@ -7602,43 +7602,106 @@ fn eval_expr<'a>(
                 let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 let index_val =
                     eval_expr(index, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
-                match (base_val, index_val) {
-                (Value::List(list), Value::Number(idx)) => {
-                    let idx_usize = idx as usize;
-                    let len = list.len();
-                    list.get(idx_usize).cloned().ok_or_else(|| {
-                        let mut msg = format!("INDEX OUT OF BOUNDS\nIndex: {}, Length: {}\n\n", idx, len);
-                        if len > 0 {
-                            msg.push_str("Did you mean:\n");
-                            msg.push_str(&format!("  1. data[{}]  (last element)\n", len - 1));
-                            if idx_usize > len {
-                                let extend_count = idx_usize - len + 1;
-                                msg.push_str(&format!("  2. Extend list with {} elements\n", extend_count));
+                match (&base_val, &index_val) {
+                    (Value::Map(m), Value::String(key)) => {
+                        m.get(key).cloned().ok_or_else(|| {
+                            let available_keys: Vec<String> = m.keys().take(5).cloned().collect();
+                            let mut msg = format!("KEY NOT FOUND\nKey: '{}'\n\n", key);
+                            if !available_keys.is_empty() {
+                                msg.push_str("Available keys:\n");
+                                for k in available_keys.iter() {
+                                    msg.push_str(&format!("  - '{}'\n", k));
+                                }
+                                if m.len() > 5 {
+                                    msg.push_str(&format!("  ... and {} more\n", m.len() - 5));
+                                }
+                            } else {
+                                msg.push_str("Note: Map is empty.\n");
                             }
-                            msg.push_str("  3. Use conditional check: if idx < len(data)\n");
+                            msg.push_str("\nDid you mean:\n");
+                            msg.push_str("  1. Check key exists: if key in map\n");
+                            msg.push_str("  2. Use default value: map.get(key, default)\n");
+                            msg
+                        })
+                    }
+                    (Value::List(list), Value::Number(idx)) => {
+                        let len = list.len() as i64;
+                        let actual_idx = if *idx < 0 {
+                            (len + idx) as usize
                         } else {
-                            msg.push_str("Note: List is empty. Initialize with values first.\n");
-                        }
-                        msg
-                    })
-                }
-                (Value::String(s), Value::Number(idx)) => {
-                    let idx_usize = idx as usize;
-                    let len = s.chars().count();
-                    s.chars().nth(idx_usize).map(|c| Value::String(c.to_string())).ok_or_else(|| {
-                        let mut msg = format!("INDEX OUT OF BOUNDS\nIndex: {}, String Length: {}\n\n", idx, len);
-                        if len > 0 {
-                            msg.push_str("Did you mean:\n");
-                            msg.push_str(&format!("  1. str[{}]  (last character)\n", len - 1));
-                            msg.push_str(&format!("  2. Use slicing: str[0..{}]\n", len));
+                            *idx as usize
+                        };
+                        
+                        list.get(actual_idx).cloned().ok_or_else(|| {
+                            let mut msg = format!("INDEX OUT OF BOUNDS\nIndex: {}, Length: {}\n\n", idx, len);
+                            if len > 0 {
+                                msg.push_str("Did you mean:\n");
+                                msg.push_str(&format!("  1. data[{}]  (last element)\n", len - 1));
+                                msg.push_str(&format!("  2. data[-1]  (last element, negative indexing)\n"));
+                                if actual_idx > len as usize {
+                                    let extend_count = actual_idx - len as usize + 1;
+                                    msg.push_str(&format!("  3. Extend list with {} elements\n", extend_count));
+                                }
+                                msg.push_str("  4. Use conditional check: if idx < len(data)\n");
+                            } else {
+                                msg.push_str("Note: List is empty. Initialize with values first.\n");
+                            }
+                            msg
+                        })
+                    }
+                    (Value::Bytes(bytes), Value::Number(idx)) => {
+                        let len = bytes.len() as i64;
+                        let actual_idx = if *idx < 0 {
+                            (len + idx) as usize
                         } else {
-                            msg.push_str("Note: String is empty.\n");
-                        }
-                        msg
-                    })
+                            *idx as usize
+                        };
+                        
+                        bytes.get(actual_idx).copied().map(|byte| Value::Number(byte as i64)).ok_or_else(|| {
+                            let mut msg = format!("INDEX OUT OF BOUNDS\nIndex: {}, Bytes Length: {}\n\n", idx, len);
+                            if len > 0 {
+                                msg.push_str("Did you mean:\n");
+                                msg.push_str(&format!("  1. bytes[{}]  (last byte)\n", len - 1));
+                                msg.push_str(&format!("  2. bytes[-1]  (last byte, negative indexing)\n"));
+                                msg.push_str(&format!("  3. Use slicing: bytes[0..{}]\n", len));
+                            } else {
+                                msg.push_str("Note: Bytes is empty.\n");
+                            }
+                            msg
+                        })
+                    }
+                    (Value::String(s), Value::Number(idx)) => {
+                        let chars: Vec<char> = s.chars().collect();
+                        let len = chars.len() as i64;
+                        let actual_idx = if *idx < 0 {
+                            (len + idx) as usize
+                        } else {
+                            *idx as usize
+                        };
+                        
+                        chars.get(actual_idx).map(|c| Value::String(c.to_string())).ok_or_else(|| {
+                            let mut msg = format!("INDEX OUT OF BOUNDS\nIndex: {}, String Length: {}\n\n", idx, len);
+                            if len > 0 {
+                                msg.push_str("Did you mean:\n");
+                                msg.push_str(&format!("  1. str[{}]  (last character)\n", len - 1));
+                                msg.push_str(&format!("  2. str[-1]  (last character, negative indexing)\n"));
+                                msg.push_str(&format!("  3. Use slicing: str[0..{}]\n", len));
+                            } else {
+                                msg.push_str("Note: String is empty.\n");
+                            }
+                            msg
+                        })
+                    }
+                    (Value::Map(_), idx) => {
+                        Err(format!("TYPE ERROR\nMap indexing requires string key\n\nGot: {:?}\n\nExamples:\n  map[\"key\"]  (string key access)\n  elf.symbols[\"main\"]  (nested map access)", idx))
+                    }
+                    (base, Value::String(_)) => {
+                        Err(format!("TYPE ERROR\nString indexing only works on maps\n\nGot base: {:?}\n\nExamples:\n  map[\"key\"]  (map access)\n  data[0]  (list access)", base))
+                    }
+                    _ => {
+                        Err(format!("TYPE ERROR\nIndexing requires:\n  - Map with string key: map[\"key\"]\n  - List with numeric index: list[0]\n  - Bytes with numeric index: bytes[0]\n  - String with numeric index: str[0]\n\nGot: {:?}[{:?}]", base_val, index_val))
+                    }
                 }
-                _ => Err("TYPE ERROR\nIndexing requires list or string base and numeric index\n\nExamples:\n  data[0]  (list access)\n  str[5]   (string access)".into()),
-            }
             }
             Expr::Slice { base, start, end } => {
                 let base_val = eval_expr(base, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
@@ -8166,5 +8229,288 @@ mod tests {
         // This is a placeholder - actual implementation depends on expression evaluation
         let result = interpret(&vec![]).await;
         assert!(result.is_ok());
+    }
+
+    /// Test map index access with string keys
+    #[tokio::test]
+    async fn test_map_index_access() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Create a map
+        let mut map = HashMap::new();
+        map.insert("base".to_string(), Value::Number(0x400000));
+        map.insert("symbols".to_string(), Value::String("test".to_string()));
+        let map_val = Value::Map(map);
+        
+        // Test map["base"]
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_map".to_string())),
+            index: Box::new(Expr::Literal(Literal::String("base".to_string()))),
+        };
+        
+        vars.write().await.insert("test_map".to_string(), map_val.clone());
+        
+        let result = eval_expr(&index_expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(0x400000));
+    }
+
+    /// Test map index access with missing key
+    #[tokio::test]
+    async fn test_map_index_missing_key() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let mut map = HashMap::new();
+        map.insert("existing".to_string(), Value::Number(42));
+        let map_val = Value::Map(map);
+        
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_map".to_string())),
+            index: Box::new(Expr::Literal(Literal::String("missing".to_string()))),
+        };
+        
+        vars.write().await.insert("test_map".to_string(), map_val);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("KEY NOT FOUND"));
+    }
+
+    /// Test list index access with positive indices
+    #[tokio::test]
+    async fn test_list_index_positive() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let list = Value::List(vec![
+            Value::Number(10),
+            Value::Number(20),
+            Value::Number(30),
+        ]);
+        
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_list".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(1))),
+        };
+        
+        vars.write().await.insert("test_list".to_string(), list);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(20));
+    }
+
+    /// Test list index access with negative indices
+    #[tokio::test]
+    async fn test_list_index_negative() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let list = Value::List(vec![
+            Value::Number(10),
+            Value::Number(20),
+            Value::Number(30),
+        ]);
+        
+        // Test list[-1] (last element)
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_list".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(-1))),
+        };
+        
+        vars.write().await.insert("test_list".to_string(), list);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(30));
+    }
+
+    /// Test list index out of bounds
+    #[tokio::test]
+    async fn test_list_index_out_of_bounds() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let list = Value::List(vec![Value::Number(10), Value::Number(20)]);
+        
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_list".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(10))),
+        };
+        
+        vars.write().await.insert("test_list".to_string(), list);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("INDEX OUT OF BOUNDS"));
+    }
+
+    /// Test bytes index access with positive indices
+    #[tokio::test]
+    async fn test_bytes_index_positive() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let bytes = Value::Bytes(vec![0x01, 0x02, 0x03, 0x04]);
+        
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_bytes".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(2))),
+        };
+        
+        vars.write().await.insert("test_bytes".to_string(), bytes);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(0x03));
+    }
+
+    /// Test bytes index access with negative indices
+    #[tokio::test]
+    async fn test_bytes_index_negative() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let bytes = Value::Bytes(vec![0xAA, 0xBB, 0xCC, 0xDD]);
+        
+        // Test bytes[-1] (last byte)
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_bytes".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(-1))),
+        };
+        
+        vars.write().await.insert("test_bytes".to_string(), bytes);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(0xDD));
+    }
+
+    /// Test bytes index out of bounds
+    #[tokio::test]
+    async fn test_bytes_index_out_of_bounds() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let bytes = Value::Bytes(vec![0x01, 0x02]);
+        
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_bytes".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(5))),
+        };
+        
+        vars.write().await.insert("test_bytes".to_string(), bytes);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("INDEX OUT OF BOUNDS"));
+    }
+
+    /// Test string index access with positive indices
+    #[tokio::test]
+    async fn test_string_index_positive() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let string = Value::String("hello".to_string());
+        
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_str".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(1))),
+        };
+        
+        vars.write().await.insert("test_str".to_string(), string);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("e".to_string()));
+    }
+
+    /// Test string index access with negative indices
+    #[tokio::test]
+    async fn test_string_index_negative() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let string = Value::String("world".to_string());
+        
+        // Test str[-1] (last character)
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_str".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(-1))),
+        };
+        
+        vars.write().await.insert("test_str".to_string(), string);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("d".to_string()));
+    }
+
+    /// Test string index out of bounds
+    #[tokio::test]
+    async fn test_string_index_out_of_bounds() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let string = Value::String("ab".to_string());
+        
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_str".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(10))),
+        };
+        
+        vars.write().await.insert("test_str".to_string(), string);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("INDEX OUT OF BOUNDS"));
+    }
+
+    /// Test type error for invalid index access
+    #[tokio::test]
+    async fn test_index_type_error() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let num = Value::Number(42);
+        
+        // Try to index a number (should fail)
+        let index_expr = Expr::Index {
+            base: Box::new(Expr::Ident("test_num".to_string())),
+            index: Box::new(Expr::Literal(Literal::Number(0))),
+        };
+        
+        vars.write().await.insert("test_num".to_string(), num);
+        
+        let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("TYPE ERROR"));
     }
 }
