@@ -104,6 +104,15 @@ INSTALLATION.md
 *_FEATURES*.md
 *_COMPARISON*.md
 
+# Documentation audit artifacts
+help_output.txt
+run_help.txt
+build_help.txt
+audit_dead_code.ps1
+dead_code_warnings.txt
+rust_files.txt
+src/module_files.txt
+
 # Temporary and workflow directories
 .zenflow/
 *.ai-scratch
