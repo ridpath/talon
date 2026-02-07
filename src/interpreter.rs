@@ -2427,25 +2427,55 @@ fn eval_expr<'a>(
                 let l = eval_expr(left, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 let r = eval_expr(right, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?;
                 match (&l, &r) {
-                (Value::Number(lv), Value::Number(rv)) => {
-                    let out = match op.as_str() {
-                        "+" => lv + rv,
-                        "-" => lv - rv,
-                        "*" => lv * rv,
-                        "/" => {
-                            if *rv == 0 {
-                                return Err("DIVISION BY ZERO\n\nDid you mean:\n  1. Check denominator: if divisor != 0\n  2. Use default value: result = (x / y) or 0\n  3. Handle error: try ... catch".into());
+                    // Numeric operations
+                    (Value::Number(lv), Value::Number(rv)) => {
+                        let out = match op.as_str() {
+                            "+" => lv + rv,
+                            "-" => lv - rv,
+                            "*" => lv * rv,
+                            "/" => {
+                                if *rv == 0 {
+                                    return Err("DIVISION BY ZERO\n\nDid you mean:\n  1. Check denominator: if divisor != 0\n  2. Use default value: result = (x / y) or 0\n  3. Handle error: try ... catch".into());
+                                }
+                                lv / rv
                             }
-                            lv / rv
+                            _ => return Err(format!("INVALID OPERATOR '{}'\n\nSupported operators: +, -, *, /", op)),
+                        };
+                        Ok(Value::Number(out))
+                    }
+                    // String concatenation: String + String
+                    (Value::String(lv), Value::String(rv)) if op == "+" => {
+                        Ok(Value::String(format!("{}{}", lv, rv)))
+                    }
+                    // String concatenation: String + Any
+                    (Value::String(lv), _) if op == "+" => {
+                        Ok(Value::String(format!("{}{}", lv, r.to_string())))
+                    }
+                    // String concatenation: Any + String
+                    (_, Value::String(rv)) if op == "+" => {
+                        Ok(Value::String(format!("{}{}", l.to_string(), rv)))
+                    }
+                    // String repetition: String * Number
+                    (Value::String(s), Value::Number(n)) if op == "*" => {
+                        if *n < 0 {
+                            return Err("String repetition count must be non-negative".into());
                         }
-                        _ => return Err(format!("INVALID OPERATOR '{}'\n\nSupported operators: +, -, *, /", op)),
-                    };
-                    Ok(Value::Number(out))
+                        Ok(Value::String(s.repeat(*n as usize)))
+                    }
+                    // String repetition: Number * String
+                    (Value::Number(n), Value::String(s)) if op == "*" => {
+                        if *n < 0 {
+                            return Err("String repetition count must be non-negative".into());
+                        }
+                        Ok(Value::String(s.repeat(*n as usize)))
+                    }
+                    _ => {
+                        Err(format!(
+                            "TYPE ERROR\nBinary operation requires compatible types\n\nGot: {:?} {} {:?}\n\nFix:\n  1. Ensure both operands are numeric for arithmetic (+, -, *, /)\n  2. Use string concatenation: \"hello\" + \"world\"\n  3. Use string repetition: \"=\" * 50\n  4. Convert types explicitly if needed",
+                            l, op, r
+                        ))
+                    }
                 }
-                _ => {
-                    Err(format!("TYPE ERROR\nBinary operation requires numbers\n\nGot: {:?} {} {:?}\n\nFix:\n  1. Ensure both operands are numeric\n  2. Use explicit conversion if needed", l, op, r))
-                }
-            }
             }
             Expr::List(items) => {
                 let mut values = Vec::new();
@@ -8512,5 +8542,237 @@ mod tests {
         let result = eval_expr(&index_expr, vars, funcs, macros, context, false).await;
         assert!(result.is_err());
         assert!(result.unwrap_err().contains("TYPE ERROR"));
+    }
+
+    // String Concatenation Tests
+
+    /// Test string + string concatenation
+    #[tokio::test]
+    async fn test_string_concatenation() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::String("Hello, ".to_string()))),
+            right: Box::new(Expr::Literal(Literal::String("World!".to_string()))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("Hello, World!".to_string()));
+    }
+
+    /// Test string + number concatenation (auto-conversion)
+    #[tokio::test]
+    async fn test_string_plus_number() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::String("Value: ".to_string()))),
+            right: Box::new(Expr::Literal(Literal::Number(42))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("Value: 42".to_string()));
+    }
+
+    /// Test number + string concatenation (auto-conversion)
+    #[tokio::test]
+    async fn test_number_plus_string() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(42))),
+            right: Box::new(Expr::Literal(Literal::String(" is the answer".to_string()))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("42 is the answer".to_string()));
+    }
+
+    /// Test string repetition (String * Number)
+    #[tokio::test]
+    async fn test_string_repetition() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let expr = Expr::BinaryOp {
+            op: "*".to_string(),
+            left: Box::new(Expr::Literal(Literal::String("=".to_string()))),
+            right: Box::new(Expr::Literal(Literal::Number(50))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("=".repeat(50)));
+    }
+
+    /// Test string repetition (Number * String)
+    #[tokio::test]
+    async fn test_number_times_string() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let expr = Expr::BinaryOp {
+            op: "*".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(3))),
+            right: Box::new(Expr::Literal(Literal::String("abc".to_string()))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("abcabcabc".to_string()));
+    }
+
+    /// Test string repetition with zero count
+    #[tokio::test]
+    async fn test_string_repetition_zero() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let expr = Expr::BinaryOp {
+            op: "*".to_string(),
+            left: Box::new(Expr::Literal(Literal::String("test".to_string()))),
+            right: Box::new(Expr::Literal(Literal::Number(0))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("".to_string()));
+    }
+
+    /// Test string repetition with negative count (should error)
+    #[tokio::test]
+    async fn test_string_repetition_negative() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        let expr = Expr::BinaryOp {
+            op: "*".to_string(),
+            left: Box::new(Expr::Literal(Literal::String("test".to_string()))),
+            right: Box::new(Expr::Literal(Literal::Number(-1))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("non-negative"));
+    }
+
+    /// Test numeric operations still work (backward compatibility)
+    #[tokio::test]
+    async fn test_numeric_operations_still_work() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Test addition
+        let expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(10))),
+            right: Box::new(Expr::Literal(Literal::Number(32))),
+        };
+        let result = eval_expr(&expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(42));
+
+        // Test multiplication
+        let expr = Expr::BinaryOp {
+            op: "*".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(6))),
+            right: Box::new(Expr::Literal(Literal::Number(7))),
+        };
+        let result = eval_expr(&expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(42));
+
+        // Test subtraction
+        let expr = Expr::BinaryOp {
+            op: "-".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(50))),
+            right: Box::new(Expr::Literal(Literal::Number(8))),
+        };
+        let result = eval_expr(&expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(42));
+
+        // Test division
+        let expr = Expr::BinaryOp {
+            op: "/".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(84))),
+            right: Box::new(Expr::Literal(Literal::Number(2))),
+        };
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(42));
+    }
+
+    /// Test error message for incompatible types
+    #[tokio::test]
+    async fn test_incompatible_binary_operation() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Test subtraction with string (not supported)
+        let expr = Expr::BinaryOp {
+            op: "-".to_string(),
+            left: Box::new(Expr::Literal(Literal::String("test".to_string()))),
+            right: Box::new(Expr::Literal(Literal::Number(5))),
+        };
+
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.contains("TYPE ERROR"));
+        assert!(error.contains("compatible types"));
+    }
+
+    /// Test complex string concatenation with multiple operations
+    #[tokio::test]
+    async fn test_complex_string_concatenation() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Create "[+] Target: 192.168.1.1"
+        let prefix_expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::String("[+] ".to_string()))),
+            right: Box::new(Expr::Literal(Literal::String("Target: ".to_string()))),
+        };
+
+        let full_expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(prefix_expr),
+            right: Box::new(Expr::Literal(Literal::String("192.168.1.1".to_string()))),
+        };
+
+        let result = eval_expr(&full_expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::String("[+] Target: 192.168.1.1".to_string()));
     }
 }
