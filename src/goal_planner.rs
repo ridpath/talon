@@ -2,6 +2,7 @@
 
 use crate::ast::{Command, Expr, Literal};
 use crate::rop_gadget_finder::{Architecture, GadgetCategory, ROPGadgetFinder};
+#[cfg(feature = "symbolic-execution")]
 use crate::z3_solver::{Z3Constraint, Z3Solver, Z3Type};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
@@ -271,11 +272,14 @@ impl GoalPlanner {
         let target = goal.target_address.unwrap_or(0xdeadbeef);
         let value = goal.target_value.unwrap_or(0xcafebabe);
 
-        let mut solver = Z3Solver::new();
-        solver.add_variable("offset".to_string(), Z3Type::Integer, 32);
-        for constraint in &goal.constraints {
-            if constraint == "no_null_bytes" {
-                solver.add_constraint(Z3Constraint::NoNullBytes("offset".to_string()));
+        #[cfg(feature = "symbolic-execution")]
+        {
+            let mut solver = Z3Solver::new();
+            solver.add_variable("offset".to_string(), Z3Type::Integer, 32);
+            for constraint in &goal.constraints {
+                if constraint == "no_null_bytes" {
+                    solver.add_constraint(Z3Constraint::NoNullBytes("offset".to_string()));
+                }
             }
         }
 

@@ -3,6 +3,8 @@
 // ═══════════════════════════════════════════════════════════════════════════
 
 use std::collections::HashMap;
+
+#[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
 use crate::opsec::polymorphic::{
     PolymorphicEngine, PolymorphicError, Architecture as PolymorphicArchitecture,
     MutationStrategy,
@@ -31,6 +33,7 @@ impl ShellcodeEntry {
     }
 
     /// Generate polymorphic variant of this shellcode
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     pub fn generate_polymorphic_variant(&self) -> Result<Vec<u8>, PolymorphicError> {
         let arch = self.map_architecture();
         let engine = PolymorphicEngine::new(arch);
@@ -38,6 +41,7 @@ impl ShellcodeEntry {
     }
 
     /// Generate multiple unique polymorphic variants
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     pub fn generate_variants(&self, count: usize) -> Result<Vec<Vec<u8>>, PolymorphicError> {
         let arch = self.map_architecture();
         let mut variants = Vec::new();
@@ -52,6 +56,7 @@ impl ShellcodeEntry {
     }
 
     /// Generate polymorphic variant with custom strategies
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     pub fn generate_custom_variant(
         &self,
         strategies: Vec<MutationStrategy>,
@@ -65,6 +70,7 @@ impl ShellcodeEntry {
     }
 
     /// Map string architecture to PolymorphicArchitecture enum
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn map_architecture(&self) -> PolymorphicArchitecture {
         match self.arch.as_str() {
             "x86-64" => PolymorphicArchitecture::X64,
@@ -127,16 +133,19 @@ impl ShellcodeDatabase {
     }
 
     /// Get polymorphic variant of shellcode by name
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     pub fn get_polymorphic(&self, name: &str) -> Option<Result<Vec<u8>, PolymorphicError>> {
         self.get(name).map(|entry| entry.generate_polymorphic_variant())
     }
 
     /// Get multiple unique variants of shellcode by name
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     pub fn get_variants(&self, name: &str, count: usize) -> Option<Result<Vec<Vec<u8>>, PolymorphicError>> {
         self.get(name).map(|entry| entry.generate_variants(count))
     }
 
     /// Get polymorphic variant with custom settings
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     pub fn get_custom_polymorphic(
         &self,
         name: &str,
@@ -464,6 +473,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn test_polymorphic_variant_generation() {
         let db = ShellcodeDatabase::new();
         let entry = db.get("x64_execve_sh").unwrap();
@@ -475,6 +485,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn test_multiple_variants_unique() {
         let db = ShellcodeDatabase::new();
         let entry = db.get("x64_execve_sh").unwrap();
@@ -487,6 +498,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn test_custom_polymorphic_variant() {
         let db = ShellcodeDatabase::new();
         let entry = db.get("x64_execve_sh").unwrap();
@@ -501,6 +513,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn test_db_get_polymorphic() {
         let db = ShellcodeDatabase::new();
         let result = db.get_polymorphic("x64_execve_sh");
@@ -509,6 +522,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn test_db_get_variants() {
         let db = ShellcodeDatabase::new();
         let result = db.get_variants("x64_execve_sh", 5);
@@ -519,6 +533,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn test_db_get_custom_polymorphic() {
         let db = ShellcodeDatabase::new();
         let result = db.get_custom_polymorphic(
@@ -531,6 +546,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
     fn test_architecture_mapping() {
         let db = ShellcodeDatabase::new();
         

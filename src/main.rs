@@ -1096,6 +1096,8 @@ For more information, visit: https://github.com/talon-lang/talon
         "Binary Analysis:".bold().cyan(),
         "Exploit Database:".bold().cyan(),
         "AI Integration:".bold().cyan(),
+        "Swarm Mode:".bold().cyan(),
+        "Cache Management:".bold().cyan(),
         "Configuration:".bold().cyan(),
         "Documentation:".bold().cyan(),
     );

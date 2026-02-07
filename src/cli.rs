@@ -91,44 +91,53 @@ pub fn run(args: Vec<String>) {
             
             let binary_path = "./talon_build/target/release/talon_script";
             
-            if let Ok(shellcode) = fs::read(binary_path) {
-                use crate::opsec::polymorphic::PolymorphicEngine;
-                use crate::opsec::polymorphic::MutationStrategy;
-                
-                let strategies = match evasion_level {
-                    "low" => vec![MutationStrategy::JunkCodeInsertion],
-                    "medium" => vec![
-                        MutationStrategy::JunkCodeInsertion,
-                        MutationStrategy::InstructionEquivalence,
-                    ],
-                    "high" => vec![
-                        MutationStrategy::JunkCodeInsertion,
-                        MutationStrategy::InstructionEquivalence,
-                        MutationStrategy::StringEncryption,
-                        MutationStrategy::RegisterPermutation,
-                    ],
-                    _ => vec![],
-                };
-                
-                let junk_density = match evasion_level {
-                    "low" => 0.1,
-                    "medium" => 0.3,
-                    "high" => 0.5,
-                    _ => 0.1,
-                };
-                
-                let mut engine = PolymorphicEngine::new(strategies);
-                engine.set_junk_density(junk_density);
-                
-                match engine.mutate(&shellcode) {
-                    Ok(mutated) => {
-                        let output_path = format!("{}.polymorphic", binary_path);
-                        fs::write(&output_path, mutated).expect("Failed to write polymorphic binary");
-                        println!("{} Polymorphic binary: {}", "[OK]".green(), output_path);
-                        println!("{} Evasion techniques applied: {}", "[INFO]".blue(), engine.strategies.len());
+            #[cfg(all(target_os = "windows", feature = "game-hacking-windows"))]
+            {
+                if let Ok(shellcode) = fs::read(binary_path) {
+                    use crate::opsec::polymorphic::PolymorphicEngine;
+                    use crate::opsec::polymorphic::MutationStrategy;
+                    
+                    let strategies = match evasion_level {
+                        "low" => vec![MutationStrategy::JunkCodeInsertion],
+                        "medium" => vec![
+                            MutationStrategy::JunkCodeInsertion,
+                            MutationStrategy::InstructionEquivalence,
+                        ],
+                        "high" => vec![
+                            MutationStrategy::JunkCodeInsertion,
+                            MutationStrategy::InstructionEquivalence,
+                            MutationStrategy::StringEncryption,
+                            MutationStrategy::RegisterPermutation,
+                        ],
+                        _ => vec![],
+                    };
+                    
+                    let junk_density = match evasion_level {
+                        "low" => 0.1,
+                        "medium" => 0.3,
+                        "high" => 0.5,
+                        _ => 0.1,
+                    };
+                    
+                    let mut engine = PolymorphicEngine::new(strategies);
+                    engine.set_junk_density(junk_density);
+                    
+                    match engine.mutate(&shellcode) {
+                        Ok(mutated) => {
+                            let output_path = format!("{}.polymorphic", binary_path);
+                            fs::write(&output_path, mutated).expect("Failed to write polymorphic binary");
+                            println!("{} Polymorphic binary: {}", "[OK]".green(), output_path);
+                            println!("{} Evasion techniques applied: {}", "[INFO]".blue(), engine.strategies.len());
+                        }
+                        Err(e) => eprintln!("{} Polymorphic transformation failed: {}", "[ERROR]".red(), e),
                     }
-                    Err(e) => eprintln!("{} Polymorphic transformation failed: {}", "[ERROR]".red(), e),
                 }
+            }
+            
+            #[cfg(not(all(target_os = "windows", feature = "game-hacking-windows")))]
+            {
+                println!("{} Polymorphic evasion not available (requires Windows + game-hacking-windows feature)", "[WARN]".yellow());
+                println!("{} Built binary available at: {}", "[OK]".green(), binary_path);
             }
         }
 
