@@ -1,4 +1,4 @@
-# ═══════════════════════════════════════════════════════════════
+﻿# ═══════════════════════════════════════════════════════════════
 # TALON TUTORIAL 4: CTF COMPLETE TOOLKIT
 # Everything you need to dominate CTF competitions
 # ═══════════════════════════════════════════════════════════════
@@ -423,7 +423,7 @@ end
 # - Shodan (IoT/exposed services)
 # - Maltego (OSINT framework)
 
-# 🏆 PRO TIPS
+#  PRO TIPS
 # ────────────────────────────────────────────────────────────────
 # 1. Always start with 'file', 'strings', 'binwalk'
 # 2. Keep a collection of wordlists (rockyou.txt is essential)
@@ -436,7 +436,7 @@ end
 # 9. In Attack-Defense CTFs, patch vulnerabilities first!
 # 10. Have fun and never stop learning!
 
-# 🎓 CONTINUE YOUR JOURNEY
+#  CONTINUE YOUR JOURNEY
 # ────────────────────────────────────────────────────────────────
 # You now have a complete CTF toolkit in Talon DSL!
 # - All 10 new modules are at your fingertips
@@ -444,4 +444,4 @@ end
 # - Production-ready code for real competitions
 # - User-friendly helpers and cheatsheets
 #
-# Go forth and capture those flags! 🚩
+# Go forth and capture those flags! 
