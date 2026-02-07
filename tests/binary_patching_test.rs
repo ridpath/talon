@@ -2,7 +2,6 @@
 // Tests semantic binary patching, assembly integration, and verification
 
 use std::fs;
-use std::path::Path;
 
 #[test]
 fn test_binary_patch_nop_out() {
@@ -19,9 +18,9 @@ fn test_binary_patch_nop_out() {
     let result = patcher.nop_out(0x100, 10);
     assert!(result.is_ok(), "NOP patching should succeed");
     
-    // Apply patches
-    let apply_result = patcher.apply();
-    assert!(apply_result.is_ok(), "Apply should succeed");
+    // Save patches
+    let save_result = patcher.save(test_path);
+    assert!(save_result.is_ok(), "Save should succeed");
     
     // Verify patch was applied
     let patched_data = fs::read(test_path).unwrap();
@@ -41,7 +40,7 @@ fn test_binary_patch_replace_call() {
     let test_path = "test_patch_call.elf";
     fs::write(test_path, &test_binary).unwrap();
     
-    let mut patcher = talon::binary_patch::Patch::new(test_path).unwrap();
+    let patcher = talon::binary_patch::Patch::new(test_path).unwrap();
     
     // Replace call instruction (hypothetical)
     // In real usage: patcher.replace_call("exit", "hacked_fn")
@@ -92,13 +91,14 @@ fn test_binary_patch_dry_run() {
     
     let original_data = fs::read(test_path).unwrap();
     
-    let mut patcher = talon::binary_patch::Patch::new_dry_run(test_path).unwrap();
+    let mut patcher = talon::binary_patch::Patch::new(test_path).unwrap();
+    patcher.set_dry_run(true);
     
     // NOP out bytes in dry-run mode
     patcher.nop_out(0x100, 10).unwrap();
     
-    // Apply (should not modify file in dry-run)
-    patcher.apply().unwrap();
+    // Save (should not modify file in dry-run)
+    patcher.save(test_path).unwrap();
     
     // Verify file unchanged
     let after_data = fs::read(test_path).unwrap();
@@ -139,7 +139,7 @@ fn test_binary_patch_rollback() {
     
     // Apply patch
     patcher.nop_out(0x100, 10).unwrap();
-    patcher.apply().unwrap();
+    patcher.save(test_path).unwrap();
     
     // Verify patch applied
     let patched_data = fs::read(test_path).unwrap();
@@ -171,11 +171,11 @@ fn test_binary_patch_undo() {
     
     // Apply first patch
     patcher.nop_out(0x100, 5).unwrap();
-    patcher.apply().unwrap();
+    patcher.save(test_path).unwrap();
     
     // Apply second patch
     patcher.nop_out(0x200, 5).unwrap();
-    patcher.apply().unwrap();
+    patcher.save(test_path).unwrap();
     
     // Undo last patch
     patcher.undo().unwrap();
@@ -207,7 +207,7 @@ fn test_binary_patch_inject_shellcode() {
     
     assert!(result.is_ok(), "Shellcode injection should succeed");
     
-    patcher.apply().unwrap();
+    patcher.save(test_path).unwrap();
     
     // Verify shellcode appended
     let data = fs::read(test_path).unwrap();
@@ -234,7 +234,7 @@ fn test_binary_patch_code_cave() {
         Ok(offset) => {
             assert!(offset > 0, "Code cave offset should be valid");
             
-            patcher.apply().unwrap();
+            patcher.save(test_path).unwrap();
             
             // Verify code cave is NOPs
             let data = fs::read(test_path).unwrap();
@@ -263,17 +263,10 @@ fn test_binary_patch_find_pattern() {
     
     // Find ELF magic bytes
     let pattern = vec![0x7F, 0x45, 0x4C, 0x46]; // ELF magic
-    let results = patcher.find_pattern(&pattern);
+    let offsets = patcher.find_pattern(&pattern);
     
-    match results {
-        Ok(offsets) => {
-            assert!(!offsets.is_empty(), "Should find ELF magic");
-            assert_eq!(offsets[0], 0, "ELF magic should be at offset 0");
-        }
-        Err(e) => {
-            panic!("Pattern finding failed: {}", e);
-        }
-    }
+    assert!(!offsets.is_empty(), "Should find ELF magic");
+    assert_eq!(offsets[0], 0, "ELF magic should be at offset 0");
     
     // Cleanup
     fs::remove_file(test_path).ok();
@@ -323,7 +316,7 @@ fn test_binary_patch_string_replacement() {
     
     assert!(result.is_ok(), "String patching should succeed");
     
-    patcher.apply().unwrap();
+    patcher.save(test_path).unwrap();
     
     // Verify string replaced
     let data = fs::read(test_path).unwrap();
