@@ -61,6 +61,9 @@ pub enum VulnerabilityType {
     StorageLayoutMismatch,
     TimelockedGovernance,
     VotingPowerManipulation,
+    
+    // Informational
+    Info,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

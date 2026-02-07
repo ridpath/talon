@@ -77,7 +77,7 @@ pub fn run(args: Vec<String>) {
             let script = fs::read_to_string(file).expect("Unable to read script file");
             let cmds = crate::parser::parse_script(&script).expect("Parse failed");
             
-            let evasion_level = match level {
+            let evasion_level = match *level {
                 "low" | "medium" | "high" => level,
                 _ => {
                     eprintln!("{} Invalid evasion level. Use: low, medium, or high", "[ERROR]".red());
@@ -527,14 +527,14 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
                             } else {
                                 println!("\n{} Found {} potential vulnerabilities:\n", "[ORACLE]".yellow(), reports.len());
                                 for (idx, report) in reports.iter().enumerate() {
-                                    println!("{}. {}", (idx + 1).to_string().yellow().bold(), report.vuln_type.cyan().bold());
+                                    println!("{}. {}", (idx + 1).to_string().yellow().bold(), format!("{}", report.vuln_type).cyan().bold());
                                     println!("   Location: {}", report.location);
                                     println!("   Confidence: {:.1}%", report.confidence * 100.0);
                                     println!("   Exploitability: {:?}", report.exploitability);
                                     println!("   Details: {}", report.details.bright_black());
                                     
-                                    if let Some(ref mitigation) = report.mitigation {
-                                        println!("   Mitigation: {}", mitigation.bright_black());
+                                    if let Some(ref suggested) = report.suggested_exploit {
+                                        println!("   Suggested Exploit: {}", suggested.bright_black());
                                     }
                                     println!();
                                 }
@@ -598,21 +598,32 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
                                 }
                             }
                             "2" => {
-                                print!("Old function name: ");
+                                print!("Call offset (hex, e.g., 0x401234): ");
                                 io::stdout().flush().unwrap();
                                 input.clear();
                                 io::stdin().read_line(&mut input).unwrap();
-                                let old_fn = input.trim().to_string();
+                                let offset_str = input.trim();
                                 
-                                print!("New function name: ");
-                                io::stdout().flush().unwrap();
-                                input.clear();
-                                io::stdin().read_line(&mut input).unwrap();
-                                let new_fn = input.trim().to_string();
+                                let call_offset = if offset_str.starts_with("0x") {
+                                    usize::from_str_radix(&offset_str[2..], 16)
+                                } else {
+                                    offset_str.parse::<usize>()
+                                };
                                 
-                                match patcher.replace_call(&old_fn, &new_fn) {
-                                    Ok(_) => println!("{} Call replaced", "[OK]".green()),
-                                    Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                                match call_offset {
+                                    Ok(offset) => {
+                                        print!("New function name: ");
+                                        io::stdout().flush().unwrap();
+                                        input.clear();
+                                        io::stdin().read_line(&mut input).unwrap();
+                                        let new_fn = input.trim();
+                                        
+                                        match patcher.replace_call(offset, new_fn) {
+                                            Ok(_) => println!("{} Call replaced", "[OK]".green()),
+                                            Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
+                                        }
+                                    }
+                                    Err(e) => eprintln!("{} Invalid offset: {}", "[ERROR]".red(), e),
                                 }
                             }
                             "7" => {
@@ -627,14 +638,14 @@ complete -W "build run wasm repl install analyze doc ast completion plugin fuzz 
                                     .collect();
                                 
                                 if let Ok(pattern) = pattern {
-                                    match patcher.find_pattern(&pattern) {
-                                        Ok(offsets) => {
-                                            println!("{} Found {} occurrence(s):", "[OK]".green(), offsets.len());
-                                            for offset in offsets {
-                                                println!("  0x{:x}", offset);
-                                            }
+                                    let offsets = patcher.find_pattern(&pattern);
+                                    if offsets.is_empty() {
+                                        println!("{} Pattern not found", "[INFO]".cyan());
+                                    } else {
+                                        println!("{} Found {} occurrence(s):", "[OK]".green(), offsets.len());
+                                        for offset in offsets {
+                                            println!("  0x{:x}", offset);
                                         }
-                                        Err(e) => eprintln!("{} {}", "[ERROR]".red(), e),
                                     }
                                 }
                             }

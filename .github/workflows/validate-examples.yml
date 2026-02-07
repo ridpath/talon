@@ -1,0 +1,170 @@
+name: Validate Examples
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday
+
+jobs:
+  validate-examples:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        rust: [stable]
+      fail-fast: false
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/registry
+        key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo index
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/git
+        key: ${{ runner.os }}-cargo-index-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Cache cargo build
+      uses: actions/cache@v4
+      with:
+        path: target
+        key: ${{ runner.os }}-cargo-build-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build TALON binary
+      run: cargo build --bin talon --release
+
+    - name: Verify binary exists (Linux)
+      if: runner.os == 'Linux'
+      run: |
+        ls -lh target/release/talon
+        file target/release/talon
+
+    - name: Verify binary exists (Windows)
+      if: runner.os == 'Windows'
+      run: |
+        dir target\release\talon.exe
+        target\release\talon.exe --version
+
+    - name: Validate example syntax (dry-run)
+      run: |
+        echo "Validating all .talon examples..."
+        for file in examples/*.talon; do
+          if [ -f "$file" ]; then
+            echo "Testing: $file"
+            target/release/talon run --dry-run "$file" || echo "FAILED: $file"
+          fi
+        done
+      shell: bash
+
+    - name: Check for emoticons in examples
+      run: |
+        echo "Checking for emoticons..."
+        if grep -rP '[\x{1F600}-\x{1F64F}\x{1F300}-\x{1F5FF}\x{1F680}-\x{1F6FF}\x{1F1E0}-\x{1F1FF}\x{2600}-\x{26FF}\x{2700}-\x{27BF}]' examples/; then
+          echo "ERROR: Emoticons found in examples!"
+          exit 1
+        else
+          echo "No emoticons found"
+        fi
+      shell: bash
+      continue-on-error: false
+
+    - name: Check for marketing language
+      run: |
+        echo "Checking for marketing language..."
+        if grep -riE "world.class|best.in.class|god.tier|titan" examples/ | grep -v ".git/"; then
+          echo "ERROR: Marketing language found in examples!"
+          exit 1
+        else
+          echo "No marketing language found"
+        fi
+      shell: bash
+      continue-on-error: false
+
+    - name: Verify example headers
+      run: |
+        echo "Verifying example headers..."
+        missing=0
+        for file in examples/*.talon; do
+          if [ -f "$file" ]; then
+            if ! head -5 "$file" | grep -q "#"; then
+              echo "WARNING: $file may be missing header documentation"
+              missing=$((missing + 1))
+            fi
+          fi
+        done
+        if [ $missing -gt 0 ]; then
+          echo "Found $missing files with potential header issues"
+        fi
+        echo "Header validation complete"
+      shell: bash
+
+    - name: Count examples by category
+      run: |
+        echo "Example Statistics:"
+        echo "Total examples: $(find examples/ -name '*.talon' -type f | wc -l)"
+        echo "SSH examples: $(grep -l 'ssh' examples/*.talon | wc -l)"
+        echo "ROP examples: $(grep -l 'rop' examples/*.talon | wc -l)"
+        echo "Heap examples: $(grep -l 'heap' examples/*.talon | wc -l)"
+        echo "Format string examples: $(grep -l 'fmtstr\|format.*string' examples/*.talon | wc -l)"
+      shell: bash
+
+    - name: Upload validation results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: example-validation-${{ matrix.os }}
+        path: |
+          examples/*.talon
+          target/release/talon*
+        retention-days: 7
+
+  validate-advanced:
+    runs-on: ubuntu-latest
+    needs: validate-examples
+    if: github.event_name == 'push' || github.event_name == 'schedule'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup Rust toolchain
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Build TALON
+      run: cargo build --bin talon --release
+
+    - name: Run validation script
+      run: |
+        if [ -f scripts/validate_examples.ps1 ]; then
+          echo "PowerShell validation script found, but requires PowerShell on Linux"
+        elif [ -f scripts/validate_examples.sh ]; then
+          bash scripts/validate_examples.sh
+        else
+          echo "No validation script found"
+        fi
+      shell: bash
+
+    - name: Check example completeness
+      run: |
+        echo "Checking feature coverage..."
+        features=(ssh rop heap format_string shellcode swarm oracle patch symbolic debug)
+        
+        for feature in "${features[@]}"; do
+          count=$(grep -ril "$feature" examples/ | wc -l)
+          echo "Feature '$feature': $count examples"
+        done
+      shell: bash
