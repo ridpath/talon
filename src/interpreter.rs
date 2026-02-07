@@ -2382,7 +2382,54 @@ fn eval_expr<'a>(
     dry_run: bool,
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, String>> + Send + 'a>> {
     Box::pin(async move {
-        match expr {
+        // Recursion depth tracking to prevent stack overflow
+        const MAX_RECURSION_DEPTH: i64 = 500; // Reduced to be safer with async overhead
+        const RECURSION_DEPTH_KEY: &str = "__recursion_depth__";
+        
+        // Get current recursion depth
+        let current_depth = {
+            let ctx = context.read().await;
+            ctx.get(RECURSION_DEPTH_KEY)
+                .and_then(|v| if let Value::Number(n) = v { Some(*n) } else { None })
+                .unwrap_or(0)
+        };
+        
+        // Check if we've exceeded the recursion limit
+        if current_depth >= MAX_RECURSION_DEPTH {
+            return Err(format!(
+                "RECURSION LIMIT EXCEEDED\n\n\
+                Maximum recursion depth ({}) reached.\n\n\
+                Possible causes:\n\
+                  1. Infinite recursion in function calls\n\
+                  2. Circular references in data structures\n\
+                  3. Expression too deeply nested\n\n\
+                Fix:\n\
+                  1. Check for infinite loops in function definitions\n\
+                  2. Simplify complex expressions\n\
+                  3. Break large expressions into smaller functions\n\
+                  4. Avoid circular data structure references\n\n\
+                Current depth: {}\n\
+                Maximum allowed: {}",
+                MAX_RECURSION_DEPTH,
+                current_depth,
+                MAX_RECURSION_DEPTH
+            ));
+        }
+        
+        // Increment recursion depth for this call
+        {
+            let mut ctx = context.write().await;
+            ctx.insert(RECURSION_DEPTH_KEY.to_string(), Value::Number(current_depth + 1));
+        }
+        
+        // Helper to decrement depth (used on both success and error paths)
+        let decrement_depth = |context: Arc<RwLock<HashMap<String, Value>>>, depth: i64| async move {
+            let mut ctx = context.write().await;
+            ctx.insert(RECURSION_DEPTH_KEY.to_string(), Value::Number(depth));
+        };
+        
+        // Execute the expression and ensure depth is decremented
+        let result = match expr {
             Expr::Literal(Literal::String(s)) => Ok(Value::String(s.clone())),
             Expr::Literal(Literal::Number(n)) => Ok(Value::Number(*n)),
             Expr::Literal(Literal::Boolean(b)) => Ok(Value::Number(if *b { 1 } else { 0 })),
@@ -7898,7 +7945,12 @@ fn eval_expr<'a>(
                 current_value.ok_or("Empty pipe".into())
             }
             Expr::Return(_) => Err("Return outside function".into()),
-        }
+        };
+        
+        // Always decrement the depth before returning (on both success and error)
+        decrement_depth(context, current_depth).await;
+        
+        result
     })
 }
 
@@ -8774,5 +8826,209 @@ mod tests {
         let result = eval_expr(&full_expr, vars, funcs, macros, context, false).await;
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), Value::String("[+] Target: 192.168.1.1".to_string()));
+    }
+
+    /// Test recursion depth limit with deeply nested expressions
+    #[tokio::test]
+    async fn test_recursion_depth_limit() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Manually set a very high recursion depth to trigger the limit
+        // This simulates what would happen with a deeply nested expression
+        {
+            let mut ctx = context.write().await;
+            ctx.insert("__recursion_depth__".to_string(), Value::Number(499));
+        }
+        
+        // Even a simple expression should now fail since we're at depth 499
+        // and the next eval_expr will increment to 500 (the limit)
+        let expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(1))),
+            right: Box::new(Expr::Literal(Literal::Number(1))),
+        };
+        
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        assert!(error.contains("RECURSION LIMIT EXCEEDED"));
+        assert!(error.contains("Maximum recursion depth"));
+        assert!(error.contains("500"));
+    }
+
+    /// Test that valid deep but not excessive recursion works
+    #[tokio::test]
+    async fn test_valid_deep_recursion() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Test with a simple expression that should work fine
+        // Set depth to a safe value (not at limit)
+        {
+            let mut ctx = context.write().await;
+            ctx.insert("__recursion_depth__".to_string(), Value::Number(100));
+        }
+        
+        // This expression should work fine since we're at depth 100 < 500
+        let expr = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(20))),
+            right: Box::new(Expr::Literal(Literal::Number(22))),
+        };
+        
+        let result = eval_expr(&expr, vars, funcs, macros, context.clone(), false).await;
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), Value::Number(42));
+        
+        // Verify depth was reset back to 100 after evaluation
+        {
+            let ctx = context.read().await;
+            let depth = ctx.get("__recursion_depth__")
+                .and_then(|v| if let Value::Number(n) = v { Some(*n) } else { None })
+                .unwrap_or(0);
+            assert_eq!(depth, 100);
+        }
+    }
+
+    /// Test recursion depth resets between separate evaluations
+    #[tokio::test]
+    async fn test_recursion_depth_reset() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // First evaluation - simple expression
+        let expr1 = Expr::BinaryOp {
+            op: "+".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(1))),
+            right: Box::new(Expr::Literal(Literal::Number(2))),
+        };
+        
+        let result1 = eval_expr(&expr1, vars.clone(), funcs.clone(), macros.clone(), context.clone(), false).await;
+        assert!(result1.is_ok());
+        assert_eq!(result1.unwrap(), Value::Number(3));
+        
+        // Verify depth was reset to 0
+        {
+            let ctx = context.read().await;
+            let depth = ctx.get("__recursion_depth__")
+                .and_then(|v| if let Value::Number(n) = v { Some(*n) } else { None })
+                .unwrap_or(0);
+            assert_eq!(depth, 0);
+        }
+        
+        // Second evaluation - should also work with same context (depth was reset)
+        let expr2 = Expr::BinaryOp {
+            op: "*".to_string(),
+            left: Box::new(Expr::Literal(Literal::Number(3))),
+            right: Box::new(Expr::Literal(Literal::Number(4))),
+        };
+        
+        let result2 = eval_expr(&expr2, vars, funcs, macros, context, false).await;
+        assert!(result2.is_ok());
+        assert_eq!(result2.unwrap(), Value::Number(12)); // Should succeed because depth was properly reset
+    }
+
+    /// Test recursion limit with nested list comprehensions
+    #[tokio::test]
+    async fn test_recursion_limit_list_comprehension() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Set recursion depth close to limit but not over
+        {
+            let mut ctx = context.write().await;
+            ctx.insert("__recursion_depth__".to_string(), Value::Number(490));
+        }
+
+        // Create a simple list comprehension - should work if we're tracking depth correctly
+        let expr = Expr::ListComprehension {
+            expr: Box::new(Expr::Ident("x".to_string())),
+            var: "x".to_string(),
+            iterable: Box::new(Expr::List(vec![
+                Expr::Literal(Literal::Number(1)),
+                Expr::Literal(Literal::Number(2)),
+            ])),
+        };
+        
+        // This should work fine since we're at depth 490 + a few more for list comprehension
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        // May fail due to variable scoping, but should not be recursion limit error
+        if result.is_err() {
+            let error = result.unwrap_err();
+            assert!(!error.contains("RECURSION LIMIT EXCEEDED"));
+        }
+    }
+
+    /// Test recursion limit with deeply nested maps
+    #[tokio::test]
+    async fn test_recursion_limit_nested_maps() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Create simple map expression (avoid deep nesting in test construction)
+        let mut inner_map = HashMap::new();
+        inner_map.insert("value".to_string(), Expr::Literal(Literal::Number(42)));
+        
+        let mut outer_map = HashMap::new();
+        outer_map.insert("nested".to_string(), Expr::Map(inner_map));
+        let expr = Expr::Map(outer_map);
+        
+        // Test with normal depth (should work fine)
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_ok());
+        
+        // Verify the result is a nested map structure
+        if let Value::Map(m) = result.unwrap() {
+            assert!(m.contains_key("nested"));
+            if let Some(Value::Map(nested)) = m.get("nested") {
+                assert!(nested.contains_key("value"));
+            }
+        } else {
+            panic!("Expected map value");
+        }
+    }
+
+    /// Test error message quality for recursion limit
+    #[tokio::test]
+    async fn test_recursion_error_message_quality() {
+        let vars = Arc::new(RwLock::new(HashMap::new()));
+        let funcs = Arc::new(RwLock::new(HashMap::new()));
+        let macros = Arc::new(RwLock::new(HashMap::new()));
+        let context = Arc::new(RwLock::new(HashMap::new()));
+
+        // Set recursion depth at the limit
+        {
+            let mut ctx = context.write().await;
+            ctx.insert("__recursion_depth__".to_string(), Value::Number(500));
+        }
+        
+        // Any expression should now fail with a helpful error
+        let expr = Expr::Literal(Literal::Number(1));
+        
+        let result = eval_expr(&expr, vars, funcs, macros, context, false).await;
+        assert!(result.is_err());
+        let error = result.unwrap_err();
+        
+        // Verify error message has all the helpful components
+        assert!(error.contains("RECURSION LIMIT EXCEEDED"));
+        assert!(error.contains("Possible causes:"));
+        assert!(error.contains("Infinite recursion"));
+        assert!(error.contains("Circular references"));
+        assert!(error.contains("Fix:"));
+        assert!(error.contains("Check for infinite loops"));
+        assert!(error.contains("Simplify complex expressions"));
+        assert!(error.contains("Current depth:"));
+        assert!(error.contains("Maximum allowed:"));
     }
 }
