@@ -3,3 +3,8 @@ mod example_scripts_test;
 mod stdlib;
 mod stdlib_test;
 mod exploit_chain_test;
+mod ssh_exploitation_test;
+mod binary_patching_test;
+mod time_travel_debugging_test;
+mod oracle_vuln_detection_test;
+mod rop_and_mitigation_test;
