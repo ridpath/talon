@@ -340,7 +340,7 @@ mod tests {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// MODERN HEAP EXPLOITATION (GLIBC 2.35+) - BEST-IN-CLASS IMPLEMENTATION
+// MODERN HEAP EXPLOITATION (GLIBC 2.35+) - COMPREHENSIVE IMPLEMENTATION
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone, PartialEq)]

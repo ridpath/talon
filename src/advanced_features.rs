@@ -1,5 +1,5 @@
 // ADVANCED FEATURES MODULE
-// Consolidated implementation of all world-class exploitation features
+// Consolidated implementation of comprehensive exploitation features
 
 // ═══════════════════════ HEAP FENG SHUI ═══════════════════════
 

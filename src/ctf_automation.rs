@@ -1,6 +1,6 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // CTF AUTOMATION & SESSION MANAGEMENT
-// Best-in-class challenge tracking, flag submission, and parallel solving
+// Comprehensive challenge tracking, flag submission, and parallel solving
 // ═══════════════════════════════════════════════════════════════════════════
 
 use serde::{Deserialize, Serialize};

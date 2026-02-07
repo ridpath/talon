@@ -1,5 +1,5 @@
 # ROP DSL Showcase - Comprehensive ROP Chain Building Examples
-# Demonstrates all the new world-class ROP DSL functions in TALON
+# Demonstrates all the comprehensive ROP DSL functions in TALON
 
 print("═══════════════════════════════════════════════════════════")
 print("    TALON ROP DSL - Complete Showcase")

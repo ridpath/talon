@@ -1,5 +1,5 @@
 // CTF Quick Helpers - One-liner functions for rapid exploitation
-// World-class helper functions for CTF speed and efficiency
+// Comprehensive helper functions for CTF speed and efficiency
 
 use std::collections::HashMap;
 

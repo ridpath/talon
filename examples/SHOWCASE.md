@@ -1,4 +1,4 @@
-# TALON: World-Class Heap Exploitation in Human-Readable DSL
+# TALON: Comprehensive Heap Exploitation in Human-Readable DSL
 
 ## The Simplest Possible Exploit
 
@@ -294,7 +294,7 @@ fn solve_ctf() -> Result<(), String> {
 
 ---
 
-## Why TALON is World-Class
+## TALON Features
 
 ### 1. **Human-Readable DSL**
 ```rust

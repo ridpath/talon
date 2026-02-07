@@ -201,7 +201,7 @@ pub struct StackFrame {
 
 // ═══════════════════════════════════════════════════════════════════════════
 // TIME-TRAVEL DEBUGGING (rr integration)
-// Best-in-class reverse debugging with checkpointing and state diffing
+// Comprehensive reverse debugging with checkpointing and state diffing
 // ═══════════════════════════════════════════════════════════════════════════
 
 #[derive(Debug, Clone)]

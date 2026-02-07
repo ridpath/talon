@@ -1242,7 +1242,7 @@ talon-heap - Modern heap exploitation framework for glibc 2.23 - 2.39+
 .SH DESCRIPTION
 The
 .B heap_exploit
-command provides best-in-class heap exploitation capabilities for modern glibc versions,
+command provides comprehensive heap exploitation capabilities for modern glibc versions,
 including advanced bypass techniques for safe-linking (glibc 2.32+) and tcache key
 validation (glibc 2.35+). Supports classic and modern heap techniques including
 House of IO, House of Apple, and largebin attacks.
@@ -3252,7 +3252,7 @@ talon-safety \- Runtime safety and resource management system
 .SH SYNOPSIS
 set_timeout, set_memory_limit, set_recursion_limit, enable_strict_mode, disable_strict_mode, get_safety_stats, reset_safety
 .SH DESCRIPTION
-Provides world-class runtime safety with automatic bounds checking, type validation, overflow protection, and resource limits. Prevents timeout, memory exhaustion, stack overflow, and common runtime errors.
+Provides comprehensive runtime safety with automatic bounds checking, type validation, overflow protection, and resource limits. Prevents timeout, memory exhaustion, stack overflow, and common runtime errors.
 .SH COMMANDS
 .TP
 .BI "set_timeout " milliseconds

@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// WORLD-CLASS HEAP EXPLOITATION - COMPLETE EXAMPLE
+// COMPREHENSIVE HEAP EXPLOITATION - COMPLETE EXAMPLE
 // ═══════════════════════════════════════════════════════════════════════════
 // Demonstrates the most advanced features:
 // - Auto leak detection
@@ -313,7 +313,7 @@ fn example_complete_workflow() -> Result<(), String> {
 
 fn main() -> Result<(), String> {
     println!("\n╔═══════════════════════════════════════════════════════════════════╗");
-    println!("║  TALON: World-Class Heap Exploitation Framework                  ║");
+    println!("║  TALON: Comprehensive Heap Exploitation Framework                ║");
     println!("║  Human-Readable DSL for Modern Heap Attacks                      ║");
     println!("╚═══════════════════════════════════════════════════════════════════╝");
 
@@ -326,7 +326,7 @@ fn main() -> Result<(), String> {
     example_complete_workflow()?;
 
     println!("\n╔═══════════════════════════════════════════════════════════════════╗");
-    println!("║   RATING: A+ TIER (WORLD-CLASS)                                ║");
+    println!("║   RATING: ADVANCED TIER                                         ║");
     println!("║                                                                   ║");
     println!("║   Modern mitigations (safe-linking, tcache key)                ║");
     println!("║   GDB integration for live analysis                            ║");

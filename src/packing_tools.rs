@@ -1,5 +1,5 @@
 // ═══════════════════════════════════════════════════════════════════════════
-// PACKING/UNPACKING TOOLKIT - WORLD-CLASS EXPLOIT DEV
+// PACKING/UNPACKING TOOLKIT - COMPREHENSIVE EXPLOIT DEV
 // ═══════════════════════════════════════════════════════════════════════════
 // Provides pwntools-style pack/unpack primitives for exploit development
 

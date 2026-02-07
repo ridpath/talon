@@ -1,7 +1,7 @@
 // ═══════════════════════════════════════════════════════════════════════════
 // HEAP GROOMING & FENG SHUI - ADVANCED HEAP LAYOUT MANIPULATION
 // ═══════════════════════════════════════════════════════════════════════════
-// World-class heap grooming primitives for controlling heap layout,
+// Comprehensive heap grooming primitives for controlling heap layout,
 // cache alignment, and exploit reliability
 
 use serde::{Deserialize, Serialize};

@@ -1,11 +1,11 @@
 # ═══════════════════════════════════════════════════════════════
 # ADVANCED FORMAT STRING SHOWCASE
-# World-class format string exploitation in TALON DSL
+# Comprehensive format string exploitation in TALON DSL
 # ═══════════════════════════════════════════════════════════════
 
 print("═══════════════════════════════════════════════════════════════")
 print("  ADVANCED FORMAT STRING SHOWCASE")
-print("  Demonstrating world-class format string exploitation")
+print("  Demonstrating comprehensive format string exploitation")
 print("═══════════════════════════════════════════════════════════════")
 print("")
 

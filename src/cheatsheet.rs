@@ -326,7 +326,7 @@ FFI Support:
   get_symbol(lib, symbol)             Get symbol address
   ffi_call(lib, func, ...)            Call foreign function
 
-WORLD-CLASS FUNCTIONS (Phase 11+)
+ADVANCED FUNCTIONS (Phase 11+)
 ──────────────────────────────────────────────────────────────────────────
 Cryptography & Hashing:
   sha256(data)                        SHA-256 hash

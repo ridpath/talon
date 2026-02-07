@@ -1,11 +1,11 @@
 # ═══════════════════════════════════════════════════════════════
 # ADVANCED SHELLCODE SHOWCASE
-# World-class shellcode generation and encoding in TALON DSL
+# Comprehensive shellcode generation and encoding in TALON DSL
 # ═══════════════════════════════════════════════════════════════
 
 print("═══════════════════════════════════════════════════════════════")
 print("  ADVANCED SHELLCODE SHOWCASE")
-print("  Demonstrating world-class shellcode generation in TALON")
+print("  Demonstrating comprehensive shellcode generation in TALON")
 print("═══════════════════════════════════════════════════════════════")
 print("")
 
