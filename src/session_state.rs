@@ -189,6 +189,26 @@ impl ExploitSession {
         state.addresses.libc_base
     }
 
+    pub async fn set_heap_base(&self, address: u64) {
+        let mut state = self.state.write().await;
+        state.addresses.heap_base = Some(address);
+    }
+
+    pub async fn get_heap_base(&self) -> Option<u64> {
+        let state = self.state.read().await;
+        state.addresses.heap_base
+    }
+
+    pub async fn set_binary_base(&self, address: u64) {
+        let mut state = self.state.write().await;
+        state.addresses.binary_base = Some(address);
+    }
+
+    pub async fn get_binary_base(&self) -> Option<u64> {
+        let state = self.state.read().await;
+        state.addresses.binary_base
+    }
+
     pub async fn set_symbol(&self, name: String, address: u64) {
         let mut state = self.state.write().await;
         state.addresses.symbols.insert(name, address);

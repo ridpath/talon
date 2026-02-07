@@ -131,7 +131,7 @@ async fn test_time_travel_send_rewind() {
     }).await;
     
     // Rewind to second send
-    let result = recorder.rewind_to_send(1).await;
+    let result: Result<(), String> = recorder.rewind_to_send(1).await;
     assert!(result.is_ok(), "Should rewind to send event");
 }
 
@@ -186,18 +186,24 @@ async fn test_time_travel_timeline_export() {
     }).await;
     
     // Export timeline
-    let timeline_path = "test_timeline.json";
-    let result = recorder.export_timeline(timeline_path).await;
+    let timeline = recorder.export_timeline().await;
     
-    if result.is_ok() {
-        assert!(Path::new(timeline_path).exists(), "Timeline file should exist");
-        
-        // Verify JSON format
-        let content = fs::read_to_string(timeline_path).unwrap();
-        assert!(content.contains("SendPayload") || content.contains("Connect"));
-        
-        // Cleanup
-        fs::remove_file(timeline_path).ok();
+    // Verify timeline has events
+    assert!(timeline.event_count >= 3, "Timeline should have at least 3 events");
+    
+    // Optionally save to JSON file for manual inspection
+    let timeline_path = "test_timeline.json";
+    if let Ok(json) = serde_json::to_string_pretty(&timeline) {
+        if fs::write(timeline_path, json).is_ok() {
+            assert!(Path::new(timeline_path).exists(), "Timeline file should exist");
+            
+            // Verify JSON format
+            let content = fs::read_to_string(timeline_path).unwrap();
+            assert!(content.contains("SendPayload") || content.contains("Connect"));
+            
+            // Cleanup
+            fs::remove_file(timeline_path).ok();
+        }
     }
 }
 
@@ -213,7 +219,14 @@ async fn test_time_travel_gdb_integration() {
     
     use talon::gdb_tools::GdbSession;
     
-    let gdb = GdbSession::new().unwrap();
+    // Start GDB with no arguments (just a shell)
+    let gdb_result = GdbSession::start("");
+    if gdb_result.is_err() {
+        println!("GDB not available: {:?}", gdb_result.err());
+        return;
+    }
+    
+    let gdb = gdb_result.unwrap();
     
     // Test reverse commands (would require target process)
     // In real usage:
@@ -285,10 +298,10 @@ async fn test_time_travel_snapshot_comparison() {
     
     // Create snapshots
     session.set_libc_base(0x7ffff7a00000).await;
-    let snap1 = recorder.create_snapshot("initial".to_string()).await;
+    let snap1: Result<u64, String> = recorder.create_snapshot("initial".to_string()).await;
     
     session.set_heap_base(0x555555756000).await;
-    let snap2 = recorder.create_snapshot("after_spray".to_string()).await;
+    let snap2: Result<u64, String> = recorder.create_snapshot("after_spray".to_string()).await;
     
     // Diff snapshots
     let diff_result = recorder.diff_checkpoints(snap1.unwrap(), snap2.unwrap()).await;
@@ -322,7 +335,7 @@ async fn test_time_travel_fast_forward() {
     session.rewind(c1).await.unwrap();
     
     // Fast-forward to latest
-    let ff_result = recorder.fast_forward_to_latest().await;
+    let ff_result: Result<(), String> = recorder.fast_forward_to_latest().await;
     
     if ff_result.is_ok() {
         // Should be at latest state
