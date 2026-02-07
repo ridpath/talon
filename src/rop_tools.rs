@@ -893,7 +893,7 @@ impl AutoROPSolver {
         true
     }
 
-    fn check_constraints(&self, chain: &[u64]) -> bool {
+    pub fn check_constraints(&self, chain: &[u64]) -> bool {
         for constraint in &self.constraints {
             match constraint {
                 Constraint::NoNullBytes => {
