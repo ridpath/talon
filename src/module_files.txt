@@ -32,7 +32,6 @@ pub mod advanced_fuzzer;
 pub mod ai_exploit_gen;
 pub mod auto_offset;
 pub mod binary_similarity;
-pub mod c2_tools;
 pub mod crypto_tools;
 pub mod cve_scanner;
 pub mod cyclic_pattern;
@@ -83,7 +82,3 @@ pub mod forensics;
 
 // Distributed Swarm Mode (Phase 6)
 pub mod cloud;
-
-// Language Server Protocol (IDE integration) - Optional feature
-#[cfg(feature = "lsp-server")]
-pub mod lsp_server;

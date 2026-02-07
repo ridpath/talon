@@ -1,0 +1,146 @@
+
+TALON v0.1.0
+
+Domain-Specific Language for Security Research & Exploit Development
+
+USAGE:
+  talon [OPTIONS] <COMMAND> [ARGS]...
+
+OPTIONS:
+  -h, --help              Display this help message
+  -v, --version           Display version information
+  -V, --verbose           Enable verbose logging
+  -q, --quiet             Suppress non-essential output
+      --no-color          Disable colored output
+      --config <PATH>     Specify alternate configuration file
+      --no-ai             Disable AI-powered features
+      --explain-errors    Enable AI-powered error explanations
+
+COMMANDS:
+  Script Execution:
+    run <file>            Execute a Talon script file
+                          Flags: --dev (fast interpreter mode, <500ms startup)
+                                 --verbose (enable debug logging)
+                                 --dry-run (validate without execution)
+                                 --production (enable error obfuscation)
+    repl                  Start an interactive REPL shell
+
+  Template Generation:
+    new <type> <name>     Generate exploit template
+                          Types: buffer-overflow, rop, format-string, heap,
+                                 kernel, ret2libc, use-after-free, shellcode,
+                                 web-sqli, smart-contract, basic
+
+  Binary Analysis:
+    build <file>          Compile script to native binary
+                          Flags: --evasion-level <low|medium|high> (polymorphic wrapping)
+                                 --static (static linking)
+                                 --run (execute after build)
+    wasm <file>           Compile script to WebAssembly
+    analyze <binary>      Detect protections and vulnerabilities
+    oracle <binary>       Vulnerability detection and analysis
+    patch <binary>        Interactive binary patching mode
+    debug <script>        Time-travel debugging with checkpoints
+    diff <file1> <file2>  Compare binaries and find exploits
+
+  Exploit Database:
+    db search <query>     Search exploit database
+    db list               List all exploits in database
+    db show <CVE-ID>      Show exploit details
+    db type <type>        Filter by exploit type
+    db platform <os>      Filter by platform
+
+  AI Integration:
+    audit --ai <binary>   AI-powered vulnerability analysis
+    explain --ai <error>  AI-powered error explanation
+    suggest --ai <script> AI code review and suggestions
+    fix --ai <script>     AI-powered automatic script fixing
+    document --ai <script> AI-powered documentation generation
+
+  Swarm Mode:
+    swarm deploy <inv>    Deploy agents from inventory file
+    swarm run <script>    Execute script on swarm agents
+                          Flags: --agents-from <inventory>
+    swarm status          Show agent status
+    swarm results <id>    Show execution results
+    agent --connect <url> Start agent and connect to swarm controller
+
+  Cache Management:
+    cache stats           Display build cache statistics
+    cache clean [days]    Clean cache entries older than N days (default: 30)
+
+  Configuration:
+    config init           Create default configuration
+    config show           Display current configuration
+    config edit           Open config file in editor
+
+  Documentation:
+    man <topic>           Display manual page
+    completion <shell>    Generate shell completion (bash/zsh/fish/powershell)
+
+EXAMPLES:
+  Run an exploit script:
+    $ talon run exploit.tal --verbose
+
+  Generate ROP template:
+    $ talon new rop my_exploit
+
+  Build with evasion:
+    $ talon build exploit.tal --evasion-level high
+
+  Analyze binary protections:
+    $ talon analyze ./vulnerable_app
+
+  Detect vulnerabilities:
+    $ talon oracle ./target_binary
+
+  Interactive patching:
+    $ talon patch ./binary
+
+  Time-travel debugging:
+    $ talon debug exploit.tal
+
+  Search for CVE:
+    $ talon db search CVE-2021-44228
+
+  AI-powered audit:
+    $ talon audit --ai ./vulnerable_app
+
+  Start interactive session:
+    $ talon repl
+
+  Diff binaries for exploits:
+    $ talon diff original.bin patched.bin
+
+  Deploy swarm agents:
+    $ talon swarm deploy inventory.ini
+
+  Start agent mode:
+    $ talon agent --connect http://primary:8080
+
+  Generate shell completion:
+    $ talon completion bash > /etc/bash_completion.d/talon
+
+CONFIGURATION:
+  Config file: ~/.config/talon/config.toml (Linux/macOS)
+               %APPDATA%\talon\config.toml (Windows)
+
+  Options:
+    lm_studio_url         - LM Studio API endpoint
+    lm_studio_model       - AI model for exploit generation
+    verbosity             - Logging level (quiet/normal/verbose/debug)
+    enable_colors         - Colored terminal output
+    enable_progress_bars  - Show progress indicators
+    default_arch          - Default target architecture
+    default_os            - Default target OS
+
+DOCUMENTATION:
+  Full manual:     man talon
+  ROP guide:       man talon-rop
+  Shellcode guide: man talon-shellcode
+  Exploit guide:   man talon-exploit
+  Templates:       man talon-new
+  Database:        man talon-db
+
+For more information, visit: https://github.com/talon-lang/talon
+

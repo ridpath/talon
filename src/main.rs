@@ -77,7 +77,9 @@ mod advanced_features; // Heap feng shui, kernel exploits, smart contracts, etc.
 mod advanced_fuzzer; // Protocol-aware coverage-guided fuzzing
 mod ai_exploit; // AI-powered exploit generation (LM Studio)
 mod debugger_bridge; // Live debugging DSL (GDB/LLDB/WinDbg)
+mod dotnet_scanner; // .NET assembly detection and analysis
 mod gdb_mi; // GDB Machine Interface protocol
+mod ghidra_bridge; // Ghidra headless analysis integration
 mod natural_language; // Natural language to Talon DSL
 #[cfg(feature = "symbolic-execution")]
 mod symbolic_engine; // Symbolic execution & constraint solving (Z3)

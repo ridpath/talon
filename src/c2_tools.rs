@@ -1,14 +1,13 @@
 use aes_gcm::{
-    aead::{Aead, KeyInit, OsRng},
-    Aes256Gcm, Nonce,
+    aead::{Aead, KeyInit},
+    Aes256Gcm,
     aead::generic_array::GenericArray,
 };
 use base64;
 use rand::{Rng, thread_rng};
-use std::collections::HashMap;
 use std::net::{UdpSocket, TcpStream};
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::io::{Write, Read};
+use std::io::Write;
 use std::fs;
 
 /// === CRYPTO PRIMITIVES ===
@@ -29,15 +28,19 @@ pub fn otp_encrypt(data: &[u8], key: &[u8]) -> Vec<u8> {
 }
 
 pub fn aes_gcm_encrypt(data: &[u8], key_hex: &str, nonce_hex: &str) -> Result<Vec<u8>, String> {
-    let key = GenericArray::from_slice(&hex::decode(key_hex).map_err(|e| e.to_string())?);
-    let nonce = GenericArray::from_slice(&hex::decode(nonce_hex).map_err(|e| e.to_string())?);
+    let key_bytes = hex::decode(key_hex).map_err(|e| e.to_string())?;
+    let nonce_bytes = hex::decode(nonce_hex).map_err(|e| e.to_string())?;
+    let key = GenericArray::from_slice(&key_bytes);
+    let nonce = GenericArray::from_slice(&nonce_bytes);
     let cipher = Aes256Gcm::new(key);
     cipher.encrypt(nonce, data).map_err(|e| format!("AES-GCM error: {}", e))
 }
 
 pub fn aes_gcm_decrypt(data: &[u8], key_hex: &str, nonce_hex: &str) -> Result<Vec<u8>, String> {
-    let key = GenericArray::from_slice(&hex::decode(key_hex).map_err(|e| e.to_string())?);
-    let nonce = GenericArray::from_slice(&hex::decode(nonce_hex).map_err(|e| e.to_string())?);
+    let key_bytes = hex::decode(key_hex).map_err(|e| e.to_string())?;
+    let nonce_bytes = hex::decode(nonce_hex).map_err(|e| e.to_string())?;
+    let key = GenericArray::from_slice(&key_bytes);
+    let nonce = GenericArray::from_slice(&nonce_bytes);
     let cipher = Aes256Gcm::new(key);
     cipher.decrypt(nonce, data).map_err(|e| format!("AES-GCM decrypt failed: {}", e))
 }

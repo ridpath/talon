@@ -62,8 +62,8 @@ log = "0.4"
 env_logger = "0.10"
 colored = "2.1"
 
-# LSP
-tower-lsp = "0.20"
+# LSP (optional - for IDE integration)
+tower-lsp = { version = "0.20", optional = true }
 
 # Optional CLI utility for future tooling
 clap = { version = "4.5", features = ["derive"] }
@@ -137,6 +137,7 @@ harness = false
 [features]
 default = []
 llvm = ["inkwell"]
+lsp-server = ["tower-lsp"]
 malware-analysis = ["yara"]
 binary-patching = ["keystone-engine"]
 symbolic-execution = ["z3"]
