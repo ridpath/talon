@@ -3019,6 +3019,64 @@ fn eval_expr<'a>(
                             }
                         }
                     }
+                    "checksec" => {
+                        // Analyze binary security features and return protection flags
+                        if arg_values.is_empty() {
+                            return Err("checksec() requires binary path argument".to_string());
+                        }
+                        let binary_path = arg_values[0].to_string();
+
+                        // Create a map with security protection information
+                        let mut protections_map = HashMap::new();
+                        protections_map.insert("path".to_string(), Value::String(binary_path.clone()));
+
+                        // Try to analyze the binary using elf_tools
+                        match crate::elf_tools::ElfContext::load(&binary_path) {
+                            Ok(elf_ctx) => {
+                                // Add protection flags as numbers (1 = enabled, 0 = disabled)
+                                protections_map.insert("pie".to_string(), Value::Number(if elf_ctx.pie { 1 } else { 0 }));
+                                protections_map.insert("nx".to_string(), Value::Number(if elf_ctx.nx { 1 } else { 0 }));
+                                protections_map.insert("canary".to_string(), Value::Number(if elf_ctx.canary { 1 } else { 0 }));
+                                protections_map.insert("relro".to_string(), Value::Number(if elf_ctx.relro { 1 } else { 0 }));
+                                protections_map.insert("fortify".to_string(), Value::Number(if elf_ctx.fortify { 1 } else { 0 }));
+
+                                // Add string representation for RELRO (Full RELRO, Partial RELRO, No RELRO)
+                                let relro_str = if elf_ctx.relro { "Full RELRO" } else { "Partial RELRO" };
+                                protections_map.insert("relro_string".to_string(), Value::String(relro_str.to_string()));
+
+                                println!("[CHECKSEC] Security features for '{}':", binary_path);
+                                println!("    PIE:    {}", if elf_ctx.pie { "Enabled" } else { "Disabled" });
+                                println!("    NX:     {}", if elf_ctx.nx { "Enabled" } else { "Disabled" });
+                                println!("    Canary: {}", if elf_ctx.canary { "Enabled" } else { "Disabled" });
+                                println!("    RELRO:  {}", relro_str);
+                                println!("    FORTIFY:{}", if elf_ctx.fortify { "Enabled" } else { "Disabled" });
+
+                                Ok(Value::Map(protections_map))
+                            }
+                            Err(e) => {
+                                // If we can't analyze the binary, return default values for dry-run
+                                eprintln!("[WARNING] Could not analyze binary '{}': {}", binary_path, e);
+                                eprintln!("[CHECKSEC] Using default protection values for dry-run mode");
+                                
+                                // Default values (assume some protections are enabled)
+                                protections_map.insert("pie".to_string(), Value::Number(0)); // Disabled by default
+                                protections_map.insert("nx".to_string(), Value::Number(1));  // Enabled by default
+                                protections_map.insert("canary".to_string(), Value::Number(1)); // Enabled by default
+                                protections_map.insert("relro".to_string(), Value::Number(1));  // Enabled by default
+                                protections_map.insert("fortify".to_string(), Value::Number(0)); // Disabled by default
+                                protections_map.insert("relro_string".to_string(), Value::String("Partial RELRO".to_string()));
+
+                                println!("[CHECKSEC] Security features for '{}' (dry-run defaults):", binary_path);
+                                println!("    PIE:    Disabled");
+                                println!("    NX:     Enabled");
+                                println!("    Canary: Enabled");
+                                println!("    RELRO:  Partial RELRO");
+                                println!("    FORTIFY:Disabled");
+
+                                Ok(Value::Map(protections_map))
+                            }
+                        }
+                    }
                     "Libc" => {
                         if arg_values.is_empty() {
                             return Err("Libc() requires libc version string argument (e.g., 'ubuntu20.04', 'ubuntu18.04', 'ubuntu22.04', 'debian10', 'debian11', 'ubuntu16.04-amd64')".to_string());

@@ -1099,6 +1099,24 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
     );
 
     registry.insert(
+        "checksec".to_string(),
+        BuiltinFunction::new(
+            "checksec",
+            "checksec(binary: string) -> map",
+            "Analyzes binary security features and returns protection flags (PIE, NX, Canary, RELRO, FORTIFY)",
+            "Binary Analysis",
+            vec![
+                "let protections = checksec(\"./vuln\")",
+                "print(\"NX:\", protections.nx)",
+                "print(\"PIE:\", protections.pie)",
+                "if checksec(binary).canary { print(\"Stack canary detected\") }",
+            ],
+        )
+        .with_related(vec!["Elf", "analyze", "parse_elf"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
         "copy".to_string(),
         BuiltinFunction::new(
             "copy",
