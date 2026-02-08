@@ -1178,18 +1178,7 @@ fn parse_expr(pair: Pair<Rule>) -> Expr {
         Rule::call_func => {
             let mut parts = pair.into_inner();
             let name = parts.next().unwrap().as_str().to_string();
-            let args = parts
-                .map(|p| {
-                    if p.as_rule() == Rule::named_arg {
-                        let mut arg_parts = p.into_inner();
-                        let key = arg_parts.next().unwrap().as_str().to_string();
-                        let value = parse_expr(arg_parts.next().unwrap());
-                        (Some(key), value)
-                    } else {
-                        (None, parse_expr(p))
-                    }
-                })
-                .collect();
+            let args = parse_call_args(parts.next());
             Expr::Call { name, args }
         }
         Rule::call_macro => {
@@ -1416,6 +1405,41 @@ fn parse_factor(pair: Pair<Rule>) -> Expr {
     left
 }
 
+fn parse_call_args(pair_opt: Option<Pair<Rule>>) -> Vec<(Option<String>, Expr)> {
+    let pair = match pair_opt {
+        Some(p) if p.as_rule() == Rule::call_args => p,
+        Some(p) => {
+            // If not call_args, treat as single positional argument
+            return vec![(None, parse_expr(p))];
+        }
+        None => return vec![], // No arguments
+    };
+
+    let mut args = Vec::new();
+    
+    for inner in pair.into_inner() {
+        match inner.as_rule() {
+            Rule::arg_item => {
+                // Check if this is a named argument or positional
+                let first_child = inner.into_inner().next().unwrap();
+                if first_child.as_rule() == Rule::func_named_arg {
+                    // Named argument
+                    let mut arg_parts = first_child.into_inner();
+                    let key = arg_parts.next().unwrap().as_str().to_string();
+                    let value = parse_expr(arg_parts.next().unwrap());
+                    args.push((Some(key), value));
+                } else {
+                    // Positional argument (expr)
+                    args.push((None, parse_expr(first_child)));
+                }
+            }
+            _ => {}
+        }
+    }
+    
+    args
+}
+
 fn parse_unary(pair: Pair<Rule>) -> Expr {
     let mut parts = pair.into_inner();
     let mut base = parse_primary(parts.next().unwrap());
@@ -1446,18 +1470,8 @@ fn parse_unary(pair: Pair<Rule>) -> Expr {
                     index: Box::new(parse_expr(first)),
                 };
             } else {
-                let args = post_parts
-                    .map(|p| {
-                        if p.as_rule() == Rule::named_arg {
-                            let mut arg_parts = p.into_inner();
-                            let key = arg_parts.next().unwrap().as_str().to_string();
-                            let value = parse_expr(arg_parts.next().unwrap());
-                            (Some(key), value)
-                        } else {
-                            (None, parse_expr(p))
-                        }
-                    })
-                    .collect();
+                // This is a function call - first element should be call_args
+                let args = parse_call_args(Some(first));
 
                 if let Expr::Ident(name) = base {
                     base = Expr::Call { name, args };

@@ -70,7 +70,11 @@ term         = { factor ~ (add_op ~ factor)* }
 factor       = { unary ~ (mul_op ~ unary)* }
 unary        = { unary_op? ~ primary ~ postfix* }
 unary_op     = { "not" | "-" | "!" }
-postfix      = { "." ~ ident | "(" ~ (named_arg | expr ~ ","?)* ~ ")" | "[" ~ (slice_range | expr) ~ "]" }
+postfix      = { "." ~ ident | "(" ~ call_args? ~ ")" | "[" ~ (slice_range | expr) ~ "]" }
+call_args    = { arg_item ~ ("," ~ arg_item)* }
+arg_item     = { func_named_arg | expr }
+func_named_arg = { param_name ~ ":" ~ expr }
+param_name   = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 slice_range  = { expr? ~ ".." ~ expr? }
 primary      = { 
     pack_expr | 
@@ -130,7 +134,8 @@ list_item    = { spread_expr | expr }
 spread_expr  = { "..." ~ expr }
 
 map          = { "{" ~ (map_pair ~ ","?)* ~ "}" }
-map_pair     = { (ident | quoted_string) ~ ":" ~ expr }
+map_pair     = { (map_key | quoted_string) ~ ":" ~ expr }
+map_key      = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 
 set          = { "#{" ~ (expr ~ ","?)* ~ "}" }
 
@@ -147,7 +152,7 @@ range        = { expr ~ ".." ~ expr }
 named_arg    = { ident ~ "=" ~ expr }
 
 // Function and macro calls (can appear as statements)
-call_func    = { ident ~ "(" ~ (named_arg | expr ~ ","?)* ~ ")" }
+call_func    = { ident ~ "(" ~ call_args? ~ ")" }
 call_macro   = { "@" ~ ident ~ "(" ~ (expr ~ ","?)* ~ ")" }
 
 // Legacy command rules (for backward compatibility with parser.rs)
