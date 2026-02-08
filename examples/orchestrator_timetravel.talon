@@ -6,8 +6,6 @@ print("Time-travel debugging with state checkpointing...")
 
 define function try_approach_a(target, base_state) {
     print("Trying approach A with base state...")
-    let state = base_state
-    state.approach = "A"
     
     # Simulate exploit attempt
     let conn = connect_tcp(target, 1337)
@@ -16,18 +14,14 @@ define function try_approach_a(target, base_state) {
     let response = recv(conn, 1024)
     
     if "success" in response {
-        state.success = true
-        return state
+        return { "target": base_state.target, "libc_base": base_state.libc_base, "binary_base": base_state.binary_base, "approach": "A", "success": true }
     }
     
-    state.success = false
-    return state
+    return { "target": base_state.target, "libc_base": base_state.libc_base, "binary_base": base_state.binary_base, "approach": "A", "success": false }
 }
 
 define function try_approach_b(target, base_state) {
     print("Trying approach B with base state...")
-    let state = base_state
-    state.approach = "B"
     
     # Different exploit strategy
     let conn = connect_tcp(target, 1337)
@@ -36,12 +30,10 @@ define function try_approach_b(target, base_state) {
     let response = recv(conn, 1024)
     
     if "success" in response {
-        state.success = true
-        return state
+        return { "target": base_state.target, "libc_base": base_state.libc_base, "binary_base": base_state.binary_base, "approach": "B", "success": true }
     }
     
-    state.success = false
-    return state
+    return { "target": base_state.target, "libc_base": base_state.libc_base, "binary_base": base_state.binary_base, "approach": "B", "success": false }
 }
 
 # Create base checkpoint state
@@ -77,42 +69,30 @@ print("\nBranching to explore different exploitation paths...")
 
 define function try_rop_branch(base_state) {
     print("Branch: ROP chain...")
-    let state = base_state
-    state.branch = "rop"
     
     # Build ROP chain
-    let rop_chain = p64(state.libc_base + 0x52290)  # system
-    state.payload = cyclic(264) + rop_chain
-    state.success_rate = 0.8
-    state.technique = "ROP"
+    let rop_chain = p64(base_state.libc_base + 0x52290)  # system
+    let payload = cyclic(264) + rop_chain
     
-    return state
+    return { "libc_base": base_state.libc_base, "stack_base": base_state.stack_base, "branch": "rop", "payload": payload, "success_rate": 0.8, "technique": "ROP" }
 }
 
 define function try_ret2libc_branch(base_state) {
     print("Branch: ret2libc...")
-    let state = base_state
-    state.branch = "ret2libc"
     
     # Build ret2libc payload
-    state.payload = cyclic(264) + p64(state.libc_base + 0x52290)
-    state.success_rate = 0.9
-    state.technique = "ret2libc"
+    let payload = cyclic(264) + p64(base_state.libc_base + 0x52290)
     
-    return state
+    return { "libc_base": base_state.libc_base, "stack_base": base_state.stack_base, "branch": "ret2libc", "payload": payload, "success_rate": 0.9, "technique": "ret2libc" }
 }
 
 define function try_one_gadget_branch(base_state) {
     print("Branch: one-gadget...")
-    let state = base_state
-    state.branch = "one_gadget"
     
     # Use one-gadget
-    state.payload = cyclic(264) + p64(state.libc_base + 0xe6c7e)
-    state.success_rate = 0.7
-    state.technique = "one-gadget"
+    let payload = cyclic(264) + p64(base_state.libc_base + 0xe6c7e)
     
-    return state
+    return { "libc_base": base_state.libc_base, "stack_base": base_state.stack_base, "branch": "one_gadget", "payload": payload, "success_rate": 0.7, "technique": "one-gadget" }
 }
 
 # Initial state after leak
@@ -177,23 +157,21 @@ let timeline_state = { "stage": 0 }
 
 define function execute_stage1(state) {
     print("[STAGE 1] Finding offset...")
-    state.stage = 1
-    state.offset = 264
-    return { "success": true, "state": state }
+    let new_state = { "stage": 1, "offset": 264 }
+    return { "success": true, "state": new_state }
 }
 
 define function execute_stage2(state) {
     print("[STAGE 2] Leaking libc...")
-    state.stage = 2
-    state.libc_base = 0x7ffff7a00000
-    return { "success": true, "state": state }
+    let new_state = { "stage": 2, "offset": state.offset, "libc_base": 0x7ffff7a00000 }
+    return { "success": true, "state": new_state }
 }
 
 define function execute_stage3(state) {
     print("[STAGE 3] Building ROP chain...")
-    state.stage = 3
-    state.rop_chain = p64(state.libc_base + 0x52290)
-    return { "success": true, "state": state }
+    let rop_chain = p64(state.libc_base + 0x52290)
+    let new_state = { "stage": 3, "offset": state.offset, "libc_base": state.libc_base, "rop_chain": rop_chain }
+    return { "success": true, "state": new_state }
 }
 
 # Execute stages
@@ -258,19 +236,15 @@ let exploit_state = {
 
 define function complex_exploit(state) {
     # Stage 1
-    state.stage = 1
-    state.events = state.events + ["Leak successful"]
+    let events1 = state.events + ["Leak successful"]
     
     # Stage 2
-    state.stage = 2
-    state.events = state.events + ["ROP built"]
+    let events2 = events1 + ["ROP built"]
     
     # Stage 3 (might fail)
-    state.stage = 3
-    state.success = false  # Simulated failure
-    state.events = state.events + ["Trigger failed"]
+    let events3 = events2 + ["Trigger failed"]
     
-    return state
+    return { "stage": 3, "events": events3, "success": false }
 }
 
 let result_state = complex_exploit(exploit_state)
