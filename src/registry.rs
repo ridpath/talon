@@ -1098,6 +1098,57 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
     );
 
     registry.insert(
+        "hex".to_string(),
+        BuiltinFunction::new(
+            "hex",
+            "hex(number: int) -> string",
+            "Converts integer to hexadecimal string with 0x prefix",
+            "Utilities",
+            vec![
+                "let addr = hex(0x401000)",
+                "print(\"Address:\", hex(win_addr))",
+                "print(hex(elf.symbols.main))",
+            ],
+        )
+        .with_related(vec!["str", "len"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "str".to_string(),
+        BuiltinFunction::new(
+            "str",
+            "str(value: any) -> string",
+            "Converts any value to string representation",
+            "Utilities",
+            vec![
+                "let size_str = str(len(payload))",
+                "print(\"Count: \" + str(42))",
+                "let json = str(map_data)",
+            ],
+        )
+        .with_related(vec!["hex", "len"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
+        "len".to_string(),
+        BuiltinFunction::new(
+            "len",
+            "len(collection: bytes/list/string/map/set) -> int",
+            "Returns the length of a collection",
+            "Utilities",
+            vec![
+                "let size = len(payload)",
+                "print(\"Payload size:\", len(payload), \"bytes\")",
+                "let gadget_count = len(rop_gadgets)",
+            ],
+        )
+        .with_related(vec!["str", "hex"])
+        .with_version("0.1.0"),
+    );
+
+    registry.insert(
         "remote".to_string(),
         BuiltinFunction::new(
             "remote",
