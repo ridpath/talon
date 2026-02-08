@@ -2875,6 +2875,60 @@ fn eval_expr<'a>(
                             }
                         }
                     }
+                    "Libc" => {
+                        if arg_values.is_empty() {
+                            return Err("Libc() requires libc version string argument (e.g., 'ubuntu20.04', 'ubuntu18.04', 'ubuntu22.04', 'debian10', 'debian11', 'ubuntu16.04-amd64')".to_string());
+                        }
+                        let version_str = arg_values[0].to_string();
+
+                        // Create a Libc context map with symbol information
+                        let mut libc_map = HashMap::new();
+                        libc_map.insert("name".to_string(), Value::String(version_str.clone()));
+                        libc_map.insert("version".to_string(), Value::String(version_str.clone()));
+
+                        // Try to get libc information from the database
+                        match crate::libc_db::LibcDatabase::new().get(&version_str) {
+                            Some(libc_info) => {
+                                // Add libc symbols as a nested map
+                                let mut symbols_map: HashMap<String, Value> = HashMap::new();
+                                for (sym_name, offset) in &libc_info.symbols {
+                                    symbols_map.insert(sym_name.clone(), Value::Number(*offset as i64));
+                                }
+                                libc_map.insert("symbols".to_string(), Value::Map(symbols_map));
+
+                                // Add build ID
+                                libc_map.insert("build_id".to_string(), Value::String(libc_info.build_id.clone()));
+
+                                Ok(Value::Map(libc_map))
+                            }
+                            None => {
+                                // If we can't find the libc version, return a basic map
+                                // This allows dry-run mode and examples to work
+                                eprintln!("[WARNING] Libc version '{}' not found in database. Using default values for dry-run.", version_str);
+                                
+                                // Return a basic Libc map with common default symbol offsets
+                                let mut symbols_map: HashMap<String, Value> = HashMap::new();
+                                symbols_map.insert("system".to_string(), Value::Number(0x50d60));
+                                symbols_map.insert("execve".to_string(), Value::Number(0xe6e30));
+                                symbols_map.insert("puts".to_string(), Value::Number(0x87490));
+                                symbols_map.insert("printf".to_string(), Value::Number(0x64f00));
+                                symbols_map.insert("malloc".to_string(), Value::Number(0x97070));
+                                symbols_map.insert("free".to_string(), Value::Number(0x98f90));
+                                symbols_map.insert("exit".to_string(), Value::Number(0x47090));
+                                symbols_map.insert("gets".to_string(), Value::Number(0x86990));
+                                symbols_map.insert("read".to_string(), Value::Number(0x111250));
+                                symbols_map.insert("write".to_string(), Value::Number(0x111310));
+                                symbols_map.insert("strcpy".to_string(), Value::Number(0x94d90));
+                                symbols_map.insert("strcmp".to_string(), Value::Number(0x943e0));
+                                symbols_map.insert("strlen".to_string(), Value::Number(0x94b40));
+                                symbols_map.insert("strcat".to_string(), Value::Number(0x93fc0));
+                                libc_map.insert("symbols".to_string(), Value::Map(symbols_map));
+                                libc_map.insert("build_id".to_string(), Value::String("unknown".to_string()));
+                                
+                                Ok(Value::Map(libc_map))
+                            }
+                        }
+                    }
                     "rop_find" => {
                         if arg_values.is_empty() {
                             return Err("rop_find() requires binary path argument".to_string());
