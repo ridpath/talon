@@ -107,7 +107,7 @@ define function exploit_target(target) {
         print("Exploiting:", target)
         let result = graph_buffer_overflow(target)
         return { "target": target, "success": true, "data": result }
-    } catch (error) {
+    } catch error {
         return { "target": target, "success": false, "error": error }
     }
 }

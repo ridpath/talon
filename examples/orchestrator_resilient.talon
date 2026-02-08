@@ -57,7 +57,7 @@ define function resilient_exploit(target) {
                 print("Exploit succeeded!")
                 return true
             }
-        } catch (error) {
+        } catch error {
             print("Attempt failed:", error)
         }
     }
@@ -86,7 +86,7 @@ define function retry_with_backoff(target, max_attempts) {
                 print("Got response:", response)
                 return { "success": true, "attempts": attempt + 1 }
             }
-        } catch (error) {
+        } catch error {
             print("Attempt failed:", error)
             attempt = attempt + 1
             
@@ -116,7 +116,7 @@ define function search_memory_pattern(pattern) {
             return { "found": true, "address": address }
         }
         return { "found": false }
-    } catch (error) {
+    } catch error {
         return { "found": false, "error": error }
     }
 }
@@ -163,7 +163,7 @@ define function resilient_network_operation(target) {
                 print("Got response:", response)
                 return { "success": true, "data": response }
             }
-        } catch (error) {
+        } catch error {
             print("Network error:", error)
             retry = retry + 1
             
@@ -196,7 +196,7 @@ define function stage_info_gathering(target) {
         
         print("[STAGE 1] Complete - state:", state)
         return { "success": true, "state": state }
-    } catch (error) {
+    } catch error {
         return { "success": false, "error": error }
     }
 }
@@ -218,7 +218,7 @@ define function stage_memory_manipulation(state) {
         
         print("[STAGE 2] Complete")
         return { "success": true }
-    } catch (error) {
+    } catch error {
         return { "success": false, "error": error }
     }
 }
@@ -236,7 +236,7 @@ define function stage_trigger_exploit(state) {
         }
         
         return { "success": false, "error": "Trigger failed" }
-    } catch (error) {
+    } catch error {
         return { "success": false, "error": error }
     }
 }

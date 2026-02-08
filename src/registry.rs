@@ -1151,6 +1151,41 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
     );
 
     registry.insert(
+        "map_set".to_string(),
+        BuiltinFunction::new(
+            "map_set",
+            "map_set(map: map, key: string, value: any) -> map",
+            "Returns a new map with the specified key-value pair set (functional-style update)",
+            "Utilities",
+            vec![
+                "let map = Map()",
+                "let map = map_set(map, \"name\", \"exploit\")",
+                "let map = map_set(map, \"count\", 42)",
+                "let libc_db = map_set(libc_db, build_id, version_info)",
+            ],
+        )
+        .with_related(vec!["Map", "map_get", "len"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "map_get".to_string(),
+        BuiltinFunction::new(
+            "map_get",
+            "map_get(map: map, key: string, default?: any) -> any",
+            "Safely retrieves a value from a map with optional default (returns Null if key not found and no default provided)",
+            "Utilities",
+            vec![
+                "let value = map_get(config, \"host\", \"localhost\")",
+                "let count = map_get(stats, \"attempts\", 0)",
+                "if map_get(libc_db, build_id) != null { print(\"Known libc\") }",
+            ],
+        )
+        .with_related(vec!["Map", "map_set", "len"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
         "hex".to_string(),
         BuiltinFunction::new(
             "hex",

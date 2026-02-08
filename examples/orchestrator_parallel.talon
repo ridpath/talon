@@ -60,7 +60,7 @@ define function try_ret2libc(target) {
             return { "strategy": "ret2libc", "success": true, "conn": conn }
         }
         return { "strategy": "ret2libc", "success": false }
-    } catch (error) {
+    } catch error {
         return { "strategy": "ret2libc", "success": false, "error": error }
     }
 }
@@ -77,7 +77,7 @@ define function try_rop_chain(target) {
             return { "strategy": "rop_chain", "success": true, "conn": conn }
         }
         return { "strategy": "rop_chain", "success": false }
-    } catch (error) {
+    } catch error {
         return { "strategy": "rop_chain", "success": false, "error": error }
     }
 }
@@ -94,7 +94,7 @@ define function try_heap_spray(target) {
             return { "strategy": "heap_spray", "success": true, "conn": conn }
         }
         return { "strategy": "heap_spray", "success": false }
-    } catch (error) {
+    } catch error {
         return { "strategy": "heap_spray", "success": false, "error": error }
     }
 }
@@ -130,7 +130,7 @@ define function fuzz_with_payload(payload_len) {
             return { "payload_len": payload_len, "crashed": true }
         }
         return { "payload_len": payload_len, "crashed": false }
-    } catch (error) {
+    } catch error {
         return { "payload_len": payload_len, "crashed": false, "error": error }
     }
 }
@@ -154,7 +154,7 @@ define function scan_port(host, port) {
         let conn = connect_tcp(host, port)
         close(conn)
         return { "port": port, "open": true }
-    } catch (error) {
+    } catch error {
         return { "port": port, "open": false }
     }
 }
@@ -198,7 +198,7 @@ define function exploit_single_target(target) {
         send(conn, exploit_payload)
         
         return { "target": target, "success": true, "libc_base": libc_base }
-    } catch (error) {
+    } catch error {
         return { "target": target, "success": false, "error": error }
     }
 }

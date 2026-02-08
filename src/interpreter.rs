@@ -5957,6 +5957,51 @@ fn eval_expr<'a>(
                             _ => Err(format!("hex() not supported for type: {:?}", arg_values[0])),
                         }
                     }
+                    "map_set" => {
+                        // Functional-style map update: map_set(map, key, value) -> new_map
+                        // This works around parser limitation with map["key"] = value in nested contexts
+                        if arg_values.len() < 3 {
+                            return Err("map_set() requires 3 arguments: map_set(map, key, value)\n\nExample:\n  let map = Map()\n  let map = map_set(map, \"key\", \"value\")\n  let map = map_set(map, \"count\", 42)".into());
+                        }
+                        
+                        match &arg_values[0] {
+                            Value::Map(m) => {
+                                let key = arg_values[1].to_string();
+                                let value = arg_values[2].clone();
+                                
+                                let mut new_map = m.clone();
+                                new_map.insert(key, value);
+                                Ok(Value::Map(new_map))
+                            }
+                            _ => Err(format!("map_set() requires a Map as first argument, got: {:?}\n\nUsage:\n  let map = Map()\n  let map = map_set(map, \"key\", value)", arg_values[0]))
+                        }
+                    }
+                    "map_get" => {
+                        // Safe map access: map_get(map, key, default?) -> value
+                        if arg_values.len() < 2 {
+                            return Err("map_get() requires at least 2 arguments: map_get(map, key) or map_get(map, key, default)".into());
+                        }
+                        
+                        match &arg_values[0] {
+                            Value::Map(m) => {
+                                let key = arg_values[1].to_string();
+                                let value = m.get(&key);
+                                
+                                match value {
+                                    Some(v) => Ok(v.clone()),
+                                    None => {
+                                        // Return default if provided, otherwise Null
+                                        if arg_values.len() >= 3 {
+                                            Ok(arg_values[2].clone())
+                                        } else {
+                                            Ok(Value::Null)
+                                        }
+                                    }
+                                }
+                            }
+                            _ => Err(format!("map_get() requires a Map as first argument, got: {:?}", arg_values[0]))
+                        }
+                    }
                     "int" => {
                         if arg_values.is_empty() {
                             return Err("int() requires 1 argument: int(value)".into());
