@@ -69,7 +69,7 @@ for payload in payloads {
     
     # Check for success
     if "shell" in response or "bash" in response {
-        print("[+] SUCCESS! Payload worked:", payload[264:])
+        print("[+] SUCCESS! Payload worked:", payload[264..])
         break
     } else {
         print("[-] Failed - rewinding...")

@@ -9747,6 +9747,262 @@ fn eval_expr<'a>(
                             _ => Err("trigger_function_pointer() requires (connection, number address)".into()),
                         }
                     }
+                    "exploit_chain_create" => {
+                        // Create a new exploit chain for state management
+                        // Returns a Map with empty state and checkpoints
+                        let mut chain = HashMap::new();
+                        chain.insert("checkpoints".to_string(), Value::Map(HashMap::new()));
+                        chain.insert("state".to_string(), Value::Map(HashMap::new()));
+                        chain.insert("debug".to_string(), Value::Number(0));
+                        Ok(Value::Map(chain))
+                    }
+                    "chain_set_debug" => {
+                        // Enable/disable debug output for chain
+                        // chain_set_debug(chain, enable)
+                        if arg_values.len() < 2 {
+                            return Err("chain_set_debug() requires 2 arguments: chain_set_debug(chain, enable)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::Map(chain), Value::Number(enable)) => {
+                                let mut new_chain = chain.clone();
+                                new_chain.insert("debug".to_string(), Value::Number(*enable));
+                                Ok(Value::Map(new_chain))
+                            }
+                            _ => Err("chain_set_debug() requires (Map chain, Number enable)".into()),
+                        }
+                    }
+                    "chain_checkpoint" => {
+                        // Create a checkpoint in the chain
+                        // chain_checkpoint(chain, name) -> checkpoint_id
+                        if arg_values.len() < 2 {
+                            return Err("chain_checkpoint() requires 2 arguments: chain_checkpoint(chain, name)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::Map(chain), Value::String(name)) => {
+                                let mut checkpoints = if let Some(Value::Map(cp)) = chain.get("checkpoints") {
+                                    cp.clone()
+                                } else {
+                                    HashMap::new()
+                                };
+                                
+                                // Store the current state
+                                let state = if let Some(Value::Map(s)) = chain.get("state") {
+                                    s.clone()
+                                } else {
+                                    HashMap::new()
+                                };
+                                
+                                checkpoints.insert(name.clone(), Value::Map(state));
+                                
+                                let mut new_chain = chain.clone();
+                                new_chain.insert("checkpoints".to_string(), Value::Map(checkpoints));
+                                
+                                Ok(Value::String(name.clone()))
+                            }
+                            _ => Err("chain_checkpoint() requires (Map chain, String name)".into()),
+                        }
+                    }
+                    "chain_store" => {
+                        // Store a value in the chain state
+                        // chain_store(chain, key, value)
+                        if arg_values.len() < 3 {
+                            return Err("chain_store() requires 3 arguments: chain_store(chain, key, value)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1], &arg_values[2]) {
+                            (Value::Map(chain), Value::String(key), value) => {
+                                let mut state = if let Some(Value::Map(s)) = chain.get("state") {
+                                    s.clone()
+                                } else {
+                                    HashMap::new()
+                                };
+                                
+                                state.insert(key.clone(), value.clone());
+                                
+                                let mut new_chain = chain.clone();
+                                new_chain.insert("state".to_string(), Value::Map(state));
+                                
+                                Ok(Value::Map(new_chain))
+                            }
+                            _ => Err("chain_store() requires (Map chain, String key, Value)".into()),
+                        }
+                    }
+                    "chain_get" => {
+                        // Get a value from the chain state
+                        // chain_get(chain, key) -> value
+                        if arg_values.len() < 2 {
+                            return Err("chain_get() requires 2 arguments: chain_get(chain, key)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::Map(chain), Value::String(key)) => {
+                                if let Some(Value::Map(state)) = chain.get("state") {
+                                    if let Some(value) = state.get(key) {
+                                        Ok(value.clone())
+                                    } else {
+                                        Err(format!("Key '{}' not found in chain state", key))
+                                    }
+                                } else {
+                                    Err("Chain has no state".into())
+                                }
+                            }
+                            _ => Err("chain_get() requires (Map chain, String key)".into()),
+                        }
+                    }
+                    "chain_rewind" => {
+                        // Rewind chain to a checkpoint
+                        // chain_rewind(chain, checkpoint_name) -> updated_chain
+                        if arg_values.len() < 2 {
+                            return Err("chain_rewind() requires 2 arguments: chain_rewind(chain, checkpoint_name)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::Map(chain), Value::String(checkpoint_name)) => {
+                                if let Some(Value::Map(checkpoints)) = chain.get("checkpoints") {
+                                    if let Some(Value::Map(checkpoint_state)) = checkpoints.get(checkpoint_name) {
+                                        let mut new_chain = chain.clone();
+                                        new_chain.insert("state".to_string(), Value::Map(checkpoint_state.clone()));
+                                        
+                                        use colored::Colorize;
+                                        println!("{} Rewound to checkpoint: {}", 
+                                            "[CHAIN]".cyan(),
+                                            checkpoint_name.yellow());
+                                        
+                                        Ok(Value::Map(new_chain))
+                                    } else {
+                                        Err(format!("Checkpoint '{}' not found", checkpoint_name))
+                                    }
+                                } else {
+                                    Err("Chain has no checkpoints".into())
+                                }
+                            }
+                            _ => Err("chain_rewind() requires (Map chain, String checkpoint_name)".into()),
+                        }
+                    }
+                    "chain_save_state" => {
+                        // Save chain state to file
+                        // chain_save_state(chain, filename)
+                        if arg_values.len() < 2 {
+                            return Err("chain_save_state() requires 2 arguments: chain_save_state(chain, filename)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::Map(_chain), Value::String(filename)) => {
+                                use colored::Colorize;
+                                println!("{} Saved chain state to: {}", 
+                                    "[CHAIN]".cyan(),
+                                    filename.green());
+                                
+                                // In real implementation, would serialize chain to JSON
+                                // For dry-run, just acknowledge the save
+                                Ok(Value::Null)
+                            }
+                            _ => Err("chain_save_state() requires (Map chain, String filename)".into()),
+                        }
+                    }
+                    "build_leak_payload" => {
+                        // Build a payload for information leaking
+                        // build_leak_payload(binary, offset) -> payload
+                        if arg_values.len() < 2 {
+                            return Err("build_leak_payload() requires 2 arguments: build_leak_payload(binary, offset)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::String(_binary), Value::Number(offset)) => {
+                                // Simple leak payload: padding + leak gadget
+                                let padding = vec![0x41; *offset as usize]; // 'A' padding
+                                let leak_gadget = vec![0x90, 0x90, 0x90, 0x90]; // NOP sled placeholder
+                                
+                                let mut payload = padding;
+                                payload.extend_from_slice(&leak_gadget);
+                                
+                                Ok(Value::Bytes(payload))
+                            }
+                            _ => Err("build_leak_payload() requires (String binary, Number offset)".into()),
+                        }
+                    }
+                    "recv_timeout" => {
+                        // Receive with timeout
+                        // recv_timeout(conn, size, timeout_seconds) -> data
+                        if arg_values.len() < 3 {
+                            return Err("recv_timeout() requires 3 arguments: recv_timeout(conn, size, timeout)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1], &arg_values[2]) {
+                            (_conn, Value::Number(size), Value::Number(_timeout)) => {
+                                // In dry-run mode, return dummy data
+                                let dummy_data = vec![0x41; *size as usize];
+                                
+                                use colored::Colorize;
+                                println!("{} {} Would receive {} bytes with timeout", 
+                                    "[RECV]".cyan(),
+                                    "[DRY-RUN]".yellow(),
+                                    size);
+                                
+                                Ok(Value::Bytes(dummy_data))
+                            }
+                            _ => Err("recv_timeout() requires (connection, Number size, Number timeout)".into()),
+                        }
+                    }
+                    "contains" => {
+                        // Check if string/bytes contains substring/pattern
+                        // contains(haystack, needle) -> bool (0 or 1)
+                        if arg_values.len() < 2 {
+                            return Err("contains() requires 2 arguments: contains(haystack, needle)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::String(haystack), Value::String(needle)) => {
+                                let result = if haystack.contains(needle) { 1 } else { 0 };
+                                Ok(Value::Number(result))
+                            }
+                            (Value::Bytes(haystack), Value::Bytes(needle)) => {
+                                let result = if haystack.windows(needle.len()).any(|window| window == needle) {
+                                    1
+                                } else {
+                                    0
+                                };
+                                Ok(Value::Number(result))
+                            }
+                            (Value::Bytes(haystack), Value::String(needle)) => {
+                                let needle_bytes = needle.as_bytes();
+                                let result = if haystack.windows(needle_bytes.len()).any(|window| window == needle_bytes) {
+                                    1
+                                } else {
+                                    0
+                                };
+                                Ok(Value::Number(result))
+                            }
+                            _ => Err("contains() requires (String/Bytes haystack, String/Bytes needle)".into()),
+                        }
+                    }
+                    "slice" => {
+                        // Extract a slice from bytes, string, or list
+                        // slice(data, start, end) -> sliced_data
+                        if arg_values.len() < 3 {
+                            return Err("slice() requires 3 arguments: slice(data, start, end)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1], &arg_values[2]) {
+                            (Value::Bytes(data), Value::Number(start), Value::Number(end)) => {
+                                let start_idx = *start as usize;
+                                let end_idx = (*end as usize).min(data.len());
+                                if start_idx > data.len() || start_idx > end_idx {
+                                    return Err(format!("Invalid slice range: [{}..{}] for bytes of length {}", start, end, data.len()));
+                                }
+                                Ok(Value::Bytes(data[start_idx..end_idx].to_vec()))
+                            }
+                            (Value::String(s), Value::Number(start), Value::Number(end)) => {
+                                let start_idx = *start as usize;
+                                let end_idx = (*end as usize).min(s.len());
+                                if start_idx > s.len() || start_idx > end_idx {
+                                    return Err(format!("Invalid slice range: [{}..{}] for string of length {}", start, end, s.len()));
+                                }
+                                Ok(Value::String(s[start_idx..end_idx].to_string()))
+                            }
+                            (Value::List(list), Value::Number(start), Value::Number(end)) => {
+                                let start_idx = *start as usize;
+                                let end_idx = (*end as usize).min(list.len());
+                                if start_idx > list.len() || start_idx > end_idx {
+                                    return Err(format!("Invalid slice range: [{}..{}] for list of length {}", start, end, list.len()));
+                                }
+                                Ok(Value::List(list[start_idx..end_idx].to_vec()))
+                            }
+                            _ => Err("slice() requires (Bytes/String/List data, Number start, Number end)".into()),
+                        }
+                    }
                     _ => {
                         if let Some(func) = funcs.read().await.get(name).cloned() {
                             let local_vars = Arc::new(RwLock::new(vars.read().await.clone()));

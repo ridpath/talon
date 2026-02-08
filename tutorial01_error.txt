@@ -1,0 +1,13 @@
+[DRY-RUN] Running in dry-run mode (no network I/O will be executed)
+[ERROR] [ERROR] Syntax Error:   --> 79:1
+   |
+79 | let ip = "192.168.1.100"
+   | ^---
+   |
+   = expected unary
+
+Common mistakes:
+  - Missing 'end' keyword to close a block
+  - Unclosed string quotes
+  - Missing colon after parameter names
+  - Incorrect indentation
