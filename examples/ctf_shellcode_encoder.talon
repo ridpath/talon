@@ -1,4 +1,4 @@
-﻿# Shellcode encoding to bypass badchars and filters
+# Shellcode encoding to bypass badchars and filters
 # Common in restricted environment challenges
 
 print("[*] Shellcode Encoding and Badchar Bypass")
@@ -25,28 +25,37 @@ let badchars = [0x00, 0x0a, 0x0d, 0x20]
 print("[*] Bad characters:", hex(badchars))
 
 # Check if original shellcode has badchars
-define function has_badchars(shellcode, badchars)
-    for byte in shellcode
-        if byte in badchars {            return true {        } {    }
+define function has_badchars(shellcode, badchars) {
+    for byte in shellcode {
+        if byte in badchars {
+            return true
+        }
+    }
     return false
 }
-if has_badchars(original_shellcode, badchars) {    print("[!] Shellcode contains badchars - encoding required")
-} else {    print("[+] Shellcode is clean!")
+if has_badchars(original_shellcode, badchars) {
+    print("[!] Shellcode contains badchars - encoding required")
+} else {
+    print("[+] Shellcode is clean!")
 }
 # Encoding Strategy 1: XOR Encoder
 print("\n[*] Encoding Strategy 1: XOR Encoder")
 
-define function xor_encode(data, key) {    let encoded = []
-    for i in range(len(data)) {        let encoded_byte = data[i] ^ key
+define function xor_encode(data, key) {
+    let encoded = []
+    for i in range(len(data)) {
+        let encoded_byte = data[i] ^ key
         encoded = encoded + [encoded_byte]
     }
     return encoded
 }
 # Find a key that doesn't create badchars
 let encoder_key = 0
-for test_key in range(1, 256)
+for test_key in range(1, 256) {
     let encoded = xor_encode(original_shellcode, test_key)
-    if !has_badchars(encoded, badchars) {        encoder_key = test_key {        break
+    if !has_badchars(encoded, badchars) {
+        encoder_key = test_key
+        break
     }
 }
 print("[+] Found XOR key:", hex(encoder_key))
@@ -100,7 +109,8 @@ print("[+] SUB encoded size:", len(sub_encoded), "bytes")
 # Test encoded shellcode (in safe sandbox)
 print("\n[*] Testing encoded shellcode...")
 
-define function test_shellcode(shellcode) {    # Create test file
+define function test_shellcode(shellcode) {
+    # Create test file
     write("/tmp/test_shellcode", shellcode)
     
     # Try to execute (in safe container)
@@ -109,20 +119,25 @@ define function test_shellcode(shellcode) {    # Create test file
 }
 # Select best encoder based on size and requirements
 let best_shellcode = xor_encoded
-if len(alphanum_shellcode) < len(best_shellcode) {    best_shellcode = alphanum_shellcode
+if len(alphanum_shellcode) < len(best_shellcode) {
+    best_shellcode = alphanum_shellcode
     print("\n[+] Best encoder: Alphanumeric")
-} else {    print("\n[+] Best encoder: XOR")
+} else {
+    print("\n[+] Best encoder: XOR")
 }
 # Output final encoded shellcode
 print("[*] Final shellcode:")
 print(hex(best_shellcode))
 
 # Generate C array for injection
-define function to_c_array(data)
+define function to_c_array(data) {
     let output = "unsigned char shellcode[] = {\n  "
-    for i in range(len(data))
+    for i in range(len(data)) {
         output = output + "0x" + hex(data[i])[2:] + ", "
-        if (i + 1) % 12 == 0 {            output = output + "\n  " {        } {    }
+        if (i + 1) % 12 == 0 {
+            output = output + "\n  "
+        }
+    }
     output = output + "\n};"
     return output
 }

