@@ -148,16 +148,10 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
             } else {
                 None
             };
-            let mut body = Vec::new();
-            for stmt in inner {
-                if stmt.as_rule() == Rule::return_stmt {
-                    let ret_expr =
-                        parse_expr(stmt.into_inner().next().ok_or("Missing return expr")?);
-                    body.push(Command::Expr(Expr::Return(Box::new(ret_expr))));
-                } else {
-                    body.extend(parse_stmt(stmt)?);
-                }
-            }
+            // Next should be the block
+            let block = inner.next().ok_or("Missing function block")?;
+            let body = parse_block(block)?;
+            
             Ok(vec![Command::DefineFunction(FunctionDef {
                 name,
                 args,
@@ -182,10 +176,11 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
                     break;
                 }
             }
-            let mut body = Vec::new();
-            for stmt in inner {
-                body.extend(parse_stmt(stmt)?);
-            }
+            
+            // Next should be the block
+            let block = inner.next().ok_or("Missing macro block")?;
+            let body = parse_block(block)?;
+            
             Ok(vec![Command::DefineMacro(MacroDef { name, args, body })])
         }
         Rule::call_macro => {
@@ -287,17 +282,20 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
         Rule::if_stmt => {
             let mut parts = pair.into_inner();
             let condition = parse_expr(parts.next().ok_or("Missing if condition")?);
-            let mut then_body = Vec::new();
+            
+            // Next should be the block (then body)
+            let then_block = parts.next().ok_or("Missing if block")?;
+            let then_body = parse_block(then_block)?;
+            
+            // Check for else clause
             let mut else_body = Vec::new();
-            for stmt in parts {
-                if stmt.as_rule() == Rule::else_stmt {
-                    for inner_stmt in stmt.into_inner() {
-                        else_body.extend(parse_stmt(inner_stmt)?);
-                    }
-                } else {
-                    then_body.extend(parse_stmt(stmt)?);
+            if let Some(else_stmt) = parts.next() {
+                if else_stmt.as_rule() == Rule::else_stmt {
+                    let else_block = else_stmt.into_inner().next().ok_or("Missing else block")?;
+                    else_body = parse_block(else_block)?;
                 }
             }
+            
             Ok(vec![Command::Control(Control::If {
                 condition,
                 then_body,
@@ -309,10 +307,11 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
             let var = parts.next().ok_or("Missing loop var")?.as_str().to_string();
             let next = parts.next().ok_or("Missing for loop part")?;
             let iterable = parse_expr(next);
-            let mut body = Vec::new();
-            for stmt in parts {
-                body.extend(parse_stmt(stmt)?);
-            }
+            
+            // Next should be the block
+            let block = parts.next().ok_or("Missing for block")?;
+            let body = parse_block(block)?;
+            
             Ok(vec![Command::Control(Control::For {
                 var,
                 iterable,
@@ -322,19 +321,18 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
         Rule::while_stmt => {
             let mut parts = pair.into_inner();
             let condition = parse_expr(parts.next().ok_or("Missing while condition")?);
-            let mut body = Vec::new();
-            for stmt in parts {
-                body.extend(parse_stmt(stmt)?);
-            }
+            
+            // Next should be the block
+            let block = parts.next().ok_or("Missing while block")?;
+            let body = parse_block(block)?;
+            
             Ok(vec![Command::Control(Control::While { condition, body })])
         }
         Rule::break_stmt => Ok(vec![Command::Control(Control::Break)]),
         Rule::continue_stmt => Ok(vec![Command::Control(Control::Continue)]),
         Rule::parallel_stmt => {
-            let mut body = Vec::new();
-            for stmt in pair.into_inner() {
-                body.extend(parse_stmt(stmt)?);
-            }
+            let block = pair.into_inner().next().ok_or("Missing parallel block")?;
+            let body = parse_block(block)?;
             Ok(vec![Command::Control(Control::Parallel { body })])
         }
         Rule::match_stmt => {

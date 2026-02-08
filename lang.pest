@@ -33,24 +33,29 @@ statement   = {
 
 include_stmt = { "include" ~ quoted_string }
 import_stmt = { "from" ~ quoted_string ~ "import" ~ (ident ~ ","?)+ | "import" ~ quoted_string }
-function_def = { ("async")? ~ "define" ~ "function" ~ ident ~ "(" ~ (arg_def ~ ","?)* ~ ")" ~ (":" ~ type_hint)? ~ statement* ~ "end" }
-macro_def = { "macro" ~ ident ~ "(" ~ (ident ~ ","?)* ~ ")" ~ statement* ~ "end" }
+function_def = { ("async")? ~ "define" ~ "function" ~ ident ~ "(" ~ (arg_def ~ ","?)* ~ ")" ~ (":" ~ type_hint)? ~ block }
+macro_def = { "macro" ~ ident ~ "(" ~ (ident ~ ","?)* ~ ")" ~ block }
 arg_def = { ident ~ (":" ~ type_hint)? ~ ("=" ~ expr)? }
 struct_def   = { "struct" ~ ident ~ "{" ~ (ident ~ ":" ~ type_hint ~ ","?)* ~ "}" }
 var_decl     = { "let" ~ ident ~ (":" ~ type_hint)? ~ "=" ~ expr }
 const_decl   = { "const" ~ ident ~ "=" ~ expr }
 destructuring_decl = { "let" ~ "(" ~ (ident ~ ","?)+ ~ ")" ~ "=" ~ expr }
 assignment   = { ident ~ ("=" | "+=" | "-=" | "*=" | "/=") ~ expr }
-if_stmt      = { "if" ~ expr ~ ("then")? ~ statement* ~ else_stmt? ~ "end" }
-else_stmt    = { "else" ~ statement* }
-for_stmt     = { "for" ~ ident ~ "in" ~ (range | expr) ~ statement* ~ "end" }
-while_stmt   = { "while" ~ expr ~ statement* ~ "end" }
-parallel_stmt = { "parallel" ~ statement* ~ "end" }
-match_stmt   = { "match" ~ expr ~ case_stmt+ ~ "end" }
+if_stmt      = { "if" ~ expr ~ ("then")? ~ block ~ else_stmt? }
+else_stmt    = { "else" ~ block }
+for_stmt     = { "for" ~ ident ~ "in" ~ (range | expr) ~ block }
+while_stmt   = { "while" ~ expr ~ block }
+parallel_stmt = { "parallel" ~ block }
+match_stmt   = { "match" ~ expr ~ case_stmt+ ~ ("end" | "}") }
 case_stmt    = { "case" ~ expr ~ (guard)? ~ ":" ~ statement* }
 guard        = { "if" ~ expr }
-try_catch_stmt = { "try" ~ statement* ~ catch_stmt ~ "end" }
-catch_stmt   = { "catch" ~ ident ~ statement* }
+try_catch_stmt = { "try" ~ block ~ catch_stmt }
+catch_stmt   = { "catch" ~ ident ~ block }
+
+// Block definition: supports both curly brace and 'end' keyword syntax
+block        = { brace_block | end_block }
+brace_block  = { "{" ~ statement* ~ "}" }
+end_block    = { statement* ~ "end" }
 return_stmt  = { "return" ~ expr? }
 break_stmt   = { "break" }
 continue_stmt = { "continue" }
