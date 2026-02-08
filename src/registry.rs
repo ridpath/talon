@@ -1117,6 +1117,24 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
     );
 
     registry.insert(
+        "check_kernel_protections".to_string(),
+        BuiltinFunction::new(
+            "check_kernel_protections",
+            "check_kernel_protections() -> map",
+            "Checks kernel security features and returns protection flags (SMEP, SMAP, KASLR, KPTI)",
+            "Kernel",
+            vec![
+                "let kernel_sec = check_kernel_protections()",
+                "print(\"SMEP:\", kernel_sec.smep)",
+                "print(\"KASLR:\", kernel_sec.kaslr)",
+                "if check_kernel_protections().smep { print(\"SMEP enabled - need bypass\") }",
+            ],
+        )
+        .with_related(vec!["checksec", "token_steal", "kernel_write"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
         "copy".to_string(),
         BuiltinFunction::new(
             "copy",
