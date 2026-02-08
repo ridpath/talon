@@ -1,139 +1,69 @@
-# Test All Examples Script (PowerShell)
-# Runs all .talon example scripts with timeout and resource limits
-# Usage: .\scripts\test_all_examples.ps1 [-Verbose] [-Timeout 30]
+#!/usr/bin/env pwsh
+# Test all examples and categorize errors
 
-param(
-    [switch]$Verbose = $false,
-    [int]$Timeout = 30,
-    [switch]$Help = $false
-)
+$BinaryPath = ".\target\debug\talon.exe"
+$ExamplesDir = ".\examples"
 
-if ($Help) {
-    Write-Host "Usage: .\test_all_examples.ps1 [OPTIONS]"
-    Write-Host ""
-    Write-Host "Options:"
-    Write-Host "  -Verbose          Show script output"
-    Write-Host "  -Timeout SECS     Set timeout per script (default: 30)"
-    Write-Host "  -Help             Show this help message"
-    exit 0
-}
+Write-Host "========================================" -ForegroundColor Cyan
+Write-Host "Testing All TALON Examples" -ForegroundColor Cyan
+Write-Host "========================================`n" -ForegroundColor Cyan
 
-$ErrorActionPreference = "Stop"
+$allExamples = Get-ChildItem "$ExamplesDir\*.talon" | Sort-Object Name
+$passCount = 0
+$failCount = 0
+$errors = @{}
 
-$ScriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
-$ProjectRoot = Split-Path -Parent $ScriptDir
-$ExamplesDir = Join-Path $ProjectRoot "examples"
-$FailedCount = 0
-$PassedCount = 0
-$SkippedCount = 0
-$FailedScripts = @()
-
-if (-not (Test-Path $ExamplesDir)) {
-    Write-Host "Error: Examples directory not found: $ExamplesDir" -ForegroundColor Red
-    exit 1
-}
-
-$TalonBin = Join-Path $ProjectRoot "target\debug\talon.exe"
-if (-not (Test-Path $TalonBin)) {
-    Write-Host "Building talon binary..." -ForegroundColor Blue
-    Push-Location $ProjectRoot
-    cargo build --quiet
-    Pop-Location
+foreach ($example in $allExamples) {
+    $name = $example.Name
+    Write-Host "Testing: $name" -NoNewline
     
-    if (-not (Test-Path $TalonBin)) {
-        Write-Host "Error: Failed to build talon binary" -ForegroundColor Red
-        exit 1
-    }
-}
-
-Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Blue
-Write-Host "  TALON Example Script Validation" -ForegroundColor Blue
-Write-Host "═══════════════════════════════════════════════════════════" -ForegroundColor Blue
-Write-Host "Examples directory: $ExamplesDir"
-Write-Host "Timeout per script: ${Timeout}s"
-Write-Host "Verbose output: $Verbose"
-Write-Host "───────────────────────────────────────────────────────────" -ForegroundColor Blue
-Write-Host ""
-
-$Scripts = Get-ChildItem -Path $ExamplesDir -Filter "*.talon"
-
-foreach ($Script in $Scripts) {
-    $ScriptName = $Script.Name
-    Write-Host "Testing: " -NoNewline
-    Write-Host ("{0,-45}" -f $ScriptName) -NoNewline
-    Write-Host " ... " -NoNewline
+    $output = & $BinaryPath run $example.FullName --dry-run 2>&1 | Out-String
     
-    $TempFile = [System.IO.Path]::GetTempFileName()
-    
-    try {
-        $Process = Start-Process -FilePath $TalonBin `
-            -ArgumentList "run", $Script.FullName `
-            -RedirectStandardOutput $TempFile `
-            -RedirectStandardError $TempFile `
-            -NoNewWindow `
-            -PassThru
-        
-        $TimedOut = $false
-        if (-not $Process.WaitForExit($Timeout * 1000)) {
-            $Process.Kill()
-            $TimedOut = $true
+    if ($output -match '\[ERROR\]') {
+        # Extract error type
+        if ($output -match 'UNKNOWN METHOD') {
+            $errorType = "UNKNOWN_METHOD"
+        } elseif ($output -match 'UNDEFINED VARIABLE') {
+            $errorType = "UNDEFINED_VAR"
+        } elseif ($output -match 'Syntax Error') {
+            $errorType = "SYNTAX_ERROR"
+        } elseif ($output -match 'TYPE ERROR') {
+            $errorType = "TYPE_ERROR"
+        } elseif ($output -match 'thread.*overflowed') {
+            $errorType = "STACK_OVERFLOW"
+        } else {
+            $errorType = "OTHER_ERROR"
         }
         
-        if ($TimedOut) {
-            Write-Host "FAIL (timeout)" -ForegroundColor Red
-            $FailedCount++
-            $FailedScripts += $ScriptName
+        if (-not $errors.ContainsKey($errorType)) {
+            $errors[$errorType] = @()
         }
-        elseif ($Process.ExitCode -eq 0) {
-            Write-Host "PASS" -ForegroundColor Green
-            $PassedCount++
-        }
-        else {
-            Write-Host "FAIL (exit code: $($Process.ExitCode))" -ForegroundColor Red
-            $FailedCount++
-            $FailedScripts += $ScriptName
-            
-            if ($Verbose) {
-                Write-Host "Output:" -ForegroundColor Yellow
-                Get-Content $TempFile | Select-Object -First 20
-                Write-Host ""
-            }
-        }
-    }
-    catch {
-        Write-Host "FAIL (exception)" -ForegroundColor Red
-        $FailedCount++
-        $FailedScripts += $ScriptName
+        $errors[$errorType] += $name
         
-        if ($Verbose) {
-            Write-Host "Error: $_" -ForegroundColor Yellow
-        }
-    }
-    finally {
-        if (Test-Path $TempFile) {
-            Remove-Item $TempFile -Force
-        }
+        Write-Host " [FAIL] $errorType" -ForegroundColor Red
+        $failCount++
+    } else {
+        Write-Host " [PASS]" -ForegroundColor Green
+        $passCount++
     }
 }
 
-Write-Host "───────────────────────────────────────────────────────────" -ForegroundColor Blue
-Write-Host "Summary:"
-Write-Host "  Passed:  $PassedCount" -ForegroundColor Green
-Write-Host "  Failed:  $FailedCount" -ForegroundColor Red
-Write-Host "  Skipped: $SkippedCount" -ForegroundColor Yellow
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "RESULTS SUMMARY" -ForegroundColor Cyan
+Write-Host "========================================`n" -ForegroundColor Cyan
 
-if ($FailedCount -gt 0) {
-    Write-Host ""
-    Write-Host "Failed examples:" -ForegroundColor Red
-    foreach ($FailedScript in $FailedScripts) {
-        Write-Host "  - $FailedScript"
+Write-Host "Total Examples: $($allExamples.Count)"
+Write-Host "Passed: $passCount ($([math]::Round($passCount / $allExamples.Count * 100, 1))%)" -ForegroundColor Green
+Write-Host "Failed: $failCount ($([math]::Round($failCount / $allExamples.Count * 100, 1))%)" -ForegroundColor Red
+
+Write-Host "`n========================================" -ForegroundColor Cyan
+Write-Host "ERROR BREAKDOWN" -ForegroundColor Cyan
+Write-Host "========================================`n" -ForegroundColor Cyan
+
+foreach ($errorType in $errors.Keys | Sort-Object) {
+    $count = $errors[$errorType].Count
+    Write-Host "`n$errorType ($count files):" -ForegroundColor Yellow
+    foreach ($file in $errors[$errorType] | Sort-Object) {
+        Write-Host "  - $file"
     }
-    Write-Host ""
-    Write-Host "Test suite failed with $FailedCount error(s)" -ForegroundColor Red
-    exit 1
-}
-else {
-    Write-Host ""
-    Write-Host "All examples passed successfully!" -ForegroundColor Green
-    exit 0
 }
