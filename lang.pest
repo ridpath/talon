@@ -244,4 +244,4 @@ ip           = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "." ~
 port         = @{ ASCII_DIGIT+ }
 
 reserved = { "define" | "function" | "end" | "if" | "then" | "else" | "for" | "while" | "break" | "continue" | "async" | "await" | "return" | "let" | "const" | "import" | "include" | "macro" | "struct" | "match" | "case" | "try" | "catch" | "parallel" | "and" | "or" | "not" | "in" | "true" | "false" | "null" }
-ident        = @{ !(reserved ~ !ASCII_ALPHANUMERIC) ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
+ident        = @{ !(reserved ~ !(ASCII_ALPHANUMERIC | "_")) ~ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }

@@ -33,7 +33,7 @@ print("    [+] Created " + str(input_length) + " bytes of symbolic input")
 print("\n[*] Step 3: Exploring paths...")
 let result = symbolic_execute(binary, symbolic_input)
 
-if result.found
+if result.found {
     print("    [+] Solution found!")
     print("    Explored " + str(result.paths_explored) + " paths")
     print("    Time: " + str(result.execution_time) + "s")
@@ -51,16 +51,16 @@ if result.found
     send(verify_session, solution)
     let output = recv(verify_session, 1024)
     
-    if "win" in output or "flag" in output
+    if "win" in output or "flag" in output {
         print("    [+] SUCCESS! Solution verified!")
         print("    Output: " + output)
-    else
+    } else {
         print("    [-] Verification failed")
-    end
-else
+    }
+} else {
     print("    [-] No solution found")
     print("    Explored " + str(result.paths_explored) + " paths")
     print("    Constraints: " + str(result.unsolvable_constraints))
-end
+}
 
 print("\n[+] Symbolic execution complete!")
