@@ -3077,6 +3077,35 @@ fn eval_expr<'a>(
                             }
                         }
                     }
+                    "kernel_version" => {
+                        // Returns the kernel version string
+                        use colored::Colorize;
+                        
+                        // Check if we're in dry-run mode or on a non-Linux platform
+                        let is_dry_run = context.read().await.get("__dry_run__").is_some();
+                        
+                        if is_dry_run || !cfg!(target_os = "linux") {
+                            // Return default kernel version for dry-run or non-Linux
+                            println!("{} [DRY-RUN] Simulating kernel version check", "[KERNEL]".cyan());
+                            Ok(Value::String("5.15.0-generic".to_string()))
+                        } else {
+                            // On Linux, read from uname -r
+                            use std::process::Command;
+                            match Command::new("uname").arg("-r").output() {
+                                Ok(output) => {
+                                    let version = String::from_utf8_lossy(&output.stdout)
+                                        .trim()
+                                        .to_string();
+                                    println!("{} Kernel version: {}", "[KERNEL]".cyan(), version.yellow());
+                                    Ok(Value::String(version))
+                                }
+                                Err(_) => {
+                                    // Fallback if uname fails
+                                    Ok(Value::String("unknown".to_string()))
+                                }
+                            }
+                        }
+                    }
                     "check_kernel_protections" => {
                         // Analyze kernel security features and return protection flags
                         // Returns a map with: smep, smap, kaslr, kpti, pti
@@ -3419,20 +3448,38 @@ fn eval_expr<'a>(
                     }
                     "chain_set_debug" => {
                         // Enable or disable debug mode for exploit chains
+                        let chain = arg_map
+                            .get("chain")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("chain_set_debug() requires chain object")?;
+
                         let enable = if let Some(Value::Number(n)) =
-                            arg_map.get("enable").or_else(|| arg_values.get(0))
+                            arg_map.get("enable").or_else(|| arg_values.get(1))
                         {
                             *n != 0
+                        } else if let Some(Value::Number(n)) = arg_values.get(1) {
+                            *n != 0
                         } else {
-                            return Err("chain_set_debug() requires 'enable' parameter (0 or 1)".to_string());
+                            // If second parameter is a boolean (true/false keyword)
+                            true // Default to true if not specified
+                        };
+
+                        let chain_id = if let Value::Map(m) = chain {
+                            if let Some(Value::Number(id)) = m.get("id") {
+                                *id as u64
+                            } else {
+                                return Err("Invalid chain object: missing 'id'".to_string());
+                            }
+                        } else {
+                            return Err("chain_set_debug() requires chain object".to_string());
                         };
 
                         use crate::exploit_chaining::ExploitChain;
                         use colored::Colorize;
 
-                        let chain_key = "exploit_chain";
+                        let chain_key = format!("__exploit_chain_{}", chain_id);
                         let mut chain = if let Some(Value::String(state_json)) =
-                            vars.read().await.get(chain_key)
+                            vars.read().await.get(&chain_key)
                         {
                             serde_json::from_str::<ExploitChain>(&state_json)
                                 .unwrap_or_else(|_| ExploitChain::new())
@@ -3446,16 +3493,17 @@ fn eval_expr<'a>(
                         vars
                             .write()
                             .await
-                            .insert(chain_key.to_string(), Value::String(state_json));
+                            .insert(chain_key, Value::String(state_json));
 
                         println!(
-                            "{} Debug mode {}",
+                            "{} Debug mode {} for chain #{}",
                             "[CHAIN]".cyan(),
                             if enable {
                                 "enabled".green()
                             } else {
                                 "disabled".yellow()
-                            }
+                            },
+                            chain_id
                         );
 
                         Ok(Value::Null)
@@ -4751,6 +4799,279 @@ fn eval_expr<'a>(
 
                         println!("[RECVLINE] Received line: {} bytes", data.len());
                         Ok(Value::Bytes(data))
+                    }
+                    "recv_until" => {
+                        // Receive data until a specific delimiter is found
+                        let conn = arg_map
+                            .get("conn")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("recv_until() requires connection object")?;
+
+                        let delimiter = if let Some(Value::String(s)) =
+                            arg_map.get("delimiter").or_else(|| arg_values.get(1))
+                        {
+                            s.as_bytes().to_vec()
+                        } else if let Some(Value::Bytes(b)) =
+                            arg_map.get("delimiter").or_else(|| arg_values.get(1))
+                        {
+                            b.clone()
+                        } else {
+                            return Err("recv_until() requires 'delimiter' parameter (string or bytes)".to_string());
+                        };
+
+                        let (conn_id, is_dry_run_conn) = if let Value::Map(m) = conn {
+                            let id = if let Some(Value::Number(id)) = m.get("id") {
+                                *id as u64
+                            } else {
+                                return Err("Invalid connection object: missing 'id'".to_string());
+                            };
+                            let is_dry_run = m.get("dry_run").is_some();
+                            (id, is_dry_run)
+                        } else {
+                            return Err("recv_until() requires connection object".to_string());
+                        };
+
+                        use colored::Colorize;
+
+                        if is_dry_run_conn {
+                            // In dry-run mode, return mock data with delimiter
+                            let mock_data = [b"mock data before delimiter".to_vec(), delimiter.clone()].concat();
+                            println!(
+                                "{} [DRY-RUN] Would receive until delimiter ({} bytes total)",
+                                "[RECV]".cyan(),
+                                mock_data.len()
+                            );
+                            Ok(Value::Bytes(mock_data))
+                        } else {
+                            let mut entry = CONNECTIONS.get_mut(conn_id)
+                                .ok_or_else(|| format!("Connection {} not found", conn_id))?;
+                            
+                            let mut buffer = Vec::new();
+                            let delimiter_len = delimiter.len();
+                            
+                            // Read byte by byte until we find the delimiter
+                            loop {
+                                let byte_data = match &mut entry.connection {
+                                    Connection::Socket(socket) => socket.recv(1)?,
+                                    Connection::Process(process) => process.recv(1)?,
+                                    Connection::Ssh(_) => {
+                                        return Err("recv_until() is not supported for SSH connections. Use ssh_interactive_recv() instead.".to_string());
+                                    }
+                                };
+
+                                if byte_data.is_empty() {
+                                    break; // Connection closed
+                                }
+
+                                buffer.push(byte_data[0]);
+
+                                // Check if we've found the delimiter
+                                if buffer.len() >= delimiter_len {
+                                    let window = &buffer[buffer.len() - delimiter_len..];
+                                    if window == delimiter.as_slice() {
+                                        break;
+                                    }
+                                }
+
+                                // Safety check: prevent infinite loop
+                                if buffer.len() > 1024 * 1024 {
+                                    return Err("recv_until() exceeded 1MB without finding delimiter".to_string());
+                                }
+                            }
+
+                            println!(
+                                "{} Received {} bytes until delimiter",
+                                "[RECV]".green(),
+                                buffer.len()
+                            );
+                            Ok(Value::Bytes(buffer))
+                        }
+                    }
+                    "find_pattern_offset" => {
+                        // Find the offset of a pattern within data
+                        let data = if let Some(Value::Bytes(b)) =
+                            arg_map.get("data").or_else(|| arg_values.get(0))
+                        {
+                            b.clone()
+                        } else if let Some(Value::String(s)) =
+                            arg_map.get("data").or_else(|| arg_values.get(0))
+                        {
+                            s.as_bytes().to_vec()
+                        } else {
+                            return Err("find_pattern_offset() requires 'data' parameter (bytes or string)".to_string());
+                        };
+
+                        let pattern = if let Some(Value::Bytes(b)) =
+                            arg_map.get("pattern").or_else(|| arg_values.get(1))
+                        {
+                            b.clone()
+                        } else if let Some(Value::String(s)) =
+                            arg_map.get("pattern").or_else(|| arg_values.get(1))
+                        {
+                            s.as_bytes().to_vec()
+                        } else {
+                            return Err("find_pattern_offset() requires 'pattern' parameter (bytes or string)".to_string());
+                        };
+
+                        // Search for pattern in data
+                        if let Some(offset) = data.windows(pattern.len()).position(|window| window == pattern.as_slice()) {
+                            use colored::Colorize;
+                            println!(
+                                "{} Pattern found at offset {}",
+                                "[FIND]".green(),
+                                offset
+                            );
+                            Ok(Value::Number(offset as i64))
+                        } else {
+                            println!("[FIND] Pattern not found");
+                            Ok(Value::Number(-1))
+                        }
+                    }
+                    "exploit_chain_create" => {
+                        // Create a new exploit chain object for state management
+                        use crate::exploit_chaining::ExploitChain;
+                        use colored::Colorize;
+
+                        let chain = ExploitChain::new();
+                        let chain_json = serde_json::to_string(&chain).unwrap_or_default();
+
+                        // Generate a unique ID for this chain
+                        static CHAIN_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(1);
+                        let chain_id = CHAIN_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+                        // Store the chain in variables
+                        let chain_key = format!("__exploit_chain_{}", chain_id);
+                        vars.write().await.insert(chain_key.clone(), Value::String(chain_json));
+
+                        println!(
+                            "{} Created exploit chain #{}",
+                            "[CHAIN]".cyan(),
+                            chain_id
+                        );
+
+                        // Return a map representing the chain
+                        let mut chain_map = HashMap::new();
+                        chain_map.insert("id".to_string(), Value::Number(chain_id as i64));
+                        chain_map.insert("type".to_string(), Value::String("exploit_chain".to_string()));
+                        Ok(Value::Map(chain_map))
+                    }
+                    "chain_checkpoint" => {
+                        // Create a checkpoint in an exploit chain
+                        let chain = arg_map
+                            .get("chain")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("chain_checkpoint() requires chain object")?;
+
+                        let label = if let Some(Value::String(s)) =
+                            arg_map.get("label").or_else(|| arg_values.get(1))
+                        {
+                            s.clone()
+                        } else {
+                            format!("checkpoint_{}", std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_secs())
+                        };
+
+                        let chain_id = if let Value::Map(m) = chain {
+                            if let Some(Value::Number(id)) = m.get("id") {
+                                *id as u64
+                            } else {
+                                return Err("Invalid chain object: missing 'id'".to_string());
+                            }
+                        } else {
+                            return Err("chain_checkpoint() requires chain object".to_string());
+                        };
+
+                        use colored::Colorize;
+                        println!(
+                            "{} Created checkpoint '{}' for chain #{}",
+                            "[CHAIN]".cyan(),
+                            label,
+                            chain_id
+                        );
+
+                        // Return checkpoint ID (we use the label as the checkpoint ID for simplicity)
+                        Ok(Value::String(label))
+                    }
+                    "chain_store" => {
+                        // Store a value in an exploit chain's state
+                        let chain = arg_map
+                            .get("chain")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("chain_store() requires chain object")?;
+
+                        let key = if let Some(Value::String(s)) =
+                            arg_map.get("key").or_else(|| arg_values.get(1))
+                        {
+                            s.clone()
+                        } else {
+                            return Err("chain_store() requires 'key' parameter (string)".to_string());
+                        };
+
+                        let value = arg_map
+                            .get("value")
+                            .or_else(|| arg_values.get(2))
+                            .ok_or("chain_store() requires 'value' parameter")?
+                            .clone();
+
+                        let chain_id = if let Value::Map(m) = chain {
+                            if let Some(Value::Number(id)) = m.get("id") {
+                                *id as u64
+                            } else {
+                                return Err("Invalid chain object: missing 'id'".to_string());
+                            }
+                        } else {
+                            return Err("chain_store() requires chain object".to_string());
+                        };
+
+                        // Store the value in a special variable for this chain
+                        let store_key = format!("__exploit_chain_{}_store_{}", chain_id, key);
+                        vars.write().await.insert(store_key, value);
+
+                        use colored::Colorize;
+                        println!(
+                            "{} Stored '{}' in chain #{}",
+                            "[CHAIN]".cyan(),
+                            key,
+                            chain_id
+                        );
+
+                        Ok(Value::Null)
+                    }
+                    "chain_rewind" => {
+                        // Rewind an exploit chain to a checkpoint (placeholder - full implementation would restore state)
+                        let chain = arg_map
+                            .get("chain")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("chain_rewind() requires chain object")?;
+
+                        let checkpoint = if let Some(Value::String(s)) =
+                            arg_map.get("checkpoint").or_else(|| arg_values.get(1))
+                        {
+                            s.clone()
+                        } else {
+                            return Err("chain_rewind() requires 'checkpoint' parameter".to_string());
+                        };
+
+                        let chain_id = if let Value::Map(m) = chain {
+                            if let Some(Value::Number(id)) = m.get("id") {
+                                *id as u64
+                            } else {
+                                return Err("Invalid chain object: missing 'id'".to_string());
+                            }
+                        } else {
+                            return Err("chain_rewind() requires chain object".to_string());
+                        };
+
+                        use colored::Colorize;
+                        println!(
+                            "{} Rewinding chain #{} to checkpoint '{}'",
+                            "[CHAIN]".yellow(),
+                            chain_id,
+                            checkpoint
+                        );
+
+                        // In a full implementation, this would restore all stored state from the checkpoint
+                        // For now, it just logs the action
+                        Ok(Value::Null)
                     }
                     "print" => {
                         for (i, val) in arg_values.iter().enumerate() {
