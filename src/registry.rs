@@ -1082,6 +1082,23 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
     );
 
     registry.insert(
+        "parse_elf".to_string(),
+        BuiltinFunction::new(
+            "parse_elf",
+            "parse_elf(binary: string) -> map",
+            "Parses an ELF binary and returns analysis including symbols, GOT, PLT, and protections (alias for Elf)",
+            "Binary Analysis",
+            vec![
+                "let elf = parse_elf(\"./vuln\")",
+                "let got_addr = parse_elf(binary).got.printf",
+                "let win_addr = parse_elf(\"./challenge\").symbols.win",
+            ],
+        )
+        .with_related(vec!["Elf", "analyze", "disasm"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
         "copy".to_string(),
         BuiltinFunction::new(
             "copy",
