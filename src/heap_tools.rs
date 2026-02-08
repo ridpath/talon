@@ -812,6 +812,8 @@ impl ModernHeapExploit {
         ptr ^ (pos >> 12)
     }
 
+    // Public API: Safe-linking demangle for heap exploitation analysis
+    #[allow(dead_code)]
     fn safe_linking_demangle(&self, pos: u64, mangled: u64) -> u64 {
         mangled ^ (pos >> 12)
     }

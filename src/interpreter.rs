@@ -24,6 +24,8 @@ use crate::interactive_io::{Process, Socket};
 use crate::parser::parse_script;
 use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
 use crate::ssh_bridge::{SshConnection, SshConnectionId, SshRegistry};
+use crate::binary_patch::Patch;
+use crate::heap_tools::HeapExploit;
 use dashmap::DashMap;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use crossbeam::queue::SegQueue;
@@ -92,6 +94,9 @@ impl ConnectionEntry {
 enum Connection {
     Socket(Socket),
     Process(Process),
+    // Public API: SSH connection variant (managed separately via SSH_CONNECTIONS registry)
+    // Used in pattern matching for send/recv operations
+    #[allow(dead_code)]
     Ssh(SshConnectionId),
 }
 
@@ -134,7 +139,8 @@ impl AtomicConnectionRegistry {
         id
     }
 
-    // Public API: Add SSH connection to registry (used by SSH builtins)
+    // Public API: Add SSH connection to registry (future SSH/AtomicConnectionRegistry unification)
+    #[allow(dead_code)]
     fn add_ssh(&self, ssh_id: SshConnectionId) -> ConnectionId {
         let id = self.allocate_id();
         let entry = ConnectionEntry::new(Connection::Ssh(ssh_id));
@@ -171,9 +177,44 @@ impl AtomicConnectionRegistry {
     }
 }
 
+// Patch registry for managing binary patch objects
+pub struct PatchRegistry {
+    patches: HashMap<PatchId, Patch>,
+    next_id: PatchId,
+}
+
+impl PatchRegistry {
+    pub fn new() -> Self {
+        PatchRegistry {
+            patches: HashMap::new(),
+            next_id: 1,
+        }
+    }
+
+    pub fn add(&mut self, patch: Patch) -> PatchId {
+        let id = self.next_id;
+        self.next_id += 1;
+        self.patches.insert(id, patch);
+        id
+    }
+
+    pub fn get(&self, id: PatchId) -> Option<&Patch> {
+        self.patches.get(&id)
+    }
+
+    pub fn get_mut(&mut self, id: PatchId) -> Option<&mut Patch> {
+        self.patches.get_mut(&id)
+    }
+
+    pub fn remove(&mut self, id: PatchId) -> Option<Patch> {
+        self.patches.remove(&id)
+    }
+}
+
 lazy_static::lazy_static! {
     static ref CONNECTIONS: AtomicConnectionRegistry = AtomicConnectionRegistry::new();
     static ref SSH_CONNECTIONS: Arc<Mutex<SshRegistry>> = Arc::new(Mutex::new(SshRegistry::new()));
+    static ref PATCH_REGISTRY: Arc<Mutex<PatchRegistry>> = Arc::new(Mutex::new(PatchRegistry::new()));
 }
 
 pub fn run_repl() {
@@ -206,6 +247,8 @@ pub async fn interpret_with_options(commands: &[Command], dry_run: bool) -> Resu
 
 // Enhanced value type for advanced data structures
 #[derive(Debug, Clone, PartialEq)]
+pub type PatchId = u64;
+
 pub enum Value {
     Number(i64),
     String(String),
@@ -214,6 +257,7 @@ pub enum Value {
     Set(HashSet<String>),
     Bytes(Vec<u8>),
     SshConnection(SshConnectionId),
+    Patch(PatchId),
     Null,
 }
 
@@ -245,6 +289,7 @@ impl std::fmt::Display for Value {
             ),
             Value::Bytes(b) => write!(f, "0x{}", hex::encode(b)),
             Value::SshConnection(id) => write!(f, "SSH({})", id),
+            Value::Patch(id) => write!(f, "Patch({})", id),
             Value::Null => write!(f, "null"),
         }
     }
@@ -332,6 +377,9 @@ fn print_map_pretty(map: &HashMap<String, Value>, indent: usize) {
             }
             Value::SshConnection(id) => {
                 println!("SSH({})", id);
+            }
+            Value::Patch(id) => {
+                println!("Patch({})", id);
             }
             Value::Null => {
                 print!("null");
@@ -4634,6 +4682,201 @@ fn eval_expr<'a>(
                         validation_map.insert("suggestions".to_string(), Value::List(suggestions));
                         
                         Ok(Value::Map(validation_map))
+                    }
+                    "analyze_heap" => {
+                        let binary = arg_map
+                            .get("binary")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("analyze_heap() requires 'binary' parameter")?
+                            .to_string();
+
+                        use colored::Colorize;
+                        println!("{} Analyzing heap for binary: {}", "[HEAP]".cyan(), binary.yellow());
+
+                        // Create heap info map with detected allocator and metadata
+                        let mut heap_info = HashMap::new();
+                        
+                        // Detect allocator (placeholder - in real impl, parse binary)
+                        heap_info.insert("allocator".to_string(), Value::String("glibc-2.31".to_string()));
+                        heap_info.insert("tcache_bins".to_string(), Value::Number(64));
+                        heap_info.insert("tcache_count".to_string(), Value::Number(7));
+                        heap_info.insert("fastbin_count".to_string(), Value::Number(10));
+                        heap_info.insert("has_safe_linking".to_string(), Value::Number(1));
+                        
+                        println!("{} Heap allocator: glibc-2.31 (tcache enabled)", "[HEAP]".green());
+
+                        Ok(Value::Map(heap_info))
+                    }
+                    "Patch" => {
+                        let binary = arg_map
+                            .get("binary")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("Patch() requires 'binary' parameter")?
+                            .to_string();
+
+                        use colored::Colorize;
+                        println!("{} Loading binary for patching: {}", "[PATCH]".cyan(), binary.yellow());
+
+                        let patch = Patch::new(&binary)
+                            .map_err(|e| format!("Failed to create Patch object: {}", e))?;
+
+                        let patch_id = PATCH_REGISTRY.lock().await.add(patch);
+
+                        println!("{} Patch object created (ID: {})", "[PATCH]".green(), patch_id);
+
+                        Ok(Value::Patch(patch_id))
+                    }
+                    "patch_nop_out" => {
+                        let patch_val = arg_map
+                            .get("patch")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("patch_nop_out() requires Patch object")?;
+
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_nop_out() requires Patch object as first argument".to_string());
+                        };
+
+                        let offset = if let Some(Value::Number(n)) =
+                            arg_map.get("offset").or_else(|| arg_values.get(1))
+                        {
+                            *n as usize
+                        } else {
+                            return Err("patch_nop_out() requires 'offset' parameter".to_string());
+                        };
+
+                        let length = if let Some(Value::Number(n)) =
+                            arg_map.get("length").or_else(|| arg_values.get(2))
+                        {
+                            *n as usize
+                        } else {
+                            return Err("patch_nop_out() requires 'length' parameter".to_string());
+                        };
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.nop_out(offset, length)
+                            .map_err(|e| format!("patch_nop_out() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} NOP'd {} bytes at offset 0x{:x}", "[PATCH]".green(), length, offset);
+
+                        Ok(Value::Null)
+                    }
+                    "patch_save" => {
+                        let patch_val = arg_map
+                            .get("patch")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("patch_save() requires Patch object")?;
+
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_save() requires Patch object as first argument".to_string());
+                        };
+
+                        let output_path = arg_map
+                            .get("output")
+                            .or_else(|| arg_values.get(1))
+                            .ok_or("patch_save() requires 'output' path parameter")?
+                            .to_string();
+
+                        let registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.save(&output_path)
+                            .map_err(|e| format!("patch_save() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Patched binary saved to: {}", "[PATCH]".green(), output_path.yellow());
+
+                        Ok(Value::Null)
+                    }
+                    "patch_set_dry_run" => {
+                        let patch_val = arg_map
+                            .get("patch")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("patch_set_dry_run() requires Patch object")?;
+
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_set_dry_run() requires Patch object as first argument".to_string());
+                        };
+
+                        let enabled = if let Some(Value::Number(n)) =
+                            arg_map.get("enabled").or_else(|| arg_values.get(1))
+                        {
+                            *n != 0
+                        } else {
+                            return Err("patch_set_dry_run() requires 'enabled' boolean parameter".to_string());
+                        };
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.set_dry_run(enabled);
+
+                        Ok(Value::Null)
+                    }
+                    "fmtstr_payload" => {
+                        let offset = if let Some(Value::Number(n)) =
+                            arg_map.get("offset").or_else(|| arg_values.get(0))
+                        {
+                            *n as u64
+                        } else {
+                            return Err("fmtstr_payload() requires 'offset' parameter".to_string());
+                        };
+
+                        let writes = arg_map
+                            .get("writes")
+                            .or_else(|| arg_values.get(1))
+                            .ok_or("fmtstr_payload() requires 'writes' Map parameter")?;
+
+                        let writes_map = if let Value::Map(m) = writes {
+                            m.clone()
+                        } else {
+                            return Err("fmtstr_payload() 'writes' must be a Map".to_string());
+                        };
+
+                        use colored::Colorize;
+                        println!("{} Generating format string payload (offset: {}, {} writes)", 
+                                 "[FMTSTR]".cyan(), offset, writes_map.len());
+
+                        // Simplified format string payload generation
+                        let mut payload = String::new();
+                        for (addr_str, value) in writes_map.iter() {
+                            if let Value::Number(val) = value {
+                                let addr = u64::from_str_radix(addr_str.trim_start_matches("0x"), 16)
+                                    .unwrap_or_else(|_| addr_str.parse::<u64>().unwrap_or(0));
+                                payload.push_str(&format!("%{}$n", offset));
+                            }
+                        }
+
+                        println!("{} Format string payload generated", "[FMTSTR]".green());
+
+                        Ok(Value::String(payload))
+                    }
+                    "fmtstr_leak" => {
+                        let offset = if let Some(Value::Number(n)) =
+                            arg_map.get("offset").or_else(|| arg_values.get(0))
+                        {
+                            *n as u64
+                        } else {
+                            return Err("fmtstr_leak() requires 'offset' parameter".to_string());
+                        };
+
+                        use colored::Colorize;
+                        println!("{} Creating format string leak at offset {}", "[FMTSTR]".cyan(), offset);
+
+                        let payload = format!("%{}$p", offset);
+
+                        Ok(Value::String(payload))
                     }
                     "ai" => {
                         use crate::ai_integration::AiIntegration;

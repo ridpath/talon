@@ -57,6 +57,8 @@ pub struct SimilarityResult {
 }
 
 pub struct SimilarityEngine {
+    // Public API: ML-based function embeddings for binary analysis
+    #[allow(dead_code)]
     function_embeddings: HashMap<String, FunctionEmbedding>,
     known_vulnerable_patterns: HashMap<String, Vec<f32>>,
     vendor_signatures: HashMap<String, Vec<Vec<f32>>>,

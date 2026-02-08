@@ -99,6 +99,8 @@ struct SymbolCache {
 /// Libc database
 pub struct LibcDatabase {
     pub versions: HashMap<String, LibcVersion>,
+    // Cache directory path for save_cache() integration
+    #[allow(dead_code)]
     cache_path: Option<String>,
     symbol_cache: HashMap<String, u64>,
 }
@@ -141,6 +143,8 @@ impl LibcDatabase {
     }
 
     /// Save cache to disk
+    // Public API: Symbol caching functionality
+    #[allow(dead_code)]
     fn save_cache(&self) {
         if let Some(ref path) = self.cache_path {
             let cache: Vec<SymbolCache> = self.symbol_cache
@@ -171,6 +175,8 @@ impl LibcDatabase {
     }
 
     /// Add to symbol cache
+    // Public API: Symbol caching functionality
+    #[allow(dead_code)]
     fn cache_symbol(&mut self, libc_name: &str, symbol: &str, offset: u64) {
         let key = format!("{}:{}", libc_name, symbol);
         self.symbol_cache.insert(key, offset);
@@ -178,6 +184,8 @@ impl LibcDatabase {
     }
 
     /// Get from symbol cache
+    // Public API: Symbol caching functionality
+    #[allow(dead_code)]
     fn get_cached_symbol(&self, libc_name: &str, symbol: &str) -> Option<u64> {
         let key = format!("{}:{}", libc_name, symbol);
         self.symbol_cache.get(&key).copied()

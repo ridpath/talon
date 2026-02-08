@@ -2,6 +2,8 @@
 // De Bruijn sequence implementation for precise offset calculation
 
 const ALPHABET: &[u8] = b"abcdefghijklmnopqrstuvwxyz";
+// Configuration constant for cyclic pattern generation
+#[allow(dead_code)]
 const ALPHABET_SIZE: usize = 26;
 const SUBSEQUENCE_LENGTH: usize = 4;
 

@@ -14,6 +14,8 @@ const DEFAULT_RECV_SIZE: usize = 4096;
 
 pub struct Socket {
     stream: TcpStream,
+    // Internal buffer reserved for buffered I/O operations
+    #[allow(dead_code)]
     buffer: Vec<u8>,
     timeout: Duration,
 }
@@ -432,6 +434,8 @@ impl Default for GdbCoordinator {
 
 pub struct AsyncSocket {
     stream: AsyncTcpStream,
+    // Internal buffer reserved for buffered async I/O operations
+    #[allow(dead_code)]
     buffer: Vec<u8>,
 }
 
@@ -535,6 +539,8 @@ pub async fn concurrent_connections(
 }
 
 pub struct TerminalManager {
+    // Terminal state tracking for restore operations
+    #[allow(dead_code)]
     original_size: Option<(u16, u16)>,
 }
 
