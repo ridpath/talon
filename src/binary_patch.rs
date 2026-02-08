@@ -96,6 +96,39 @@ impl Patch {
         }
     }
     
+    /// Create a mock Patch object for dry-run mode without reading the actual file
+    /// This allows examples to work even when the binary file doesn't exist
+    pub fn new_for_dry_run(binary_path: &str) -> Result<Self, String> {
+        // Create a larger mock binary (64KB) to allow for realistic offsets in examples
+        // Start with a minimal valid ELF header
+        let mut binary_data = vec![
+            0x7f, 0x45, 0x4c, 0x46, // ELF magic
+            0x02, // 64-bit
+            0x01, // Little endian
+            0x01, // ELF version
+            0x00, // System V ABI
+        ];
+        
+        // Pad to 64KB (65536 bytes) with zeros to allow for realistic offsets
+        binary_data.resize(65536, 0x00);
+        
+        let original_checksum = Self::compute_checksum(&binary_data);
+        
+        println!("[PATCH] Created mock binary (64KB) for dry-run mode");
+        
+        // Assume x64 ELF for dry-run mode
+        Ok(Patch {
+            binary_path: binary_path.to_string(),
+            binary_data,
+            original_checksum,
+            architecture: Architecture::X64,
+            is_elf: true,
+            is_pe: false,
+            operations: Vec::new(),
+            dry_run: true,
+        })
+    }
+    
     fn compute_checksum(data: &[u8]) -> String {
         let mut hasher = Sha256::new();
         hasher.update(data);

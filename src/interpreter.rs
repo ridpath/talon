@@ -4857,8 +4857,19 @@ fn eval_expr<'a>(
                         use colored::Colorize;
                         println!("{} Loading binary for patching: {}", "[PATCH]".cyan(), binary.yellow());
 
-                        let patch = Patch::new(&binary)
-                            .map_err(|e| format!("Failed to create Patch object: {}", e))?;
+                        // Try to create a real Patch, but if it fails and we're in dry-run mode, use a mock
+                        let patch = match Patch::new(&binary) {
+                            Ok(p) => p,
+                            Err(e) => {
+                                if dry_run {
+                                    println!("{} Binary not found, using mock for dry-run mode", "[PATCH]".yellow());
+                                    Patch::new_for_dry_run(&binary)
+                                        .map_err(|e| format!("Failed to create mock Patch: {}", e))?
+                                } else {
+                                    return Err(format!("Failed to create Patch object: {}", e));
+                                }
+                            }
+                        };
 
                         let patch_id = PATCH_REGISTRY.lock().await.add(patch);
 
