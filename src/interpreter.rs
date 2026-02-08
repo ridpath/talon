@@ -3371,6 +3371,49 @@ fn eval_expr<'a>(
                         println!("{}", output);
                         Ok(Value::String("Disassembly complete".to_string()))
                     }
+                    "chain_set_debug" => {
+                        // Enable or disable debug mode for exploit chains
+                        let enable = if let Some(Value::Number(n)) =
+                            arg_map.get("enable").or_else(|| arg_values.get(0))
+                        {
+                            *n != 0
+                        } else {
+                            return Err("chain_set_debug() requires 'enable' parameter (0 or 1)".to_string());
+                        };
+
+                        use crate::exploit_chaining::ExploitChain;
+                        use colored::Colorize;
+
+                        let chain_key = "exploit_chain";
+                        let mut chain = if let Some(Value::String(state_json)) =
+                            vars.read().await.get(chain_key)
+                        {
+                            serde_json::from_str::<ExploitChain>(&state_json)
+                                .unwrap_or_else(|_| ExploitChain::new())
+                        } else {
+                            ExploitChain::new()
+                        };
+
+                        chain.set_debug(enable);
+
+                        let state_json = serde_json::to_string(&chain).unwrap_or_default();
+                        vars
+                            .write()
+                            .await
+                            .insert(chain_key.to_string(), Value::String(state_json));
+
+                        println!(
+                            "{} Debug mode {}",
+                            "[CHAIN]".cyan(),
+                            if enable {
+                                "enabled".green()
+                            } else {
+                                "disabled".yellow()
+                            }
+                        );
+
+                        Ok(Value::Null)
+                    }
                     "parallel_exploit" => {
                         use crate::parallel_exploit::exploit_parallel;
 
@@ -3752,6 +3795,80 @@ fn eval_expr<'a>(
                                 *p as u16
                             } else {
                                 return Err("connect_tcp() requires 'port' parameter when host doesn't include port".to_string());
+                            };
+                            (first_arg, port)
+                        };
+
+                        use colored::Colorize;
+
+                        // Check if we're in dry-run mode
+                        let is_dry_run = context.read().await.get("__dry_run__").is_some();
+
+                        if is_dry_run {
+                            // In dry-run mode, return a mock connection without actually connecting
+                            println!(
+                                "{} [DRY-RUN] Mock connection to {}:{}",
+                                "[TCP]".cyan(),
+                                host.yellow(),
+                                port.to_string().yellow()
+                            );
+                            
+                            let mut conn_map = HashMap::new();
+                            conn_map.insert("id".to_string(), Value::Number(999)); // Mock connection ID
+                            conn_map.insert("host".to_string(), Value::String(host));
+                            conn_map.insert("port".to_string(), Value::Number(port as i64));
+                            conn_map.insert("type".to_string(), Value::String("socket".to_string()));
+                            conn_map.insert("dry_run".to_string(), Value::Number(1));
+                            
+                            Ok(Value::Map(conn_map))
+                        } else {
+                            println!(
+                                "{} Connecting to {}:{}",
+                                "[TCP]".cyan(),
+                                host.yellow(),
+                                port.to_string().yellow()
+                            );
+                            let socket = Socket::connect(format!("{}:{}", host, port))?;
+                            println!("{} TCP connection established", "[TCP]".green());
+
+                            let conn_id = CONNECTIONS.add_socket(socket);
+
+                            let mut conn_map = HashMap::new();
+                            conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
+                            conn_map.insert("host".to_string(), Value::String(host));
+                            conn_map.insert("port".to_string(), Value::Number(port as i64));
+                            conn_map.insert("type".to_string(), Value::String("socket".to_string()));
+
+                            Ok(Value::Map(conn_map))
+                        }
+                    }
+                    "connect" => {
+                        // Alias for connect_tcp() for simpler syntax
+                        // Supports both formats: connect("host:port") or connect("host", port)
+                        let first_arg = arg_map
+                            .get("host")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("connect() requires 'host' parameter or 'host:port' string")?
+                            .to_string();
+
+                        // Try to parse "host:port" format first
+                        let (host, port) = if first_arg.contains(':') {
+                            let parts: Vec<&str> = first_arg.split(':').collect();
+                            if parts.len() != 2 {
+                                return Err(format!("Invalid host:port format: '{}'", first_arg));
+                            }
+                            let host = parts[0].to_string();
+                            let port = parts[1].parse::<u16>()
+                                .map_err(|_| format!("Invalid port number: '{}'", parts[1]))?;
+                            (host, port)
+                        } else {
+                            // Separate host and port arguments
+                            let port = if let Some(Value::Number(p)) =
+                                arg_map.get("port").or_else(|| arg_values.get(1))
+                            {
+                                *p as u16
+                            } else {
+                                return Err("connect() requires 'port' parameter when host doesn't include port".to_string());
                             };
                             (first_arg, port)
                         };
