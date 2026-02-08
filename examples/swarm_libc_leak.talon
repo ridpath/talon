@@ -1,4 +1,4 @@
-﻿// TALON Swarm Distributed Libc Detection and Aggregation Example
+// TALON Swarm Distributed Libc Detection and Aggregation Example
 // Demonstrates swarm-based reconnaissance for libc version detection across networks
 //
 // Usage:
@@ -90,38 +90,62 @@ for conn_result in connections
                 // Fingerprint libc version based on leaked symbols
                 let libc_info = fingerprint_libc(leaked_symbols, target_ip)
                 
-                if libc_info.version != "unknown"
-                    print "  Detected: " + libc_info.version
-                    print "  Base address: 0x" + hex(libc_info.base)
-                    print "  Build ID: " + libc_info.build_id
+                if libc_info["version"] != "unknown" {
+                    print "  Detected: " + libc_info["version"]
+                    print "  Base address: 0x" + hex(libc_info["base"])
+                    print "  Build ID: " + libc_info["build_id"]
                     
                     // Add to database
-                    let db_key = libc_info.build_id
+                    let db_key = libc_info["build_id"]
                     
-                    if libc_database[db_key] == null {                        // New libc version discovered
+                    if libc_database[db_key] == null {
+                        // New libc version discovered
                         unique_libc_count = unique_libc_count + 1
                         print "  [NEW] Unique libc version #" + unique_libc_count
                         
-                        libc_database[db_key] = {
-                            "version": libc_info.version,
-                            "build_id": libc_info.build_id,
-                            "symbols": libc_info.symbols,
-                            "targets": [target_ip],
-                            "first_seen": current_timestamp(),
-                            "agent_discovered": agent_id
-                        }
+                        let libc_version = libc_info["version"]
+                        let libc_build_id = libc_info["build_id"]
+                        let libc_symbols = libc_info["symbols"]
+                        let timestamp = current_timestamp()
+                        let agent = agent_id
+                        
+                        let new_entry = Map()
+                        new_entry["version"] = libc_version
+                        new_entry["build_id"] = libc_build_id
+                        new_entry["symbols"] = libc_symbols
+                        new_entry["targets"] = [target_ip]
+                        new_entry["first_seen"] = timestamp
+                        new_entry["agent_discovered"] = agent
+                        libc_database[db_key] = new_entry
                         
                         // Synchronize with other agents
                         swarm_sync_libc_discovery(db_key, libc_database[db_key])
-                    } else {                        // Known libc, add target to list
+                    } else {
+                        // Known libc, add target to list
                         let existing = libc_database[db_key]
-                        existing.targets = [...existing.targets, target_ip]
+                        let updated_targets = existing["targets"]
+                        updated_targets = [...updated_targets, target_ip]
+                        existing["targets"] = updated_targets
                         libc_database[db_key] = existing
                         print "  [KNOWN] Matches existing entry"
                     }
+                    
                     // Store symbol offsets for cross-referencing
-                    for symbol_name, offset in libc_info.symbols
-                        if symbol_offsets[symbol_name] == null {                            symbol_offsets[symbol_name] = {} {                        } {                        symbol_offsets[symbol_name][libc_info.version] = offset {                    } {                } else {                    print "  [FAILED] Could not fingerprint libc" {                } {            } else {                print "  [FAILED] No symbols leaked"
+                    let libc_symbols = libc_info["symbols"]
+                    let libc_version = libc_info["version"]
+                    for symbol_name, offset in libc_symbols {
+                        if symbol_offsets[symbol_name] == null {
+                            symbol_offsets[symbol_name] = Map()
+                        }
+                        let version_map = symbol_offsets[symbol_name]
+                        version_map[libc_version] = offset
+                        symbol_offsets[symbol_name] = version_map
+                    }
+                } else {
+                    print "  [FAILED] Could not fingerprint libc"
+                }
+            } else {
+                print "  [FAILED] No symbols leaked"
             }
             // Close connection
             close conn_id
@@ -140,30 +164,32 @@ print ""
 // Display discovered libc database
 print "Discovered Libc Database:"
 print "========================="
-for build_id, info in libc_database
+for build_id, info in libc_database {
     print ""
     print "Build ID: " + build_id
-    print "  Version: " + info.version
-    print "  Targets: " + len(info.targets) + " (" + join(info.targets, ", ") + ")"
-    print "  Discovered by: " + info.agent_discovered
-    print "  First seen: " + info.first_seen
+    print "  Version: " + info["version"]
+    let info_targets = info["targets"]
+    print "  Targets: " + len(info_targets) + " (" + join(info_targets, ", ") + ")"
+    print "  Discovered by: " + info["agent_discovered"]
+    print "  First seen: " + info["first_seen"]
     print "  Symbols:"
     
-    for symbol_name, offset in info.symbols
+    let info_symbols = info["symbols"]
+    for symbol_name, offset in info_symbols {
         print "    " + symbol_name + ": 0x" + hex(offset)
-    end
-end
+    }
+}
 
 print ""
 print "Symbol Offset Cross-Reference:"
 print "==============================="
-for symbol_name, versions in symbol_offsets
+for symbol_name, versions in symbol_offsets {
     print ""
     print symbol_name + ":"
-    for version, offset in versions
+    for version, offset in versions {
         print "  " + version + ": 0x" + hex(offset)
-    end
-end
+    }
+}
 
 // Return results for swarm aggregation
 return {
@@ -183,13 +209,18 @@ define leak_multiple_symbols(conn_id, max_attempts)
     // Common symbols to leak for fingerprinting
     let symbol_list = ["system", "execve", "puts", "printf", "malloc", "free", "read", "write"]
     
-    for symbol_name in symbol_list {        try
+    for symbol_name in symbol_list {
+        try {
             // Send leak request for specific symbol
             send conn_id, "LEAK:" + symbol_name + "\n"
             let response = recv conn_id, 8, 2000
             
-            if len(response) == 8 {                let addr = u64(response) {                symbols[symbol_name] = addr {                print "    Leaked " + symbol_name + ": 0x" + hex(addr) {            }
-        catch error
+            if len(response) == 8 {
+                let addr = u64(response)
+                symbols[symbol_name] = addr
+                print "    Leaked " + symbol_name + ": 0x" + hex(addr)
+            }
+        } catch error {
             // Continue to next symbol
         }
     }
@@ -200,15 +231,14 @@ define fingerprint_libc(leaked_symbols, target_ip)
     // Calculate base address from known offsets
     // This is simplified - production would use comprehensive libc database
     
-    let libc_info = {
-        "version": "unknown",
-        "build_id": "unknown",
-        "base": 0x0,
-        "symbols": {}
-    }
+    let libc_info = Map()
+    libc_info["version"] = "unknown"
+    libc_info["build_id"] = "unknown"
+    libc_info["base"] = 0x0
+    libc_info["symbols"] = Map()
     
     // Check if we have system() symbol
-    if leaked_symbols["system"] != null
+    if leaked_symbols["system"] != null {
         let system_addr = leaked_symbols["system"]
         
         // Try to match against known libc versions
@@ -228,32 +258,35 @@ define fingerprint_libc(leaked_symbols, target_ip)
             potential_base_2_35
         )
         
-        if matched_version == "2.31"
-            libc_info.version = "libc-2.31"
-            libc_info.build_id = "libc6_2.31-0ubuntu9.9"
-            libc_info.base = potential_base_2_31
-        else if matched_version == "2.27"
-            libc_info.version = "libc-2.27"
-            libc_info.build_id = "libc6_2.27-3ubuntu1.6"
-            libc_info.base = potential_base_2_27
-        else if matched_version == "2.35"
-            libc_info.version = "libc-2.35"
-            libc_info.build_id = "libc6_2.35-0ubuntu3.4"
-            libc_info.base = potential_base_2_35
-        else
+        if matched_version == "2.31" {
+            libc_info["version"] = "libc-2.31"
+            libc_info["build_id"] = "libc6_2.31-0ubuntu9.9"
+            libc_info["base"] = potential_base_2_31
+        } else if matched_version == "2.27" {
+            libc_info["version"] = "libc-2.27"
+            libc_info["build_id"] = "libc6_2.27-3ubuntu1.6"
+            libc_info["base"] = potential_base_2_27
+        } else if matched_version == "2.35" {
+            libc_info["version"] = "libc-2.35"
+            libc_info["build_id"] = "libc6_2.35-0ubuntu3.4"
+            libc_info["base"] = potential_base_2_35
+        } else {
             // Unknown version - use generic fingerprint
-            libc_info.version = "libc-unknown"
-            libc_info.build_id = "build_" + hex(system_addr)
-            libc_info.base = potential_base_2_31  // Best guess
+            libc_info["version"] = "libc-unknown"
+            libc_info["build_id"] = "build_" + hex(system_addr)
+            libc_info["base"] = potential_base_2_31  // Best guess
         }
         // Calculate all symbol offsets
-        for symbol_name, addr in leaked_symbols
-            libc_info.symbols[symbol_name] = addr - libc_info.base
-        end
-    end
+        for symbol_name, addr in leaked_symbols {
+            let symbols_map = libc_info["symbols"]
+            let base = libc_info["base"]
+            symbols_map[symbol_name] = addr - base
+            libc_info["symbols"] = symbols_map
+        }
+    }
     
     return libc_info
-end
+}
 
 // Cross-check libc version using multiple symbols
 define cross_check_version(leaked_symbols, base_2_31, base_2_27, base_2_35)
@@ -262,49 +295,53 @@ define cross_check_version(leaked_symbols, base_2_31, base_2_27, base_2_35)
     let score_2_35 = 0
     
     // Known offsets for common symbols
-    let offsets_2_31 = {
-        "system": 0x50d60,
-        "puts": 0x875a0,
-        "printf": 0x64f70,
-        "malloc": 0x97070
-    }
+    let offsets_2_31 = Map()
+    offsets_2_31["system"] = 0x50d60
+    offsets_2_31["puts"] = 0x875a0
+    offsets_2_31["printf"] = 0x64f70
+    offsets_2_31["malloc"] = 0x97070
     
-    let offsets_2_27 = {
-        "system": 0x4f4e0,
-        "puts": 0x809c0,
-        "printf": 0x64e80,
-        "malloc": 0x97070
-    }
+    let offsets_2_27 = Map()
+    offsets_2_27["system"] = 0x4f4e0
+    offsets_2_27["puts"] = 0x809c0
+    offsets_2_27["printf"] = 0x64e80
+    offsets_2_27["malloc"] = 0x97070
     
-    let offsets_2_35 = {
-        "system": 0x52290,
-        "puts": 0x80ed0,
-        "printf": 0x61c90,
-        "malloc": 0x9a1f0
-    }
+    let offsets_2_35 = Map()
+    offsets_2_35["system"] = 0x52290
+    offsets_2_35["puts"] = 0x80ed0
+    offsets_2_35["printf"] = 0x61c90
+    offsets_2_35["malloc"] = 0x9a1f0
     
     // Score each version based on matching offsets
-    for symbol_name, addr in leaked_symbols
-        if offsets_2_31[symbol_name] != null
-            if addr == base_2_31 + offsets_2_31[symbol_name] {                score_2_31 = score_2_31 + 1 {            }
+    for symbol_name, addr in leaked_symbols {
+        if offsets_2_31[symbol_name] != null {
+            if addr == base_2_31 + offsets_2_31[symbol_name] {
+                score_2_31 = score_2_31 + 1
+            }
         }
-        if offsets_2_27[symbol_name] != null
-            if addr == base_2_27 + offsets_2_27[symbol_name] {                score_2_27 = score_2_27 + 1 {            }
+        if offsets_2_27[symbol_name] != null {
+            if addr == base_2_27 + offsets_2_27[symbol_name] {
+                score_2_27 = score_2_27 + 1
+            }
         }
-        if offsets_2_35[symbol_name] != null
-            if addr == base_2_35 + offsets_2_35[symbol_name] {                score_2_35 = score_2_35 + 1 {            } {        }
+        if offsets_2_35[symbol_name] != null {
+            if addr == base_2_35 + offsets_2_35[symbol_name] {
+                score_2_35 = score_2_35 + 1
+            }
+        }
     }
     // Return version with highest score
-    if score_2_31 > score_2_27 && score_2_31 > score_2_35
+    if score_2_31 > score_2_27 && score_2_31 > score_2_35 {
         return "2.31"
-    else if score_2_27 > score_2_35
+    } else if score_2_27 > score_2_35 {
         return "2.27"
-    else if score_2_35 > 0
+    } else if score_2_35 > 0 {
         return "2.35"
-    else
+    } else {
         return "unknown"
-    end
-end
+    }
+}
 
 // Synchronize libc discovery with swarm
 define swarm_sync_libc_discovery(build_id, libc_info)
@@ -317,14 +354,23 @@ end
 // Helper function to count successful connections
 define count_successful(results)
     let count = 0
-    for result in results
-        if result.success {            count = count + 1 {        } {    }
+    for result in results {
+        if result.success {
+            count = count + 1
+        }
+    }
     return count
 }
+
 define count_failed(results)
     let count = 0
-    for result in results
-        if !result.success {            count = count + 1 {        } {    } {    return count {}
+    for result in results {
+        if result.success == false {
+            count = count + 1
+        }
+    }
+    return count
+}
 // Get current timestamp
 define current_timestamp()
     return "2026-02-06T18:59:00Z"
@@ -337,8 +383,11 @@ define get_agent_id()
 define join(array, separator)
     let result = ""
     let first = true
-    for item in array
-        if !first {            result = result + separator {        } {        result = result + item
+    for item in array {
+        if first == false {
+            result = result + separator
+        }
+        result = result + item
         first = false
     }
     return result
