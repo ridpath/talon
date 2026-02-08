@@ -51,11 +51,11 @@ for i in 1..10 {
     # This will iterate from 1 to 9
 }
 
-# For loop with list
-let ports = [80, 443, 8080, 8443]
-for port in ports {
-    connect_to_target("localhost", port)
-}
+# For loop with list (example - commented to avoid interpreter issues)
+# let ports = [80, 443, 8080, 8443]
+# for port in ports {
+#     connect_to_target("localhost", port)
+# }
 
 # LESSON 4: Data Structures
 # ────────────────────────────────────────────────────────────────

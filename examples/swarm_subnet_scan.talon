@@ -146,12 +146,12 @@ return final_result
 
 // Helper Functions
 
-define extract_port(target) {
+define function extract_port(target) {
     let parts = split(target, ":")
     return parts[1]
 }
 
-define grab_banner(conn_id, port, timeout) {
+define function grab_banner(conn_id, port, timeout) {
     try {
         // Try to receive banner
         let banner = recv(conn_id, 1024, timeout)
