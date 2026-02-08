@@ -20,7 +20,7 @@
 
 // Helper functions (defined first)
 
-define count_successful(results) {
+define function count_successful(results) {
     let count = 0
     for result in results {
         if result.success {
@@ -30,7 +30,7 @@ define count_successful(results) {
     return count
 }
 
-define count_failed(results) {
+define function count_failed(results) {
     let count = 0
     for result in results {
         if result.success == false {
@@ -40,12 +40,12 @@ define count_failed(results) {
     return count
 }
 
-define swarm_sync_libc(libc_base, target_ip) {
+define function swarm_sync_libc(libc_base, target_ip) {
     // In production, this would use swarm.sync()
     return true
 }
 
-define get_agent_id() {
+define function get_agent_id() {
     return "agent-local"
 }
 

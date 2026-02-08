@@ -217,7 +217,7 @@ return final_result
 // Helper Functions
 
 // Leak multiple symbols from target
-define leak_multiple_symbols(conn_id, max_attempts) {
+define function leak_multiple_symbols(conn_id, max_attempts) {
     let symbols = Map()
     
     // Common symbols to leak for fingerprinting
@@ -242,7 +242,7 @@ define leak_multiple_symbols(conn_id, max_attempts) {
 }
 
 // Fingerprint libc version
-define fingerprint_libc(leaked_symbols, target_ip) {
+define function fingerprint_libc(leaked_symbols, target_ip) {
     let libc_info = Map()
     map_set(libc_info, "version", "unknown")
     map_set(libc_info, "build_id", "unknown")
@@ -299,7 +299,7 @@ define fingerprint_libc(leaked_symbols, target_ip) {
 }
 
 // Cross-check libc version
-define cross_check_version(leaked_symbols, base_2_31, base_2_27, base_2_35) {
+define function cross_check_version(leaked_symbols, base_2_31, base_2_27, base_2_35) {
     let score_2_31 = 0
     let score_2_27 = 0
     let score_2_35 = 0
@@ -351,7 +351,7 @@ define cross_check_version(leaked_symbols, base_2_31, base_2_27, base_2_35) {
     }
     
     // Return version with highest score
-    if score_2_31 > score_2_27 && score_2_31 > score_2_35 {
+    if score_2_31 > score_2_27 and score_2_31 > score_2_35 {
         return "2.31"
     } else if score_2_27 > score_2_35 {
         return "2.27"
@@ -363,20 +363,20 @@ define cross_check_version(leaked_symbols, base_2_31, base_2_27, base_2_35) {
 }
 
 // Helper to convert map to list of {key, value} entries
-define get_map_entries(map_obj) {
+define function get_map_entries(map_obj) {
     // In production, this would use map iterator
     // For now, return empty list (placeholder)
     return []
 }
 
 // Synchronize libc discovery with swarm
-define swarm_sync_libc_discovery(build_id, libc_info) {
+define function swarm_sync_libc_discovery(build_id, libc_info) {
     // In production: swarm.sync_registry("libc_database", build_id, libc_info)
     return true
 }
 
 // Count successful connections
-define count_successful(results) {
+define function count_successful(results) {
     let count = 0
     for result in results {
         if result.success {
@@ -386,7 +386,7 @@ define count_successful(results) {
     return count
 }
 
-define count_failed(results) {
+define function count_failed(results) {
     let count = 0
     for result in results {
         if result.success == false {
@@ -397,17 +397,17 @@ define count_failed(results) {
 }
 
 // Get current timestamp
-define current_timestamp() {
+define function current_timestamp() {
     return "2026-02-06T18:59:00Z"
 }
 
 // Get agent ID
-define get_agent_id() {
+define function get_agent_id() {
     return "agent-libc-01"
 }
 
 // Join array elements
-define join(array, separator) {
+define function join(array, separator) {
     let result = ""
     let first = true
     for item in array {
