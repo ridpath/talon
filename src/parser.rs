@@ -364,26 +364,25 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
             Ok(vec![Command::Match(MatchBlock { expr, arms })])
         }
         Rule::try_catch_stmt => {
-            let parts = pair.into_inner();
-            let mut try_body = Vec::new();
-            let mut catch_var = String::new();
-            let mut catch_body = Vec::new();
-            let mut in_catch = false;
-            for part in parts {
-                if part.as_rule() == Rule::catch_stmt {
-                    in_catch = true;
-                    let mut catch_parts = part.into_inner();
-                    catch_var = catch_parts
-                        .next()
-                        .ok_or("Missing catch var")?
-                        .as_str()
-                        .to_string();
-                } else if in_catch {
-                    catch_body.extend(parse_stmt(part)?);
-                } else {
-                    try_body.extend(parse_stmt(part)?);
-                }
-            }
+            let mut parts = pair.into_inner();
+            
+            // First block is the try block
+            let try_block = parts.next().ok_or("Missing try block")?;
+            let try_body = parse_block(try_block)?;
+            
+            // Next is the catch statement
+            let catch_stmt = parts.next().ok_or("Missing catch statement")?;
+            let mut catch_parts = catch_stmt.into_inner();
+            let catch_var = catch_parts
+                .next()
+                .ok_or("Missing catch var")?
+                .as_str()
+                .to_string();
+            
+            // Catch block
+            let catch_block = catch_parts.next().ok_or("Missing catch block")?;
+            let catch_body = parse_block(catch_block)?;
+            
             Ok(vec![Command::TryCatch(TryCatch {
                 try_body,
                 catch_var,
@@ -418,6 +417,35 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
             }
         }
         _ => Ok(vec![]),
+    }
+}
+
+// Helper function to parse both curly brace and 'end' keyword blocks
+fn parse_block(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
+    match pair.as_rule() {
+        Rule::block => {
+            // Block can be either brace_block or end_block
+            let block_type = pair.into_inner().next().ok_or("Empty block")?;
+            match block_type.as_rule() {
+                Rule::brace_block | Rule::end_block => {
+                    let mut commands = Vec::new();
+                    for stmt in block_type.into_inner() {
+                        commands.extend(parse_stmt(stmt)?);
+                    }
+                    Ok(commands)
+                }
+                _ => Err(format!("Expected block, got {:?}", block_type.as_rule())),
+            }
+        }
+        // Direct brace_block or end_block without wrapper
+        Rule::brace_block | Rule::end_block => {
+            let mut commands = Vec::new();
+            for stmt in pair.into_inner() {
+                commands.extend(parse_stmt(stmt)?);
+            }
+            Ok(commands)
+        }
+        _ => Err(format!("Expected block, got {:?}", pair.as_rule())),
     }
 }
 
