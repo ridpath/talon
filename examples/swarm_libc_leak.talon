@@ -1,4 +1,4 @@
-// TALON Swarm Distributed Libc Detection and Aggregation Example
+﻿// TALON Swarm Distributed Libc Detection and Aggregation Example
 // Demonstrates swarm-based reconnaissance for libc version detection across networks
 //
 // Usage:
@@ -98,8 +98,7 @@ for conn_result in connections
                     // Add to database
                     let db_key = libc_info.build_id
                     
-                    if libc_database[db_key] == null
-                        // New libc version discovered
+                    if libc_database[db_key] == null {                        // New libc version discovered
                         unique_libc_count = unique_libc_count + 1
                         print "  [NEW] Unique libc version #" + unique_libc_count
                         
@@ -114,38 +113,24 @@ for conn_result in connections
                         
                         // Synchronize with other agents
                         swarm_sync_libc_discovery(db_key, libc_database[db_key])
-                    else
-                        // Known libc, add target to list
+                    } else {                        // Known libc, add target to list
                         let existing = libc_database[db_key]
                         existing.targets = [...existing.targets, target_ip]
                         libc_database[db_key] = existing
                         print "  [KNOWN] Matches existing entry"
-                    end
-                    
+                    }
                     // Store symbol offsets for cross-referencing
                     for symbol_name, offset in libc_info.symbols
-                        if symbol_offsets[symbol_name] == null
-                            symbol_offsets[symbol_name] = {}
-                        end
-                        
-                        symbol_offsets[symbol_name][libc_info.version] = offset
-                    end
-                else
-                    print "  [FAILED] Could not fingerprint libc"
-                end
-            else
-                print "  [FAILED] No symbols leaked"
-            end
-            
+                        if symbol_offsets[symbol_name] == null {                            symbol_offsets[symbol_name] = {} {                        } {                        symbol_offsets[symbol_name][libc_info.version] = offset {                    } {                } else {                    print "  [FAILED] Could not fingerprint libc" {                } {            } else {                print "  [FAILED] No symbols leaked"
+            }
             // Close connection
             close conn_id
             
         catch error
             print "  [ERROR] " + error
-        end
-    end
-end
-
+        }
+    }
+}
 print ""
 print "Libc Detection Complete"
 print "  Unique libc versions: " + unique_libc_count
@@ -198,25 +183,18 @@ define leak_multiple_symbols(conn_id, max_attempts)
     // Common symbols to leak for fingerprinting
     let symbol_list = ["system", "execve", "puts", "printf", "malloc", "free", "read", "write"]
     
-    for symbol_name in symbol_list
-        try
+    for symbol_name in symbol_list {        try
             // Send leak request for specific symbol
             send conn_id, "LEAK:" + symbol_name + "\n"
             let response = recv conn_id, 8, 2000
             
-            if len(response) == 8
-                let addr = u64(response)
-                symbols[symbol_name] = addr
-                print "    Leaked " + symbol_name + ": 0x" + hex(addr)
-            end
+            if len(response) == 8 {                let addr = u64(response) {                symbols[symbol_name] = addr {                print "    Leaked " + symbol_name + ": 0x" + hex(addr) {            }
         catch error
             // Continue to next symbol
-        end
-    end
-    
+        }
+    }
     return symbols
-end
-
+}
 // Fingerprint libc version based on leaked symbols
 define fingerprint_libc(leaked_symbols, target_ip)
     // Calculate base address from known offsets
@@ -267,8 +245,7 @@ define fingerprint_libc(leaked_symbols, target_ip)
             libc_info.version = "libc-unknown"
             libc_info.build_id = "build_" + hex(system_addr)
             libc_info.base = potential_base_2_31  // Best guess
-        end
-        
+        }
         // Calculate all symbol offsets
         for symbol_name, addr in leaked_symbols
             libc_info.symbols[symbol_name] = addr - libc_info.base
@@ -309,24 +286,14 @@ define cross_check_version(leaked_symbols, base_2_31, base_2_27, base_2_35)
     // Score each version based on matching offsets
     for symbol_name, addr in leaked_symbols
         if offsets_2_31[symbol_name] != null
-            if addr == base_2_31 + offsets_2_31[symbol_name]
-                score_2_31 = score_2_31 + 1
-            end
-        end
-        
+            if addr == base_2_31 + offsets_2_31[symbol_name] {                score_2_31 = score_2_31 + 1 {            }
+        }
         if offsets_2_27[symbol_name] != null
-            if addr == base_2_27 + offsets_2_27[symbol_name]
-                score_2_27 = score_2_27 + 1
-            end
-        end
-        
+            if addr == base_2_27 + offsets_2_27[symbol_name] {                score_2_27 = score_2_27 + 1 {            }
+        }
         if offsets_2_35[symbol_name] != null
-            if addr == base_2_35 + offsets_2_35[symbol_name]
-                score_2_35 = score_2_35 + 1
-            end
-        end
-    end
-    
+            if addr == base_2_35 + offsets_2_35[symbol_name] {                score_2_35 = score_2_35 + 1 {            } {        }
+    }
     // Return version with highest score
     if score_2_31 > score_2_27 && score_2_31 > score_2_35
         return "2.31"
@@ -351,47 +318,31 @@ end
 define count_successful(results)
     let count = 0
     for result in results
-        if result.success
-            count = count + 1
-        end
-    end
+        if result.success {            count = count + 1 {        } {    }
     return count
-end
-
+}
 define count_failed(results)
     let count = 0
     for result in results
-        if !result.success
-            count = count + 1
-        end
-    end
-    return count
-end
-
+        if !result.success {            count = count + 1 {        } {    } {    return count {}
 // Get current timestamp
 define current_timestamp()
     return "2026-02-06T18:59:00Z"
-end
-
+}
 // Get agent ID
 define get_agent_id()
     return "agent-libc-01"
-end
-
+}
 // Join array elements with separator
 define join(array, separator)
     let result = ""
     let first = true
     for item in array
-        if !first
-            result = result + separator
-        end
-        result = result + item
+        if !first {            result = result + separator {        } {        result = result + item
         first = false
-    end
+    }
     return result
-end
-
+}
 // Expected output when run via swarm controller:
 //
 // TALON Swarm Distributed Libc Detection Results

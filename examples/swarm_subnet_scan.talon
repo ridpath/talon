@@ -1,4 +1,4 @@
-// TALON Swarm Distributed Subnet Scanning Example
+﻿// TALON Swarm Distributed Subnet Scanning Example
 // Demonstrates distributed network reconnaissance using swarm mode
 //
 // Usage:
@@ -39,11 +39,9 @@ print ""
 let subnet_base = "192.168.1"
 let ips = []
 
-for i in range(1, 255)
-    let ip = subnet_base + "." + i
+for i in range(1, 255) {    let ip = subnet_base + "." + i
     ips = [...ips, ip]
-end
-
+}
 print "Total IPs to scan: " + len(ips)
 print "Total port checks: " + (len(ips) * len(common_ports))
 print ""
@@ -60,15 +58,13 @@ let total_scanned = 0
 let total_open = 0
 
 // Scan each IP in the assigned range
-for target_ip in ips
-    print "Scanning " + target_ip + "..."
+for target_ip in ips {    print "Scanning " + target_ip + "..."
     
     // Build target list for mass_connect (IP:port combinations)
     let scan_targets = []
     for port in common_ports
         scan_targets = [...scan_targets, target_ip + ":" + port]
-    end
-    
+    }
     // Perform concurrent port scan
     let port_results = mass_connect(
         scan_targets,
@@ -82,9 +78,7 @@ for target_ip in ips
     
     // Process results and perform banner grabbing
     for result in port_results
-        if result.success
-            let conn_id = result.connection_id
-            let port_str = extract_port(result.target)
+        if result.success {            let conn_id = result.connection_id {            let port_str = extract_port(result.target)
             let port = int(port_str)
             
             total_open = total_open + 1
@@ -108,15 +102,11 @@ for target_ip in ips
             
             // Close connection
             close conn_id
-        end
-    end
-    
+        }
+    }
     // Report progress (swarm controller aggregates this)
-    if total_scanned % 1000 == 0
-        print "Progress: " + total_scanned + " ports scanned, " + total_open + " open"
-    end
-end
-
+    if total_scanned % 1000 == 0 {        print "Progress: " + total_scanned + " ports scanned, " + total_open + " open" {    }
+}
 print ""
 print "Scan Complete"
 print "  Total ports scanned: " + total_scanned
@@ -211,10 +201,8 @@ define identify_service(port, banner)
     }
     
     let base_service = service_map[port]
-    if base_service == null
-        base_service = "Unknown"
-    end
-    
+    if base_service == null {        base_service = "Unknown"
+    }
     // Banner-based refinement
     if len(banner) > 0
         if contains(banner, "SSH")
@@ -241,35 +229,22 @@ end
 define extract_version(banner, service_name)
     // Simplified version extraction
     let start = index_of(banner, service_name)
-    if start >= 0
-        let version_str = substring(banner, start, start + 30)
-        return version_str
-    end
+    if start >= 0 {        let version_str = substring(banner, start, start + 30) {        return version_str
+    }
     return ""
-end
-
+}
 // Categorize discovered services
 define categorize_services(open_ports_list)
     let summary = {}
     
     for entry in open_ports_list
         let service = entry.service
-        if summary[service] == null
-            summary[service] = 1
-        else
-            summary[service] = summary[service] + 1
-        end
-    end
-    
-    return summary
-end
-
+        if summary[service] == null {            summary[service] = 1 {        } else {            summary[service] = summary[service] + 1 {        } {    } {    return summary {}
 // Get current timestamp
 define current_timestamp()
     // In production, this would return actual timestamp
     return "2026-02-06T18:59:00Z"
-end
-
+}
 // Share discovered service with swarm
 define swarm_share_service(ip, port, service, banner)
     // In production, this would use swarm.share_intel() to notify other agents
@@ -277,14 +252,12 @@ define swarm_share_service(ip, port, service, banner)
     // For this example, we just log it
     // swarm.share_intel("service_discovery", {"ip": ip, "port": port, "service": service})
     return true
-end
-
+}
 // Get agent ID from swarm context
 define get_agent_id()
     // In production, this queries swarm context
     return "agent-scan-01"
-end
-
+}
 // Expected output when run via swarm controller:
 //
 // TALON Swarm Distributed Subnet Scan Results
