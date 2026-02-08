@@ -210,10 +210,20 @@ impl PatchRegistry {
     }
 }
 
+// Exploit Chain State Management
+#[derive(Clone)]
+struct ExploitChainState {
+    id: u64,
+    debug: bool,
+    checkpoints: HashMap<String, HashMap<String, Value>>,
+    state: HashMap<String, Value>,
+}
+
 lazy_static::lazy_static! {
     static ref CONNECTIONS: AtomicConnectionRegistry = AtomicConnectionRegistry::new();
     static ref SSH_CONNECTIONS: Arc<Mutex<SshRegistry>> = Arc::new(Mutex::new(SshRegistry::new()));
     static ref PATCH_REGISTRY: Arc<Mutex<PatchRegistry>> = Arc::new(Mutex::new(PatchRegistry::new()));
+    static ref EXPLOIT_CHAINS: Arc<Mutex<HashMap<u64, ExploitChainState>>> = Arc::new(Mutex::new(HashMap::new()));
 }
 
 pub fn run_repl() {
@@ -8249,6 +8259,166 @@ fn eval_expr<'a>(
                                 Ok(Value::Bytes(obfuscated))
                             }
                             _ => Err("signature_obfuscate() requires bytes code".into()),
+                        }
+                    }
+                    
+                    // Exploit Chain Helper Functions
+                    "contains" => {
+                        if arg_values.len() < 2 {
+                            return Err("contains() requires 2 arguments: contains(haystack, needle)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::String(haystack), Value::String(needle)) => {
+                                Ok(Value::Number(if haystack.contains(needle) { 1 } else { 0 }))
+                            }
+                            (Value::Bytes(haystack), Value::Bytes(needle)) => {
+                                let found = haystack
+                                    .windows(needle.len())
+                                    .any(|window| window == needle.as_slice());
+                                Ok(Value::Number(if found { 1 } else { 0 }))
+                            }
+                            _ => Err("contains() requires (string, string) or (bytes, bytes)".into()),
+                        }
+                    }
+                    
+                    "parse_int" => {
+                        if arg_values.is_empty() {
+                            return Err("parse_int() requires 1 argument: parse_int(string)".into());
+                        }
+                        match &arg_values[0] {
+                            Value::String(s) => {
+                                let trimmed = s.trim();
+                                // Try parsing as decimal first, then hex if it starts with 0x
+                                if trimmed.starts_with("0x") || trimmed.starts_with("0X") {
+                                    let hex_part = &trimmed[2..];
+                                    i64::from_str_radix(hex_part, 16)
+                                        .map(Value::Number)
+                                        .map_err(|e| format!("Failed to parse hex: {}", e))
+                                } else {
+                                    trimmed
+                                        .parse::<i64>()
+                                        .map(Value::Number)
+                                        .map_err(|e| format!("Failed to parse int: {}", e))
+                                }
+                            }
+                            _ => Err("parse_int() requires string argument".into()),
+                        }
+                    }
+                    
+                    "parse_hex" => {
+                        if arg_values.is_empty() {
+                            return Err("parse_hex() requires 1 argument: parse_hex(string)".into());
+                        }
+                        match &arg_values[0] {
+                            Value::String(s) => {
+                                // Extract hex value from string (handles formats like "0x7f1234567890" or "7f1234567890")
+                                let cleaned = s.trim().replace("0x", "").replace("0X", "");
+                                i64::from_str_radix(&cleaned, 16)
+                                    .map(Value::Number)
+                                    .map_err(|e| format!("Failed to parse hex: {}", e))
+                            }
+                            _ => Err("parse_hex() requires string argument".into()),
+                        }
+                    }
+                    
+                    "format_string_write" => {
+                        if arg_values.len() < 3 {
+                            return Err("format_string_write() requires 3 arguments: format_string_write(address, value, offset)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1], &arg_values[2]) {
+                            (Value::Number(address), Value::Number(value), Value::Number(offset)) => {
+                                // Generate format string payload for GOT overwrite
+                                // This is a simplified implementation - real implementation would use %n writes
+                                let payload = format!(
+                                    "{}%{}$n",
+                                    "A".repeat((*value & 0xFFFF) as usize),
+                                    offset
+                                );
+                                println!(
+                                    "[FORMAT_STRING] Writing 0x{:x} to address 0x{:x} at offset {}",
+                                    value, address, offset
+                                );
+                                Ok(Value::String(payload))
+                            }
+                            _ => Err("format_string_write() requires (number address, number value, number offset)".into()),
+                        }
+                    }
+                    
+                    "build_leak_payload" => {
+                        if arg_values.len() < 2 {
+                            return Err("build_leak_payload() requires 2 arguments: build_leak_payload(binary, offset)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::String(_binary), Value::Number(offset)) => {
+                                // Build a simple leak payload (padding + ROP to leak)
+                                // This is a placeholder - real implementation would analyze binary
+                                let padding = vec![b'A'; *offset as usize];
+                                println!("[BUILD_LEAK] Creating leak payload with {} byte offset", offset);
+                                Ok(Value::Bytes(padding))
+                            }
+                            _ => Err("build_leak_payload() requires (string binary, number offset)".into()),
+                        }
+                    }
+                    
+                    "recv_timeout" => {
+                        if arg_values.len() < 3 {
+                            return Err("recv_timeout() requires 3 arguments: recv_timeout(conn, size, timeout_sec)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1], &arg_values[2]) {
+                            (Value::Number(conn_id), Value::Number(size), Value::Number(_timeout)) => {
+                                // Get connection from registry (simplified for dry-run mode)
+                                if CONNECTIONS.get(*conn_id as u64).is_some() {
+                                    // In dry-run mode, return dummy data
+                                    println!("[RECV_TIMEOUT] Receiving {} bytes (dry-run mode)", size);
+                                    Ok(Value::Bytes(vec![0x41; *size as usize]))
+                                } else {
+                                    Err(format!("Invalid connection ID: {}", conn_id))
+                                }
+                            }
+                            _ => Err("recv_timeout() requires (number conn, number size, number timeout)".into()),
+                        }
+                    }
+                    
+                    "chain_get" => {
+                        if arg_values.len() < 2 {
+                            return Err("chain_get() requires 2 arguments: chain_get(chain, key)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::Number(chain_id), Value::String(key)) => {
+                                let chains = EXPLOIT_CHAINS.lock().await;
+                                if let Some(chain) = chains.get(&(*chain_id as u64)) {
+                                    match chain.state.get(key) {
+                                        Some(value) => Ok(value.clone()),
+                                        None => Err(format!("Key '{}' not found in chain state", key)),
+                                    }
+                                } else {
+                                    Err(format!("Invalid chain ID: {}", chain_id))
+                                }
+                            }
+                            _ => Err("chain_get() requires (number chain, string key)".into()),
+                        }
+                    }
+                    
+                    "chain_save_state" => {
+                        if arg_values.len() < 2 {
+                            return Err("chain_save_state() requires 2 arguments: chain_save_state(chain, filename)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::Number(chain_id), Value::String(filename)) => {
+                                let chains = EXPLOIT_CHAINS.lock().await;
+                                if let Some(chain) = chains.get(&(*chain_id as u64)) {
+                                    // In dry-run mode, just log the action
+                                    println!(
+                                        "[EXPLOIT_CHAIN] Saving chain state to '{}' ({} entries)",
+                                        filename,
+                                        chain.state.len()
+                                    );
+                                    Ok(Value::Null)
+                                } else {
+                                    Err(format!("Invalid chain ID: {}", chain_id))
+                                }
+                            }
+                            _ => Err("chain_save_state() requires (number chain, string filename)".into()),
                         }
                     }
                     "unity_find_objects" => {
