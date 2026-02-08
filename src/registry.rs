@@ -2107,6 +2107,24 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         .with_version("0.2.0"),
     );
 
+    registry.insert(
+        "analyze_elf".to_string(),
+        BuiltinFunction::new(
+            "analyze_elf",
+            "analyze_elf(binary_path: string) -> map",
+            "Analyzes ELF binary and returns comprehensive map with symbols, PLT, GOT, and protection flags. Alias for Elf() commonly used in exploit chain examples.",
+            "Binary Analysis",
+            vec![
+                "let elf = analyze_elf(\"./vuln\")",
+                "print(hex(elf.plt.puts))",
+                "print(hex(elf.got.__libc_start_main))",
+                "print(hex(elf.symbols.main))",
+            ],
+        )
+        .with_related(vec!["Elf", "analyze", "checksec", "parse_elf"])
+        .with_version("0.2.0"),
+    );
+
     registry
 }
 

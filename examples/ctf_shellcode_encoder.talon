@@ -53,7 +53,7 @@ define function xor_encode(data, key) {
 let encoder_key = 0
 for test_key in range(1, 256) {
     let encoded = xor_encode(original_shellcode, test_key)
-    if !has_badchars(encoded, badchars) {
+    if has_badchars(encoded, badchars) == false {
         encoder_key = test_key
         break
     }
@@ -133,7 +133,7 @@ print(hex(best_shellcode))
 define function to_c_array(data) {
     let output = "unsigned char shellcode[] = {\n  "
     for i in range(len(data)) {
-        output = output + "0x" + hex(data[i])[2:] + ", "
+        output = output + "0x" + hex(data[i])[2..] + ", "
         if (i + 1) % 12 == 0 {
             output = output + "\n  "
         }
