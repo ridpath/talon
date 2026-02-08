@@ -18,6 +18,37 @@
 // - swarm.filter(): Select agents by OS, arch, or capabilities
 // - swarm.sync(): Share discovered gadgets/offsets between agents
 
+// Helper functions (defined first)
+
+define count_successful(results) {
+    let count = 0
+    for result in results {
+        if result.success {
+            count = count + 1
+        }
+    }
+    return count
+}
+
+define count_failed(results) {
+    let count = 0
+    for result in results {
+        if result.success == false {
+            count = count + 1
+        }
+    }
+    return count
+}
+
+define swarm_sync_libc(libc_base, target_ip) {
+    // In production, this would use swarm.sync()
+    return true
+}
+
+define get_agent_id() {
+    return "agent-local"
+}
+
 // Configuration for mass exploitation
 let max_concurrent = 100
 let timeout_ms = 10000
@@ -188,34 +219,3 @@ map_set(final_results, "exploits_failed", failed_count)
 map_set(final_results, "results", exploit_results)
 
 return final_results
-
-// Helper functions
-
-define count_successful(results) {
-    let count = 0
-    for result in results {
-        if result.success {
-            count = count + 1
-        }
-    }
-    return count
-}
-
-define count_failed(results) {
-    let count = 0
-    for result in results {
-        if result.success == false {
-            count = count + 1
-        }
-    }
-    return count
-}
-
-define swarm_sync_libc(libc_base, target_ip) {
-    // In production, this would use swarm.sync()
-    return true
-}
-
-define get_agent_id() {
-    return "agent-local"
-}
