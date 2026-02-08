@@ -40,7 +40,8 @@ struct_def   = { "struct" ~ ident ~ "{" ~ (ident ~ ":" ~ type_hint ~ ","?)* ~ "}
 var_decl     = { "let" ~ ident ~ (":" ~ type_hint)? ~ "=" ~ expr }
 const_decl   = { "const" ~ ident ~ "=" ~ expr }
 destructuring_decl = { "let" ~ "(" ~ (ident ~ ","?)+ ~ ")" ~ "=" ~ expr }
-assignment   = { ident ~ ("=" | "+=" | "-=" | "*=" | "/=") ~ expr }
+assignment   = { assign_target ~ ("=" | "+=" | "-=" | "*=" | "/=") ~ expr }
+assign_target = { ident ~ ("[" ~ expr ~ "]")? }
 if_stmt      = { "if" ~ expr ~ ("then")? ~ block ~ else_stmt? }
 else_stmt    = { "else" ~ (if_stmt | block) }
 for_stmt     = { "for" ~ ident ~ "in" ~ (range | expr) ~ block }

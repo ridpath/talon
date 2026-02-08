@@ -247,13 +247,31 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
         }
         Rule::assignment => {
             let mut parts = pair.into_inner();
-            let name = parts
+            
+            // Parse the assign_target (can be ident or ident[expr])
+            let target = parts.next().ok_or("Missing assignment target")?;
+            let mut target_parts = target.into_inner();
+            
+            let name = target_parts
                 .next()
-                .ok_or("Missing assignment name")?
+                .ok_or("Missing identifier in assignment target")?
                 .as_str()
                 .to_string();
-            let expr = parse_expr(parts.next().ok_or("Missing assignment value")?);
-            Ok(vec![Command::Assignment { name, value: expr }])
+            
+            // Check if there's an index expression
+            let index_expr = target_parts.next();
+            
+            // Get the assignment value
+            let value = parse_expr(parts.next().ok_or("Missing assignment value")?);
+            
+            if let Some(index_pair) = index_expr {
+                // Index assignment: map[key] = value
+                let index = parse_expr(index_pair);
+                Ok(vec![Command::IndexAssignment { name, index, value }])
+            } else {
+                // Regular assignment: x = value
+                Ok(vec![Command::Assignment { name, value }])
+            }
         }
         Rule::struct_def => {
             let mut parts = pair.into_inner();

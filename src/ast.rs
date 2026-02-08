@@ -122,6 +122,11 @@ pub enum Command {
         name: String,
         value: Expr,
     },
+    IndexAssignment {
+        name: String,
+        index: Expr,
+        value: Expr,
+    },
     StructDef {
         name: String,
         fields: Vec<(String, String)>,
