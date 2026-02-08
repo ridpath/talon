@@ -30,7 +30,7 @@ patch_insert_asm(p, 0x9abc, "xor eax, eax; ret")
 patch_patch_string(p, "example.com", "evil.com")
 
 // Example 5: Inject shellcode at end of binary
-let shellcode = b"\x31\xc0\x48\x89\xc7\x48\x89\xc6\x48\x89\xc2\xb0\x3b\x0f\x05"
+let shellcode = bytes([0x31, 0xc0, 0x48, 0x89, 0xc7, 0x48, 0x89, 0xc6, 0x48, 0x89, 0xc2, 0xb0, 0x3b, 0x0f, 0x05])
 let injection_offset = patch_inject_shellcode(p, shellcode)
 print("Shellcode injected at offset: " + hex(injection_offset))
 
@@ -48,7 +48,7 @@ print(preview)
 patch_recalculate_headers(p)
 
 // Example 9: Find patterns in binary
-let pattern = b"\x48\x89\xe5"  // mov rbp, rsp
+let pattern = bytes([0x48, 0x89, 0xe5])  // mov rbp, rsp
 let offsets = patch_find_pattern(p, pattern)
 print("Found pattern at offsets: " + str(offsets))
 
