@@ -4964,6 +4964,289 @@ fn eval_expr<'a>(
 
                         Ok(Value::Null)
                     }
+                    "patch_replace_call" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_replace_call() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_replace_call() requires Patch object".to_string());
+                        };
+
+                        let offset = if let Some(Value::Number(n)) = arg_map.get("offset").or_else(|| arg_values.get(1)) {
+                            *n as usize
+                        } else {
+                            return Err("patch_replace_call() requires 'offset' parameter".to_string());
+                        };
+
+                        let function = arg_map.get("function").or_else(|| arg_values.get(2))
+                            .ok_or("patch_replace_call() requires 'function' parameter")?
+                            .to_string();
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.replace_call(offset, &function)
+                            .map_err(|e| format!("patch_replace_call() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Replaced call at 0x{:x} with {}", "[PATCH]".cyan(), offset, function.yellow());
+
+                        Ok(Value::Null)
+                    }
+                    "patch_insert_asm" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_insert_asm() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_insert_asm() requires Patch object".to_string());
+                        };
+
+                        let offset = if let Some(Value::Number(n)) = arg_map.get("offset").or_else(|| arg_values.get(1)) {
+                            *n as usize
+                        } else {
+                            return Err("patch_insert_asm() requires 'offset' parameter".to_string());
+                        };
+
+                        let asm_code = arg_map.get("assembly").or_else(|| arg_values.get(2))
+                            .ok_or("patch_insert_asm() requires 'assembly' parameter")?
+                            .to_string();
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.insert_asm(offset, &asm_code)
+                            .map_err(|e| format!("patch_insert_asm() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Inserted assembly at 0x{:x}: {}", "[PATCH]".cyan(), offset, asm_code.yellow());
+
+                        Ok(Value::Null)
+                    }
+                    "patch_patch_string" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_patch_string() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_patch_string() requires Patch object".to_string());
+                        };
+
+                        let old_str = arg_map.get("old").or_else(|| arg_values.get(1))
+                            .ok_or("patch_patch_string() requires 'old' parameter")?
+                            .to_string();
+
+                        let new_str = arg_map.get("new").or_else(|| arg_values.get(2))
+                            .ok_or("patch_patch_string() requires 'new' parameter")?
+                            .to_string();
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        let count = patch.patch_string(&old_str, &new_str)
+                            .map_err(|e| format!("patch_patch_string() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Patched {} occurrences of '{}' -> '{}'", "[PATCH]".green(), count, old_str, new_str);
+
+                        Ok(Value::Number(count as i64))
+                    }
+                    "patch_inject_shellcode" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_inject_shellcode() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_inject_shellcode() requires Patch object".to_string());
+                        };
+
+                        let shellcode_val = arg_map.get("shellcode").or_else(|| arg_values.get(1))
+                            .ok_or("patch_inject_shellcode() requires 'shellcode' parameter")?;
+
+                        let shellcode = if let Value::Bytes(b) = shellcode_val {
+                            b.clone()
+                        } else {
+                            return Err("patch_inject_shellcode() requires bytes for shellcode".to_string());
+                        };
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        let offset = patch.inject_shellcode(&shellcode)
+                            .map_err(|e| format!("patch_inject_shellcode() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Injected {} bytes of shellcode at 0x{:x}", "[PATCH]".green(), shellcode.len(), offset);
+
+                        Ok(Value::Number(offset as i64))
+                    }
+                    "patch_create_code_cave" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_create_code_cave() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_create_code_cave() requires Patch object".to_string());
+                        };
+
+                        let size = if let Some(Value::Number(n)) = arg_map.get("size").or_else(|| arg_values.get(1)) {
+                            *n as usize
+                        } else {
+                            return Err("patch_create_code_cave() requires 'size' parameter".to_string());
+                        };
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        let offset = patch.create_code_cave(size)
+                            .map_err(|e| format!("patch_create_code_cave() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Created code cave of {} bytes at 0x{:x}", "[PATCH]".green(), size, offset);
+
+                        Ok(Value::Number(offset as i64))
+                    }
+                    "patch_preview_diff" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_preview_diff() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_preview_diff() requires Patch object".to_string());
+                        };
+
+                        let registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        let diff = patch.preview_diff();
+
+                        Ok(Value::String(diff))
+                    }
+                    "patch_recalculate_headers" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_recalculate_headers() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_recalculate_headers() requires Patch object".to_string());
+                        };
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.recalculate_headers()
+                            .map_err(|e| format!("patch_recalculate_headers() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Recalculated binary headers", "[PATCH]".green());
+
+                        Ok(Value::Null)
+                    }
+                    "patch_find_pattern" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_find_pattern() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_find_pattern() requires Patch object".to_string());
+                        };
+
+                        let pattern_val = arg_map.get("pattern").or_else(|| arg_values.get(1))
+                            .ok_or("patch_find_pattern() requires 'pattern' parameter")?;
+
+                        let pattern = if let Value::Bytes(b) = pattern_val {
+                            b.clone()
+                        } else {
+                            return Err("patch_find_pattern() requires bytes for pattern".to_string());
+                        };
+
+                        let registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        let offsets = patch.find_pattern(&pattern);
+
+                        use colored::Colorize;
+                        println!("{} Found {} occurrences of pattern", "[PATCH]".cyan(), offsets.len());
+
+                        let offset_values: Vec<Value> = offsets.into_iter().map(|o| Value::Number(o as i64)).collect();
+                        Ok(Value::List(offset_values))
+                    }
+                    "patch_verify_integrity" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_verify_integrity() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_verify_integrity() requires Patch object".to_string());
+                        };
+
+                        let registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        let is_valid = patch.verify_integrity()
+                            .map_err(|e| format!("patch_verify_integrity() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        if is_valid {
+                            println!("{} Integrity check PASSED", "[PATCH]".green());
+                        } else {
+                            println!("{} Integrity check FAILED", "[PATCH]".red());
+                        }
+
+                        Ok(Value::Number(if is_valid { 1 } else { 0 }))
+                    }
+                    "patch_undo" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_undo() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_undo() requires Patch object".to_string());
+                        };
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.undo()
+                            .map_err(|e| format!("patch_undo() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Undid last patch operation", "[PATCH]".yellow());
+
+                        Ok(Value::Null)
+                    }
+                    "patch_rollback_all" => {
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                            .ok_or("patch_rollback_all() requires Patch object")?;
+                        let patch_id = if let Value::Patch(id) = patch_val {
+                            *id
+                        } else {
+                            return Err("patch_rollback_all() requires Patch object".to_string());
+                        };
+
+                        let mut registry = PATCH_REGISTRY.lock().await;
+                        let patch = registry.get_mut(patch_id)
+                            .ok_or_else(|| format!("Patch {} not found", patch_id))?;
+
+                        patch.rollback_all()
+                            .map_err(|e| format!("patch_rollback_all() failed: {}", e))?;
+
+                        use colored::Colorize;
+                        println!("{} Rolled back all patch operations", "[PATCH]".yellow());
+
+                        Ok(Value::Null)
+                    }
                     "fmtstr_leak" => {
                         let offset = if let Some(Value::Number(n)) =
                             arg_map.get("offset").or_else(|| arg_values.get(0))

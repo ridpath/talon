@@ -21,53 +21,53 @@
 # - Run on system with or without EDR for comparison
 
 # Initialize syscall resolver
-print "[+] Initializing indirect syscall resolver"
+print("[+] Initializing indirect syscall resolver")
 
 # Example 1: Memory Allocation via NtAllocateVirtualMemory
 # Standard API: VirtualAlloc (often hooked by EDR)
 # Syscall: NtAllocateVirtualMemory (bypasses hooks)
-print "\n[*] Example 1: Memory Allocation"
-print "Standard approach: VirtualAlloc (HOOKED by EDR)"
-print "Evasion approach: NtAllocateVirtualMemory syscall (BYPASS)"
+print("\n[*] Example 1: Memory Allocation")
+print("Standard approach: VirtualAlloc (HOOKED by EDR)")
+print("Evasion approach: NtAllocateVirtualMemory syscall (BYPASS)")
 
 # Example 2: Thread Creation via NtCreateThreadEx
 # Standard API: CreateThread (monitored by EDR)
 # Syscall: NtCreateThreadEx (undetected)
-print "\n[*] Example 2: Thread Creation"
-print "Standard approach: CreateThread (DETECTED)"
-print "Evasion approach: NtCreateThreadEx syscall (UNDETECTED)"
+print("\n[*] Example 2: Thread Creation")
+print("Standard approach: CreateThread (DETECTED)")
+print("Evasion approach: NtCreateThreadEx syscall (UNDETECTED)")
 
 # Example 3: Process Injection via NtWriteVirtualMemory
 # Standard API: WriteProcessMemory (blocked by EDR)
 # Syscall: NtWriteVirtualMemory (allowed)
-print "\n[*] Example 3: Process Memory Write"
-print "Standard approach: WriteProcessMemory (BLOCKED)"
-print "Evasion approach: NtWriteVirtualMemory syscall (ALLOWED)"
+print("\n[*] Example 3: Process Memory Write")
+print("Standard approach: WriteProcessMemory (BLOCKED)")
+print("Evasion approach: NtWriteVirtualMemory syscall (ALLOWED)")
 
 # Example 4: File Operations via NtCreateFile
 # Standard API: CreateFile (logged by EDR)
 # Syscall: NtCreateFile (not logged)
-print "\n[*] Example 4: File Operations"
-print "Standard approach: CreateFile (LOGGED)"
-print "Evasion approach: NtCreateFile syscall (STEALTH)"
+print("\n[*] Example 4: File Operations")
+print("Standard approach: CreateFile (LOGGED)")
+print("Evasion approach: NtCreateFile syscall (STEALTH)")
 
 # Example 5: Hook Detection
 # Detect if EDR has hooked common functions
-print "\n[*] Example 5: Hook Detection"
-print "Checking for inline hooks in ntdll.dll functions"
-print "Expected: Hooks detected on systems with EDR"
-print "Expected: No hooks on clean systems"
+print("\n[*] Example 5: Hook Detection")
+print("Checking for inline hooks in ntdll.dll functions")
+print("Expected: Hooks detected on systems with EDR")
+print("Expected: No hooks on clean systems")
 
 # Example 6: Process Opening via NtOpenProcess
 # Standard API: OpenProcess (restricted by EDR)
 # Syscall: NtOpenProcess (unrestricted)
-print "\n[*] Example 6: Process Opening"
-print "Standard approach: OpenProcess (RESTRICTED)"
-print "Evasion approach: NtOpenProcess syscall (UNRESTRICTED)"
+print("\n[*] Example 6: Process Opening")
+print("Standard approach: OpenProcess (RESTRICTED)")
+print("Evasion approach: NtOpenProcess syscall (UNRESTRICTED)")
 
-print "\n[+] Indirect syscall examples complete"
-print "[!] Note: This script demonstrates the API. Actual syscall"
-print "[!] invocation happens in the compiled binary using assembly stubs."
+print("\n[+] Indirect syscall examples complete")
+print("[!] Note: This script demonstrates the API. Actual syscall")
+print("[!] invocation happens in the compiled binary using assembly stubs.")
 
 # Technical Details:
 # 1. SyscallResolver dynamically extracts syscall numbers from ntdll.dll
@@ -122,5 +122,5 @@ print "[!] invocation happens in the compiled binary using assembly stubs."
 #    - Write payload: NtWriteVirtualMemory
 #    - Resume thread: NtResumeThread
 
-print "\n[+] Syscall integration ready for exploit development"
-print "[+] Use 'talon build --evasion-level high' for obfuscated stubs"
+print("\n[+] Syscall integration ready for exploit development")
+print("[+] Use 'talon build --evasion-level high' for obfuscated stubs")
