@@ -177,7 +177,7 @@ define function grab_banner(conn_id, port, timeout) {
     }
 }
 
-define identify_service(port, banner) {
+define function identify_service(port, banner) {
     // Port-based identification
     let service_map = Map()
     map_set(service_map, 21, "FTP")
