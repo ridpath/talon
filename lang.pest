@@ -58,10 +58,14 @@ continue_stmt = { "continue" }
 type_hint    = { "int" | "string" | "list" | "map" | "set" | "bytes" | "bool" | "any" }
 
 expr         = { pipe }
-pipe         = { logical_or ~ ("|" ~ logical_or)* }
+pipe         = { logical_or ~ ("|>" ~ logical_or)* }
 logical_or   = { logical_and ~ ("or" ~ logical_and)* }
 logical_and  = { comparison ~ ("and" ~ comparison)* }
-comparison   = { term ~ (comp_op ~ term)* }
+comparison   = { bitwise_or ~ (comp_op ~ bitwise_or)* }
+bitwise_or   = { bitwise_xor ~ ("|" ~ bitwise_xor)* }
+bitwise_xor  = { bitwise_and ~ ("^" ~ bitwise_and)* }
+bitwise_and  = { shift ~ ("&" ~ shift)* }
+shift        = { term ~ (shift_op ~ term)* }
 term         = { factor ~ (add_op ~ factor)* }
 factor       = { unary ~ (mul_op ~ unary)* }
 unary        = { unary_op? ~ primary ~ postfix* }
@@ -89,6 +93,7 @@ primary      = {
 comp_op      = { "==" | "!=" | "<=" | ">=" | "<" | ">" | "in" }
 add_op       = { "+" | "-" }
 mul_op       = { "*" | "/" | "%" }
+shift_op     = { "<<" | ">>" }
 
 literal      = { boolean | number | quoted_string | multiline_string | null | byte_array }
 boolean      = { "true" | "false" }

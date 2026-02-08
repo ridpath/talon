@@ -1291,17 +1291,90 @@ fn parse_logical_and(pair: Pair<Rule>) -> Expr {
 
 fn parse_comparison(pair: Pair<Rule>) -> Expr {
     let mut parts = pair.into_inner();
-    let mut left = parse_term(parts.next().unwrap());
+    let mut left = parse_bitwise_or(parts.next().unwrap());
     while let Some(op_pair) = parts.next() {
         if op_pair.as_rule() == Rule::comp_op {
-            let right = parse_term(parts.next().unwrap());
+            let right = parse_bitwise_or(parts.next().unwrap());
             left = Expr::ComparisonOp {
                 op: op_pair.as_str().to_string(),
                 left: Box::new(left),
                 right: Box::new(right),
             };
         } else {
-            left = parse_term(op_pair);
+            left = parse_bitwise_or(op_pair);
+        }
+    }
+    left
+}
+
+fn parse_bitwise_or(pair: Pair<Rule>) -> Expr {
+    let mut parts = pair.into_inner();
+    let mut left = parse_bitwise_xor(parts.next().unwrap());
+    while let Some(next) = parts.next() {
+        if next.as_str() == "|" {
+            let right = parse_bitwise_xor(parts.next().unwrap());
+            left = Expr::BitwiseOp {
+                op: "|".to_string(),
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        } else {
+            left = parse_bitwise_xor(next);
+        }
+    }
+    left
+}
+
+fn parse_bitwise_xor(pair: Pair<Rule>) -> Expr {
+    let mut parts = pair.into_inner();
+    let mut left = parse_bitwise_and(parts.next().unwrap());
+    while let Some(next) = parts.next() {
+        if next.as_str() == "^" {
+            let right = parse_bitwise_and(parts.next().unwrap());
+            left = Expr::BitwiseOp {
+                op: "^".to_string(),
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        } else {
+            left = parse_bitwise_and(next);
+        }
+    }
+    left
+}
+
+fn parse_bitwise_and(pair: Pair<Rule>) -> Expr {
+    let mut parts = pair.into_inner();
+    let mut left = parse_shift(parts.next().unwrap());
+    while let Some(next) = parts.next() {
+        if next.as_str() == "&" {
+            let right = parse_shift(parts.next().unwrap());
+            left = Expr::BitwiseOp {
+                op: "&".to_string(),
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        } else {
+            left = parse_shift(next);
+        }
+    }
+    left
+}
+
+fn parse_shift(pair: Pair<Rule>) -> Expr {
+    let mut parts = pair.into_inner();
+    let mut left = parse_term(parts.next().unwrap());
+    while let Some(next) = parts.next() {
+        let op = next.as_str();
+        if op == "<<" || op == ">>" {
+            let right = parse_term(parts.next().unwrap());
+            left = Expr::BitwiseOp {
+                op: op.to_string(),
+                left: Box::new(left),
+                right: Box::new(right),
+            };
+        } else {
+            left = parse_term(next);
         }
     }
     left

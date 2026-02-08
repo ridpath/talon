@@ -216,7 +216,7 @@ fn example_gdb_integration() -> Result<(), String> {
 }
 
 // ───────────────────────────────────────────────────────────────────────────
-// Example 6: House of Apple (Cutting-Edge Technique)
+// Example 6: House of Apple (Advanced Technique)
 // ───────────────────────────────────────────────────────────────────────────
 
 fn example_house_of_apple() -> Result<(), String> {
@@ -334,7 +334,7 @@ fn main() -> Result<(), String> {
     println!("║   Libc database with auto-resolution                           ║");
     println!("║   One-liner exploitation                                       ║");
     println!("║   Interactive IO (pwntools-style)                              ║");
-    println!("║   House of IO/Apple (cutting-edge)                            ║");
+    println!("║   House of IO/Apple (advanced technique)                      ║");
     println!("║   Multi-architecture ready                                     ║");
     println!("║   Comprehensive testing (89+ heap tests)                       ║");
     println!("║                                                                   ║");

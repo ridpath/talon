@@ -178,7 +178,7 @@ fn main() -> Result<(), String> {
 
 ---
 
-## House of Apple (Cutting-Edge, glibc 2.35+)
+## House of Apple (Advanced Technique, glibc 2.35+)
 
 ```rust
 use talon::quick_pwn::QuickPwn;

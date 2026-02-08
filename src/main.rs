@@ -154,7 +154,7 @@ mod session_state;
 mod split_screen_debugger;
 mod time_travel;
 
-// PHASE 20 - REVOLUTIONARY UX & COMMUNITY FEATURES
+// PHASE 20 - ADVANCED UX & COMMUNITY FEATURES
 mod adversary_playbook; // Adversary emulation playbook simulator
 mod challenge_marketplace; // Community challenge marketplace
 mod collaborative_session; // Real-time collaborative exploitation sessions
