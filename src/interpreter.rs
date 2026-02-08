@@ -2647,11 +2647,27 @@ fn eval_expr<'a>(
             Expr::Lambda { arg, body } => {
                 Ok(Value::String(format!("lambda({}) => {:?}", arg, body)))
             }
-            Expr::Variant(name, Some(expr)) => Ok(Value::String(format!(
-                "{}({})",
-                name,
-                eval_expr(expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?
-            ))),
+            Expr::Variant(name, Some(expr)) => {
+                // Check if this is actually a builtin function call (parser ambiguity fix)
+                // Convert to Call expression and re-evaluate
+                let call_expr = Expr::Call {
+                    name: name.clone(),
+                    args: vec![(None, *expr.clone())],
+                };
+                
+                // Try to evaluate as a function call first
+                match eval_expr(&call_expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await {
+                    Ok(val) => Ok(val),
+                    Err(_) => {
+                        // If function call fails, treat as variant constructor (old behavior)
+                        Ok(Value::String(format!(
+                            "{}({})",
+                            name,
+                            eval_expr(&*expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?
+                        )))
+                    }
+                }
+            }
             Expr::Variant(name, None) => Ok(Value::String(name.clone())),
             Expr::Env(key) => Ok(Value::String(std::env::var(key).unwrap_or_default())),
             Expr::RegexMatch { regex, haystack } => {
