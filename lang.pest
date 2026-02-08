@@ -42,7 +42,7 @@ const_decl   = { "const" ~ ident ~ "=" ~ expr }
 destructuring_decl = { "let" ~ "(" ~ (ident ~ ","?)+ ~ ")" ~ "=" ~ expr }
 assignment   = { ident ~ ("=" | "+=" | "-=" | "*=" | "/=") ~ expr }
 if_stmt      = { "if" ~ expr ~ ("then")? ~ block ~ else_stmt? }
-else_stmt    = { "else" ~ block }
+else_stmt    = { "else" ~ (if_stmt | block) }
 for_stmt     = { "for" ~ ident ~ "in" ~ (range | expr) ~ block }
 while_stmt   = { "while" ~ expr ~ block }
 parallel_stmt = { "parallel" ~ block }

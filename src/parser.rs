@@ -291,8 +291,18 @@ fn parse_stmt(pair: Pair<Rule>) -> Result<Vec<Command>, String> {
             let mut else_body = Vec::new();
             if let Some(else_stmt) = parts.next() {
                 if else_stmt.as_rule() == Rule::else_stmt {
-                    let else_block = else_stmt.into_inner().next().ok_or("Missing else block")?;
-                    else_body = parse_block(else_block)?;
+                    let else_content = else_stmt.into_inner().next().ok_or("Missing else content")?;
+                    // Check if this is "else if" or just "else"
+                    match else_content.as_rule() {
+                        Rule::if_stmt => {
+                            // This is "else if", parse it as a nested if statement
+                            else_body = parse_stmt(else_content)?;
+                        }
+                        _ => {
+                            // This is just "else", parse the block
+                            else_body = parse_block(else_content)?;
+                        }
+                    }
                 }
             }
             
