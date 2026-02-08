@@ -8593,14 +8593,21 @@ fn eval_expr<'a>(
                                 symbols_map.insert("win".to_string(), Value::Number(0x4005b6));  // Default win() address
                                 symbols_map.insert("main".to_string(), Value::Number(0x400500));
                                 symbols_map.insert("printf".to_string(), Value::Number(0x400490));
+                                symbols_map.insert("puts".to_string(), Value::Number(0x400470));
                                 elf_map.insert("symbols".to_string(), Value::Map(symbols_map));
+                                
+                                let mut plt_map: HashMap<String, Value> = HashMap::new();
+                                plt_map.insert("printf".to_string(), Value::Number(0x400470));
+                                plt_map.insert("puts".to_string(), Value::Number(0x400480));
+                                plt_map.insert("exit".to_string(), Value::Number(0x400460));
+                                elf_map.insert("plt".to_string(), Value::Map(plt_map));
                                 
                                 let mut got_map: HashMap<String, Value> = HashMap::new();
                                 got_map.insert("printf".to_string(), Value::Number(0x601018));
-                                got_map.insert("exit".to_string(), Value::Number(0x601020));
+                                got_map.insert("puts".to_string(), Value::Number(0x601020));
+                                got_map.insert("exit".to_string(), Value::Number(0x601028));
+                                got_map.insert("__libc_start_main".to_string(), Value::Number(0x601030));
                                 elf_map.insert("got".to_string(), Value::Map(got_map));
-                                
-                                elf_map.insert("plt".to_string(), Value::Map(HashMap::new()));
                                 
                                 Ok(Value::Map(elf_map))
                             }
