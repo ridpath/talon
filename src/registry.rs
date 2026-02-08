@@ -2056,6 +2056,21 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         .with_version("0.2.0"),
     );
 
+    registry.register(
+        BuiltinFunction::new(
+            "connect_tcp",
+            "connect_tcp(host: string, port: int)",
+            "Create a TCP connection to a remote host (alias for remote())",
+            FunctionCategory::Network,
+        )
+        .with_examples(vec![
+            "let conn = connect_tcp(\"127.0.0.1\", 8888)",
+            "let conn = connect_tcp(\"target.com\", 1337)",
+        ])
+        .with_related(vec!["remote", "send", "recv", "sendline", "recvline"])
+        .with_version("0.2.0"),
+    );
+
     registry
 }
 

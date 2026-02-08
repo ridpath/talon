@@ -212,6 +212,17 @@ impl LibcDatabase {
         ubuntu2004.free_hook = 0x1eeb28;
         ubuntu2004.realloc_hook = 0x1ecb60;
         ubuntu2004.one_gadgets = vec![0x4f3d5, 0x4f432, 0x10a41c];
+        // Add common symbols to the symbols HashMap
+        ubuntu2004.symbols.insert("printf".to_string(), 0x64f00);
+        ubuntu2004.symbols.insert("puts".to_string(), 0x84420);
+        ubuntu2004.symbols.insert("malloc".to_string(), 0x97070);
+        ubuntu2004.symbols.insert("free".to_string(), 0x98f90);
+        ubuntu2004.symbols.insert("gets".to_string(), 0x86990);
+        ubuntu2004.symbols.insert("strcpy".to_string(), 0x94d90);
+        ubuntu2004.symbols.insert("strcmp".to_string(), 0x943e0);
+        ubuntu2004.symbols.insert("strlen".to_string(), 0x94b40);
+        ubuntu2004.symbols.insert("strcat".to_string(), 0x93fc0);
+        ubuntu2004.symbols.insert("exit".to_string(), 0x47090);
         self.versions.insert("ubuntu20.04".to_string(), ubuntu2004);
 
         // Ubuntu 18.04 - libc 2.27 (x64)

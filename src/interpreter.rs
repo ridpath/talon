@@ -3656,6 +3656,80 @@ fn eval_expr<'a>(
 
                         Ok(Value::Map(conn_map))
                     }
+                    "connect_tcp" => {
+                        // Alias for remote() for backward compatibility with CTF examples
+                        // Supports both formats: connect_tcp("host:port") or connect_tcp("host", port)
+                        let first_arg = arg_map
+                            .get("host")
+                            .or_else(|| arg_values.get(0))
+                            .ok_or("connect_tcp() requires 'host' parameter or 'host:port' string")?
+                            .to_string();
+
+                        // Try to parse "host:port" format first
+                        let (host, port) = if first_arg.contains(':') {
+                            let parts: Vec<&str> = first_arg.split(':').collect();
+                            if parts.len() != 2 {
+                                return Err(format!("Invalid host:port format: '{}'", first_arg));
+                            }
+                            let host = parts[0].to_string();
+                            let port = parts[1].parse::<u16>()
+                                .map_err(|_| format!("Invalid port number: '{}'", parts[1]))?;
+                            (host, port)
+                        } else {
+                            // Separate host and port arguments
+                            let port = if let Some(Value::Number(p)) =
+                                arg_map.get("port").or_else(|| arg_values.get(1))
+                            {
+                                *p as u16
+                            } else {
+                                return Err("connect_tcp() requires 'port' parameter when host doesn't include port".to_string());
+                            };
+                            (first_arg, port)
+                        };
+
+                        use colored::Colorize;
+
+                        // Check if we're in dry-run mode
+                        let is_dry_run = context.read().await.get("__dry_run__").is_some();
+
+                        if is_dry_run {
+                            // In dry-run mode, return a mock connection without actually connecting
+                            println!(
+                                "{} [DRY-RUN] Mock connection to {}:{}",
+                                "[TCP]".cyan(),
+                                host.yellow(),
+                                port.to_string().yellow()
+                            );
+                            
+                            let mut conn_map = HashMap::new();
+                            conn_map.insert("id".to_string(), Value::Number(999)); // Mock connection ID
+                            conn_map.insert("host".to_string(), Value::String(host));
+                            conn_map.insert("port".to_string(), Value::Number(port as i64));
+                            conn_map.insert("type".to_string(), Value::String("socket".to_string()));
+                            conn_map.insert("dry_run".to_string(), Value::Number(1));
+                            
+                            Ok(Value::Map(conn_map))
+                        } else {
+                            println!(
+                                "{} Connecting to {}:{}",
+                                "[TCP]".cyan(),
+                                host.yellow(),
+                                port.to_string().yellow()
+                            );
+                            let socket = Socket::connect(format!("{}:{}", host, port))?;
+                            println!("{} TCP connection established", "[TCP]".green());
+
+                            let conn_id = CONNECTIONS.add_socket(socket);
+
+                            let mut conn_map = HashMap::new();
+                            conn_map.insert("id".to_string(), Value::Number(conn_id as i64));
+                            conn_map.insert("host".to_string(), Value::String(host));
+                            conn_map.insert("port".to_string(), Value::Number(port as i64));
+                            conn_map.insert("type".to_string(), Value::String("socket".to_string()));
+
+                            Ok(Value::Map(conn_map))
+                        }
+                    }
                     "process" => {
                         let binary = arg_map
                             .get("binary")
@@ -4255,12 +4329,14 @@ fn eval_expr<'a>(
                             .or_else(|| arg_values.get(1))
                             .ok_or("send() requires 'data' parameter")?;
 
-                        let conn_id = if let Value::Map(m) = conn {
-                            if let Some(Value::Number(id)) = m.get("id") {
+                        let (conn_id, is_dry_run_conn) = if let Value::Map(m) = conn {
+                            let id = if let Some(Value::Number(id)) = m.get("id") {
                                 *id as u64
                             } else {
                                 return Err("Invalid connection object: missing 'id'".to_string());
-                            }
+                            };
+                            let is_dry_run = m.get("dry_run").is_some();
+                            (id, is_dry_run)
                         } else {
                             return Err("send() requires connection object".to_string());
                         };
@@ -4276,24 +4352,35 @@ fn eval_expr<'a>(
                             }
                         };
 
-                        let mut entry = CONNECTIONS.get_mut(conn_id)
-                            .ok_or_else(|| format!("Connection {} not found", conn_id))?;
-                        
-                        match &mut entry.connection {
-                            Connection::Socket(socket) => {
-                                socket.send(&data)?;
-                                println!("[SEND] Sent {} bytes", data.len());
+                        if is_dry_run_conn {
+                            // In dry-run mode, just print what would be sent
+                            use colored::Colorize;
+                            println!(
+                                "{} [DRY-RUN] Would send {} bytes",
+                                "[SEND]".cyan(),
+                                data.len()
+                            );
+                            Ok(Value::Number(data.len() as i64))
+                        } else {
+                            let mut entry = CONNECTIONS.get_mut(conn_id)
+                                .ok_or_else(|| format!("Connection {} not found", conn_id))?;
+                            
+                            match &mut entry.connection {
+                                Connection::Socket(socket) => {
+                                    socket.send(&data)?;
+                                    println!("[SEND] Sent {} bytes", data.len());
+                                }
+                                Connection::Process(process) => {
+                                    process.send(&data)?;
+                                    println!("[SEND] Sent {} bytes to process", data.len());
+                                }
+                                Connection::Ssh(_) => {
+                                    return Err("send() is not supported for SSH connections. Use ssh_interactive_send() instead.".to_string());
+                                }
                             }
-                            Connection::Process(process) => {
-                                process.send(&data)?;
-                                println!("[SEND] Sent {} bytes to process", data.len());
-                            }
-                            Connection::Ssh(_) => {
-                                return Err("send() is not supported for SSH connections. Use ssh_interactive_send() instead.".to_string());
-                            }
-                        }
 
-                        Ok(Value::Number(data.len() as i64))
+                            Ok(Value::Number(data.len() as i64))
+                        }
                     }
                     "sendline" => {
                         let conn = arg_map
@@ -4365,29 +4452,43 @@ fn eval_expr<'a>(
                             );
                         };
 
-                        let conn_id = if let Value::Map(m) = conn {
-                            if let Some(Value::Number(id)) = m.get("id") {
+                        let (conn_id, is_dry_run_conn) = if let Value::Map(m) = conn {
+                            let id = if let Some(Value::Number(id)) = m.get("id") {
                                 *id as u64
                             } else {
                                 return Err("Invalid connection object: missing 'id'".to_string());
-                            }
+                            };
+                            let is_dry_run = m.get("dry_run").is_some();
+                            (id, is_dry_run)
                         } else {
                             return Err("recv() requires connection object".to_string());
                         };
 
-                        let mut entry = CONNECTIONS.get_mut(conn_id)
-                            .ok_or_else(|| format!("Connection {} not found", conn_id))?;
-                        
-                        let data = match &mut entry.connection {
-                            Connection::Socket(socket) => socket.recv(n)?,
-                            Connection::Process(process) => process.recv(n)?,
-                            Connection::Ssh(_) => {
-                                return Err("recv() is not supported for SSH connections. Use ssh_interactive_recv() instead.".to_string());
-                            }
-                        };
+                        if is_dry_run_conn {
+                            // In dry-run mode, return mock data
+                            use colored::Colorize;
+                            let mock_data = vec![0u8; n.min(1024)]; // Return up to 1024 bytes of mock data
+                            println!(
+                                "{} [DRY-RUN] Would receive {} bytes",
+                                "[RECV]".cyan(),
+                                mock_data.len()
+                            );
+                            Ok(Value::Bytes(mock_data))
+                        } else {
+                            let mut entry = CONNECTIONS.get_mut(conn_id)
+                                .ok_or_else(|| format!("Connection {} not found", conn_id))?;
+                            
+                            let data = match &mut entry.connection {
+                                Connection::Socket(socket) => socket.recv(n)?,
+                                Connection::Process(process) => process.recv(n)?,
+                                Connection::Ssh(_) => {
+                                    return Err("recv() is not supported for SSH connections. Use ssh_interactive_recv() instead.".to_string());
+                                }
+                            };
 
-                        println!("[RECV] Received {} bytes", data.len());
-                        Ok(Value::Bytes(data))
+                            println!("[RECV] Received {} bytes", data.len());
+                            Ok(Value::Bytes(data))
+                        }
                     }
                     "recvline" => {
                         let conn = arg_map
