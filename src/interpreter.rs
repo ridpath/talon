@@ -2891,10 +2891,57 @@ fn eval_expr<'a>(
                             Some(libc_info) => {
                                 // Add libc symbols as a nested map
                                 let mut symbols_map: HashMap<String, Value> = HashMap::new();
+                                
+                                // Add well-known symbols from the struct fields
+                                if libc_info.system != 0 {
+                                    symbols_map.insert("system".to_string(), Value::Number(libc_info.system as i64));
+                                }
+                                if libc_info.execve != 0 {
+                                    symbols_map.insert("execve".to_string(), Value::Number(libc_info.execve as i64));
+                                }
+                                if libc_info.sh_string != 0 {
+                                    symbols_map.insert("sh".to_string(), Value::Number(libc_info.sh_string as i64));
+                                }
+                                if libc_info.bin_sh_string != 0 {
+                                    symbols_map.insert("bin_sh".to_string(), Value::Number(libc_info.bin_sh_string as i64));
+                                }
+                                if libc_info.dup2 != 0 {
+                                    symbols_map.insert("dup2".to_string(), Value::Number(libc_info.dup2 as i64));
+                                }
+                                if libc_info.read != 0 {
+                                    symbols_map.insert("read".to_string(), Value::Number(libc_info.read as i64));
+                                }
+                                if libc_info.write != 0 {
+                                    symbols_map.insert("write".to_string(), Value::Number(libc_info.write as i64));
+                                }
+                                if libc_info.open != 0 {
+                                    symbols_map.insert("open".to_string(), Value::Number(libc_info.open as i64));
+                                }
+                                if libc_info.mprotect != 0 {
+                                    symbols_map.insert("mprotect".to_string(), Value::Number(libc_info.mprotect as i64));
+                                }
+                                if libc_info.malloc_hook != 0 {
+                                    symbols_map.insert("__malloc_hook".to_string(), Value::Number(libc_info.malloc_hook as i64));
+                                }
+                                if libc_info.free_hook != 0 {
+                                    symbols_map.insert("__free_hook".to_string(), Value::Number(libc_info.free_hook as i64));
+                                }
+                                if libc_info.realloc_hook != 0 {
+                                    symbols_map.insert("__realloc_hook".to_string(), Value::Number(libc_info.realloc_hook as i64));
+                                }
+                                
+                                // Also add any symbols from the symbols HashMap
                                 for (sym_name, offset) in &libc_info.symbols {
                                     symbols_map.insert(sym_name.clone(), Value::Number(*offset as i64));
                                 }
+                                
                                 libc_map.insert("symbols".to_string(), Value::Map(symbols_map));
+
+                                // Add one_gadgets as a list
+                                let one_gadgets_list: Vec<Value> = libc_info.one_gadgets.iter()
+                                    .map(|addr| Value::Number(*addr as i64))
+                                    .collect();
+                                libc_map.insert("one_gadgets".to_string(), Value::List(one_gadgets_list));
 
                                 // Add build ID
                                 libc_map.insert("build_id".to_string(), Value::String(libc_info.build_id.clone()));
