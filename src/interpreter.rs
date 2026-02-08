@@ -2459,7 +2459,7 @@ fn eval_expr<'a>(
 ) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<Value, String>> + Send + 'a>> {
     Box::pin(async move {
         // Recursion depth tracking to prevent stack overflow
-        const MAX_RECURSION_DEPTH: i64 = 500; // Reduced to be safer with async overhead
+        const MAX_RECURSION_DEPTH: i64 = 100; // Conservative limit to prevent stack overflow with async overhead
         const RECURSION_DEPTH_KEY: &str = "__recursion_depth__";
         
         // Get current recursion depth
