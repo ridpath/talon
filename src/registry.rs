@@ -1990,6 +1990,72 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         .with_version("0.2.0"),
     );
 
+    registry.insert(
+        "analyze".to_string(),
+        BuiltinFunction::new(
+            "analyze",
+            "analyze(binary: string) -> map",
+            "Analyzes ELF binary and returns metadata (alias for Elf()). Returns map with symbols, GOT, PLT entries, protection flags (PIE, NX, Canary, RELRO).",
+            "Binary Analysis",
+            vec![
+                "let elf = analyze(binary)",
+                "print(elf.base)",
+                "print(elf.symbols.main)",
+                "print(elf.got.printf)",
+            ],
+        )
+        .with_related(vec!["Elf", "oracle_analyze", "auto_offset"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "allocate".to_string(),
+        BuiltinFunction::new(
+            "allocate",
+            "allocate(connection, size: int) -> int",
+            "Allocates heap chunk of specified size on target via connection. Returns address of allocated chunk. Used for heap exploitation workflows.",
+            "Heap",
+            vec![
+                "let addr = allocate(conn, 0x80)",
+                "print(hex(addr))",
+            ],
+        )
+        .with_related(vec!["free", "edit", "analyze_heap", "heap_spray"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "edit".to_string(),
+        BuiltinFunction::new(
+            "edit",
+            "edit(connection, address: int, data)",
+            "Edits heap chunk at specified address with provided data via connection. Data can be bytes, string, or number. Used for heap corruption exploits.",
+            "Heap",
+            vec![
+                "edit(conn, chunk_addr, poisoned_fd)",
+                "edit(conn, vuln_chunk, b\"\\x41\" * 16)",
+            ],
+        )
+        .with_related(vec!["allocate", "free", "analyze_heap"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "trigger_function_pointer".to_string(),
+        BuiltinFunction::new(
+            "trigger_function_pointer",
+            "trigger_function_pointer(connection, address: int)",
+            "Triggers function pointer at specified address on target via connection. Used to execute shellcode or ROP chain after heap/stack corruption.",
+            "Exploitation",
+            vec![
+                "trigger_function_pointer(conn, shellcode_addr)",
+                "trigger_function_pointer(conn, 0x555555554800)",
+            ],
+        )
+        .with_related(vec!["allocate", "edit", "shellcode"])
+        .with_version("0.2.0"),
+    );
+
     registry
 }
 

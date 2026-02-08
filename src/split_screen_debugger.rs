@@ -14,11 +14,15 @@ use tokio::sync::RwLock;
 pub struct SplitScreenDebugger {
     gdb_session: Arc<RwLock<Option<GdbSession>>>,
     debugger: Arc<TimeTravelDebugger>,
+    // Debugger state: Source file path for displaying code context
+    #[allow(dead_code)]
     source_file: Option<String>,
     source_lines: Vec<String>,
     current_line: usize,
     gdb_output: Vec<String>,
     terminal_height: u16,
+    // Debugger state: Terminal width for responsive rendering
+    #[allow(dead_code)]
     terminal_width: u16,
 }
 

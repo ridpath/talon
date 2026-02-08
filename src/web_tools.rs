@@ -8,7 +8,11 @@ use std::time::Duration;
 
 // Constants for web exploitation
 const DEFAULT_HTTP_TIMEOUT_SECS: u64 = 10;
+// Configuration constant: XSS test request timeout
+#[allow(dead_code)]
 const XSS_TEST_TIMEOUT_SECS: u64 = 5;
+// Configuration constant: SSRF test request timeout
+#[allow(dead_code)]
 const SSRF_TIMEOUT_SECS: u64 = 3;
 
 // ────────────────────────────────────────────────────────────────────────────

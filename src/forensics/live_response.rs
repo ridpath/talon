@@ -214,6 +214,8 @@ impl Default for EnvironmentDetection {
 }
 
 pub struct VmContainerDetector {
+    // VM/container detection heuristics with confidence scores
+    #[allow(dead_code)]
     heuristics: HashMap<String, f32>,
 }
 

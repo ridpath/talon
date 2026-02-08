@@ -14,6 +14,8 @@ pub struct AiIntegration {
     oracle: Arc<TokioMutex<MlOracle>>,
     cache: Arc<StdMutex<AiCache>>,
     token_budget: Arc<StdMutex<TokenBudget>>,
+    // AI configuration: Settings for LM Studio/GGUF backend
+    #[allow(dead_code)]
     config: AiConfig,
     enabled: bool,
 }
@@ -121,6 +123,8 @@ impl TokenBudget {
         }
     }
 
+    // Public API: Token budget monitoring method
+    #[allow(dead_code)]
     fn remaining(&mut self) -> usize {
         self.reset_if_expired();
         self.max_tokens_per_hour.saturating_sub(self.tokens_used)

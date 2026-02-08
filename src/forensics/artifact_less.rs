@@ -37,6 +37,8 @@ impl std::fmt::Display for ExecutionError {
 impl std::error::Error for ExecutionError {}
 
 pub struct MemfdExecutor {
+    // Memory file descriptor name for artifact-less execution
+    #[allow(dead_code)]
     name: String,
 }
 

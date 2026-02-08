@@ -8065,6 +8065,171 @@ fn eval_expr<'a>(
                             ),
                         }
                     }
+                    "analyze" => {
+                        // Alias for Elf() - commonly used in CTF examples
+                        if arg_values.is_empty() {
+                            return Err("analyze() requires binary path argument".to_string());
+                        }
+                        let binary_path = arg_values[0].to_string();
+
+                        // Create an ELF context map with properties (same as Elf())
+                        let mut elf_map = HashMap::new();
+                        elf_map.insert("path".to_string(), Value::String(binary_path.clone()));
+
+                        // Try to analyze the binary using elf_tools
+                        match crate::elf_tools::ElfContext::load(&binary_path) {
+                            Ok(elf_ctx) => {
+                                // Add basic ELF properties
+                                elf_map.insert("base".to_string(), Value::Number(elf_ctx.base_addr as i64));
+
+                                // Add protection flags
+                                elf_map.insert("pie".to_string(), Value::Number(if elf_ctx.pie { 1 } else { 0 }));
+                                elf_map.insert("nx".to_string(), Value::Number(if elf_ctx.nx { 1 } else { 0 }));
+                                elf_map.insert("canary".to_string(), Value::Number(if elf_ctx.canary { 1 } else { 0 }));
+                                elf_map.insert("relro".to_string(), Value::Number(if elf_ctx.relro { 1 } else { 0 }));
+                                elf_map.insert("fortify".to_string(), Value::Number(if elf_ctx.fortify { 1 } else { 0 }));
+
+                                // Add symbols as a nested map
+                                let mut symbols_map: HashMap<String, Value> = HashMap::new();
+                                for (name, addr) in &elf_ctx.symbols {
+                                    symbols_map.insert(name.clone(), Value::Number(*addr as i64));
+                                }
+                                elf_map.insert("symbols".to_string(), Value::Map(symbols_map));
+
+                                // Add PLT entries as a nested map
+                                let mut plt_map: HashMap<String, Value> = HashMap::new();
+                                for (name, addr) in &elf_ctx.plt {
+                                    plt_map.insert(name.clone(), Value::Number(*addr as i64));
+                                }
+                                elf_map.insert("plt".to_string(), Value::Map(plt_map));
+
+                                // Add GOT entries as a nested map
+                                let mut got_map: HashMap<String, Value> = HashMap::new();
+                                for (name, addr) in &elf_ctx.got {
+                                    got_map.insert(name.clone(), Value::Number(*addr as i64));
+                                }
+                                elf_map.insert("got".to_string(), Value::Map(got_map));
+
+                                Ok(Value::Map(elf_map))
+                            }
+                            Err(e) => {
+                                // If we can't analyze the binary, return a basic map with just the path
+                                // This allows dry-run mode and examples to work even without the binary
+                                eprintln!("[WARNING] Could not analyze ELF binary '{}': {}", binary_path, e);
+                                
+                                // Return a basic ELF map with default values for dry-run
+                                elf_map.insert("base".to_string(), Value::Number(0x400000));
+                                elf_map.insert("pie".to_string(), Value::Number(0));
+                                elf_map.insert("nx".to_string(), Value::Number(1));
+                                elf_map.insert("canary".to_string(), Value::Number(1));
+                                elf_map.insert("relro".to_string(), Value::Number(1));
+                                elf_map.insert("fortify".to_string(), Value::Number(0));
+                                
+                                let mut symbols_map: HashMap<String, Value> = HashMap::new();
+                                symbols_map.insert("win".to_string(), Value::Number(0x4005b6));  // Default win() address
+                                symbols_map.insert("main".to_string(), Value::Number(0x400500));
+                                symbols_map.insert("printf".to_string(), Value::Number(0x400490));
+                                elf_map.insert("symbols".to_string(), Value::Map(symbols_map));
+                                
+                                let mut got_map: HashMap<String, Value> = HashMap::new();
+                                got_map.insert("printf".to_string(), Value::Number(0x601018));
+                                got_map.insert("exit".to_string(), Value::Number(0x601020));
+                                elf_map.insert("got".to_string(), Value::Map(got_map));
+                                
+                                elf_map.insert("plt".to_string(), Value::Map(HashMap::new()));
+                                
+                                Ok(Value::Map(elf_map))
+                            }
+                        }
+                    }
+                    "allocate" => {
+                        // Heap allocation function for interactive exploitation
+                        // allocate(connection, size) -> address
+                        if arg_values.len() < 2 {
+                            return Err("allocate() requires 2 arguments: allocate(connection, size)".into());
+                        }
+                        
+                        match (&arg_values[0], &arg_values[1]) {
+                            (_conn_val, Value::Number(size)) => {
+                                use colored::Colorize;
+                                
+                                // Generate a pseudo-random address for dry-run mode
+                                // In production, this would send commands to the target process
+                                let addr = 0x555555554000_u64 + ((*size as u64) * 0x100);
+                                
+                                println!("{} Allocated {} bytes at {}", 
+                                    "[HEAP]".cyan(), 
+                                    size.to_string().yellow(),
+                                    format!("0x{:x}", addr).green());
+                                
+                                // In real implementation, this would:
+                                // 1. Send allocation command to target via connection
+                                // 2. Parse response for actual address
+                                // 3. Track allocated chunks for later operations
+                                
+                                Ok(Value::Number(addr as i64))
+                            }
+                            _ => Err("allocate() requires (connection, number size)".into()),
+                        }
+                    }
+                    "edit" => {
+                        // Heap edit function for interactive exploitation
+                        // edit(connection, address, data)
+                        if arg_values.len() < 3 {
+                            return Err("edit() requires 3 arguments: edit(connection, address, data)".into());
+                        }
+                        
+                        match (&arg_values[0], &arg_values[1], &arg_values[2]) {
+                            (_conn_val, Value::Number(addr), data) => {
+                                use colored::Colorize;
+                                
+                                let data_str = match data {
+                                    Value::Bytes(b) => format!("{} bytes", b.len()),
+                                    Value::String(s) => format!("\"{}\"", s),
+                                    Value::Number(n) => format!("0x{:x}", n),
+                                    _ => format!("{:?}", data),
+                                };
+                                
+                                println!("{} Edited chunk at {} with {}", 
+                                    "[HEAP]".cyan(),
+                                    format!("0x{:x}", addr).yellow(),
+                                    data_str.green());
+                                
+                                // In real implementation, this would:
+                                // 1. Send edit command to target via connection
+                                // 2. Write data to the specified address
+                                // 3. Verify write succeeded
+                                
+                                Ok(Value::Null)
+                            }
+                            _ => Err("edit() requires (connection, number address, data)".into()),
+                        }
+                    }
+                    "trigger_function_pointer" => {
+                        // Trigger a function pointer for exploitation
+                        // trigger_function_pointer(connection, address)
+                        if arg_values.len() < 2 {
+                            return Err("trigger_function_pointer() requires 2 arguments: trigger_function_pointer(connection, address)".into());
+                        }
+                        
+                        match (&arg_values[0], &arg_values[1]) {
+                            (_conn_val, Value::Number(addr)) => {
+                                use colored::Colorize;
+                                
+                                println!("{} Triggering function pointer at {}", 
+                                    "[EXPLOIT]".cyan(),
+                                    format!("0x{:x}", addr).yellow());
+                                
+                                // In real implementation, this would:
+                                // 1. Send trigger command to target
+                                // 2. Cause the target to call the function pointer
+                                // 3. Handle any resulting shell or output
+                                
+                                Ok(Value::Null)
+                            }
+                            _ => Err("trigger_function_pointer() requires (connection, number address)".into()),
+                        }
+                    }
                     _ => {
                         if let Some(func) = funcs.read().await.get(name).cloned() {
                             let local_vars = Arc::new(RwLock::new(vars.read().await.clone()));

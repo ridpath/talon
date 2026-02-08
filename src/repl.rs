@@ -188,6 +188,8 @@ impl TalonCompleter {
     }
 }
 
+// Public API: Pretty-print utility for hexdump display of byte arrays (used in REPL output)
+#[allow(dead_code)]
 fn pretty_print_bytes(bytes: &[u8]) -> String {
     if bytes.is_empty() {
         return "b\"\"".to_string();
@@ -230,6 +232,8 @@ fn pretty_print_bytes(bytes: &[u8]) -> String {
     output
 }
 
+// Public API: Pretty-print utility for JSON-style map display (used in REPL output)
+#[allow(dead_code)]
 fn pretty_print_map(map: &HashMap<String, Value>, indent: usize) -> String {
     if map.is_empty() {
         return "{}".to_string();
@@ -285,6 +289,8 @@ fn pretty_print_map(map: &HashMap<String, Value>, indent: usize) -> String {
     output
 }
 
+// Public API: Format utility for converting Value types to string representation
+#[allow(dead_code)]
 fn format_value(value: &Value) -> String {
     match value {
         Value::Number(n) => n.to_string(),
@@ -305,6 +311,8 @@ fn format_value(value: &Value) -> String {
     }
 }
 
+// Public API: Print utility for displaying formatted values to console
+#[allow(dead_code)]
 fn pretty_print_value(value: &Value) {
     match value {
         Value::Bytes(bytes) => {

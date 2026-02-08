@@ -32,6 +32,8 @@ impl std::error::Error for SshError {}
 
 pub struct SshConnection {
     session: Arc<Mutex<Session>>,
+    // Internal SSH connection state: TCP stream for network communication
+    #[allow(dead_code)]
     tcp_stream: Arc<Mutex<Option<TcpStream>>>,
     interactive_channel: Arc<Mutex<Option<Channel>>>,
     host: String,
