@@ -1889,6 +1889,107 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
         .with_version("0.1.0"),
     );
 
+    registry.insert(
+        "analyze_heap".to_string(),
+        BuiltinFunction::new(
+            "analyze_heap",
+            "analyze_heap(binary: string) -> map",
+            "Analyzes heap implementation and returns metadata including allocator type, tcache configuration, and security features.",
+            "Heap",
+            vec![
+                "let heap = analyze_heap(\"./vuln\")",
+                "print(heap.allocator)",
+                "print(heap.tcache_bins)",
+                "print(heap.tcache_count)",
+            ],
+        )
+        .with_related(vec!["heap_spray", "heap_feng_shui"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "Patch".to_string(),
+        BuiltinFunction::new(
+            "Patch",
+            "Patch(binary: string) -> Patch",
+            "Creates binary patch object for semantic binary modification. Supports NOP injection, function replacement, assembly insertion, and more.",
+            "Binary Analysis",
+            vec![
+                "let p = Patch(\"/tmp/target\")",
+                "patch_nop_out(p, 0x1234, 10)",
+                "patch_save(p, \"/tmp/patched\")",
+            ],
+        )
+        .with_related(vec!["patch_nop_out", "patch_save", "patch_set_dry_run"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "patch_nop_out".to_string(),
+        BuiltinFunction::new(
+            "patch_nop_out",
+            "patch_nop_out(patch: Patch, offset: int, length: int)",
+            "NOPs out instructions at specified offset for security check bypass or code elimination.",
+            "Binary Analysis",
+            vec![
+                "let p = Patch(binary)",
+                "patch_nop_out(p, 0x1234, 10)",
+            ],
+        )
+        .with_related(vec!["Patch", "patch_save"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "patch_save".to_string(),
+        BuiltinFunction::new(
+            "patch_save",
+            "patch_save(patch: Patch, output: string)",
+            "Saves patched binary to disk with all applied modifications.",
+            "Binary Analysis",
+            vec![
+                "let p = Patch(binary)",
+                "patch_nop_out(p, 0x1000, 20)",
+                "patch_save(p, \"./patched_binary\")",
+            ],
+        )
+        .with_related(vec!["Patch", "patch_nop_out"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "patch_set_dry_run".to_string(),
+        BuiltinFunction::new(
+            "patch_set_dry_run",
+            "patch_set_dry_run(patch: Patch, enabled: int)",
+            "Enables dry-run mode for safe preview of patch operations without modifying files.",
+            "Binary Analysis",
+            vec![
+                "let p = Patch(binary)",
+                "patch_set_dry_run(p, 1)",
+                "patch_nop_out(p, 0x1000, 20)",
+            ],
+        )
+        .with_related(vec!["Patch"])
+        .with_version("0.2.0"),
+    );
+
+    registry.insert(
+        "fmtstr_leak".to_string(),
+        BuiltinFunction::new(
+            "fmtstr_leak",
+            "fmtstr_leak(offset: int) -> string",
+            "Generates format string payload for leaking stack values at specified offset.",
+            "Exploitation",
+            vec![
+                "let leak = fmtstr_leak(6)",
+                "send(conn, leak)",
+            ],
+        )
+        .with_related(vec!["fmtstr_payload"])
+        .with_version("0.2.0"),
+    );
+
     registry
 }
 

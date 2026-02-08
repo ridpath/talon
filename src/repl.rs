@@ -301,6 +301,7 @@ fn format_value(value: &Value) -> String {
             format!("#{{{}}}", items.join(", "))
         }
         Value::SshConnection(id) => format!("SSH({})", id),
+        Value::Patch(id) => format!("Patch({})", id),
     }
 }
 

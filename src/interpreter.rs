@@ -25,7 +25,6 @@ use crate::parser::parse_script;
 use crate::runtime_safety::{RuntimeSafety, SafetyConfig};
 use crate::ssh_bridge::{SshConnection, SshConnectionId, SshRegistry};
 use crate::binary_patch::Patch;
-use crate::heap_tools::HeapExploit;
 use dashmap::DashMap;
 use std::sync::atomic::{AtomicU64, AtomicU8, Ordering};
 use crossbeam::queue::SegQueue;
@@ -246,9 +245,9 @@ pub async fn interpret_with_options(commands: &[Command], dry_run: bool) -> Resu
 }
 
 // Enhanced value type for advanced data structures
-#[derive(Debug, Clone, PartialEq)]
 pub type PatchId = u64;
 
+#[derive(Debug, Clone, PartialEq)]
 pub enum Value {
     Number(i64),
     String(String),
@@ -4439,6 +4438,7 @@ fn eval_expr<'a>(
                                 }
                                 Value::Set(s) => print!("{:?}", s),
                                 Value::SshConnection(id) => print!("SSH({})", id),
+                                Value::Patch(id) => print!("Patch({})", id),
                                 Value::Null => print!("null"),
                             }
                         }
@@ -4823,44 +4823,6 @@ fn eval_expr<'a>(
                         patch.set_dry_run(enabled);
 
                         Ok(Value::Null)
-                    }
-                    "fmtstr_payload" => {
-                        let offset = if let Some(Value::Number(n)) =
-                            arg_map.get("offset").or_else(|| arg_values.get(0))
-                        {
-                            *n as u64
-                        } else {
-                            return Err("fmtstr_payload() requires 'offset' parameter".to_string());
-                        };
-
-                        let writes = arg_map
-                            .get("writes")
-                            .or_else(|| arg_values.get(1))
-                            .ok_or("fmtstr_payload() requires 'writes' Map parameter")?;
-
-                        let writes_map = if let Value::Map(m) = writes {
-                            m.clone()
-                        } else {
-                            return Err("fmtstr_payload() 'writes' must be a Map".to_string());
-                        };
-
-                        use colored::Colorize;
-                        println!("{} Generating format string payload (offset: {}, {} writes)", 
-                                 "[FMTSTR]".cyan(), offset, writes_map.len());
-
-                        // Simplified format string payload generation
-                        let mut payload = String::new();
-                        for (addr_str, value) in writes_map.iter() {
-                            if let Value::Number(val) = value {
-                                let addr = u64::from_str_radix(addr_str.trim_start_matches("0x"), 16)
-                                    .unwrap_or_else(|_| addr_str.parse::<u64>().unwrap_or(0));
-                                payload.push_str(&format!("%{}$n", offset));
-                            }
-                        }
-
-                        println!("{} Format string payload generated", "[FMTSTR]".green());
-
-                        Ok(Value::String(payload))
                     }
                     "fmtstr_leak" => {
                         let offset = if let Some(Value::Number(n)) =
