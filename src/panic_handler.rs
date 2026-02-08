@@ -28,6 +28,8 @@ pub fn install_sanitized_panic_handler() {
 }
 
 /// Sanitize message by removing file paths and debug info
+/// Used in release builds only (conditional compilation)
+#[allow(dead_code)]
 fn sanitize_message(msg: &str) -> String {
     let mut sanitized = msg.to_string();
     

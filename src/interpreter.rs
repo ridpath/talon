@@ -54,6 +54,8 @@ impl From<u8> for ConnectionState {
 // Connection wrapper with atomic state
 struct ConnectionEntry {
     connection: Connection,
+    // Public API: Connection state tracking for atomic operations
+    #[allow(dead_code)]
     state: AtomicU8,
 }
 
@@ -65,14 +67,18 @@ impl ConnectionEntry {
         }
     }
 
+    // Public API: Atomic state management methods for connection lifecycle
+    #[allow(dead_code)]
     fn get_state(&self) -> ConnectionState {
         ConnectionState::from(self.state.load(Ordering::Acquire))
     }
 
+    #[allow(dead_code)]
     fn set_state(&self, new_state: ConnectionState) {
         self.state.store(new_state as u8, Ordering::Release);
     }
 
+    #[allow(dead_code)]
     fn try_transition(&self, from: ConnectionState, to: ConnectionState) -> bool {
         self.state.compare_exchange(
             from as u8,
@@ -128,6 +134,16 @@ impl AtomicConnectionRegistry {
         id
     }
 
+    // Public API: Add SSH connection to registry (used by SSH builtins)
+    fn add_ssh(&self, ssh_id: SshConnectionId) -> ConnectionId {
+        let id = self.allocate_id();
+        let entry = ConnectionEntry::new(Connection::Ssh(ssh_id));
+        self.connections.insert(id, entry);
+        id
+    }
+
+    // Public API: Registry query and management methods
+    #[allow(dead_code)]
     fn get(&self, id: ConnectionId) -> Option<dashmap::mapref::one::Ref<'_, ConnectionId, ConnectionEntry>> {
         self.connections.get(&id)
     }
@@ -136,6 +152,7 @@ impl AtomicConnectionRegistry {
         self.connections.get_mut(&id)
     }
 
+    #[allow(dead_code)]
     fn remove(&self, id: ConnectionId) {
         if let Some((_, entry)) = self.connections.remove(&id) {
             entry.set_state(ConnectionState::Closed);
@@ -143,10 +160,12 @@ impl AtomicConnectionRegistry {
         }
     }
 
+    #[allow(dead_code)]
     fn len(&self) -> usize {
         self.connections.len()
     }
 
+    #[allow(dead_code)]
     fn is_empty(&self) -> bool {
         self.connections.is_empty()
     }

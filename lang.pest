@@ -72,7 +72,8 @@ unary        = { unary_op? ~ primary ~ postfix* }
 unary_op     = { "not" | "-" | "!" }
 postfix      = { "." ~ ident | "(" ~ call_args? ~ ")" | "[" ~ (slice_range | expr) ~ "]" }
 call_args    = { arg_item ~ ("," ~ arg_item)* }
-arg_item     = { func_named_arg | expr }
+arg_item     = { python_named_arg | func_named_arg | expr }
+python_named_arg = { param_name ~ "=" ~ expr }
 func_named_arg = { param_name ~ ":" ~ expr }
 param_name   = @{ (ASCII_ALPHA | "_") ~ (ASCII_ALPHANUMERIC | "_")* }
 slice_range  = { expr? ~ ".." ~ expr? }

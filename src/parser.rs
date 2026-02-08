@@ -1420,17 +1420,27 @@ fn parse_call_args(pair_opt: Option<Pair<Rule>>) -> Vec<(Option<String>, Expr)> 
     for inner in pair.into_inner() {
         match inner.as_rule() {
             Rule::arg_item => {
-                // Check if this is a named argument or positional
+                // Check if this is a named argument (Python-style or Map-style) or positional
                 let first_child = inner.into_inner().next().unwrap();
-                if first_child.as_rule() == Rule::func_named_arg {
-                    // Named argument
-                    let mut arg_parts = first_child.into_inner();
-                    let key = arg_parts.next().unwrap().as_str().to_string();
-                    let value = parse_expr(arg_parts.next().unwrap());
-                    args.push((Some(key), value));
-                } else {
-                    // Positional argument (expr)
-                    args.push((None, parse_expr(first_child)));
+                match first_child.as_rule() {
+                    Rule::python_named_arg => {
+                        // Python-style named argument: name=value
+                        let mut arg_parts = first_child.into_inner();
+                        let key = arg_parts.next().unwrap().as_str().to_string();
+                        let value = parse_expr(arg_parts.next().unwrap());
+                        args.push((Some(key), value));
+                    }
+                    Rule::func_named_arg => {
+                        // Map-style named argument: name:value
+                        let mut arg_parts = first_child.into_inner();
+                        let key = arg_parts.next().unwrap().as_str().to_string();
+                        let value = parse_expr(arg_parts.next().unwrap());
+                        args.push((Some(key), value));
+                    }
+                    _ => {
+                        // Positional argument (expr)
+                        args.push((None, parse_expr(first_child)));
+                    }
                 }
             }
             _ => {}
@@ -1488,5 +1498,63 @@ fn parse_primary(pair: Pair<Rule>) -> Expr {
         Rule::primary => parse_expr(pair.into_inner().next().unwrap()),
         Rule::expr => parse_expr(pair),
         _ => parse_expr(pair),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_python_style_named_args() {
+        // Test Python-style named arguments: func(name=value)
+        let script = r#"
+            let result = test_func(a=1, b=2, c=3)
+        "#;
+        let commands = parse_script(script);
+        assert!(commands.is_ok(), "Failed to parse Python-style named args: {:?}", commands.err());
+    }
+
+    #[test]
+    fn test_mixed_positional_and_named_args() {
+        // Test mixed positional and Python-style named arguments
+        let script = r#"
+            let result = test_func(1, 2, c=3, d=4)
+        "#;
+        let commands = parse_script(script);
+        assert!(commands.is_ok(), "Failed to parse mixed args: {:?}", commands.err());
+    }
+
+    #[test]
+    fn test_map_style_named_args_backward_compat() {
+        // Test Map-style named arguments still work (backward compatibility)
+        let script = r#"
+            let result = test_func({a: 1, b: 2})
+        "#;
+        let commands = parse_script(script);
+        assert!(commands.is_ok(), "Failed to parse Map-style args: {:?}", commands.err());
+    }
+
+    #[test]
+    fn test_real_world_python_named_args() {
+        // Test real-world examples from failing tests
+        let script = r#"
+            let nops = nop_sled(64, polymorphic="true")
+            let response = recv(conn, 2048, timeout=5)
+            let encoded = shellcode_encode(raw, encoder="xor", bad_chars=[0x00, 0x0a])
+        "#;
+        let commands = parse_script(script);
+        assert!(commands.is_ok(), "Failed to parse real-world examples: {:?}", commands.err());
+    }
+
+    #[test]
+    fn test_both_named_arg_styles() {
+        // Test both Python-style (=) and Map-style (:) in same script
+        let script = r#"
+            let result1 = func1(a=1, b=2)
+            let result2 = func2({a: 1, b: 2})
+        "#;
+        let commands = parse_script(script);
+        assert!(commands.is_ok(), "Failed to parse both styles: {:?}", commands.err());
     }
 }

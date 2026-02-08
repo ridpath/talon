@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 pub mod ast;
 pub mod build_cache;
 pub mod codegen;
