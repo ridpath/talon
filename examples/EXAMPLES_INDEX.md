@@ -45,7 +45,7 @@ Comprehensive guide to all TALON example files organized by topic.
 
 ### Return-Oriented Programming
 - **`02_rop_libc_attack.talon`** - ret2libc attack
-- **`advanced_rop_exploitation.talon`** - Advanced ROP techniques
+- **`rop_exploitation_techniques.talon`** - ROP exploitation techniques
 - **`rop_dsl_showcase.talon`** - ROP DSL features
 - **`ctf_ret2libc_pwn.talon`** - CTF-style ret2libc challenge
 - **`ctf_blind_rop.talon`** - Blind ROP exploitation
@@ -54,7 +54,7 @@ Comprehensive guide to all TALON example files organized by topic.
 - **`ctf_quick_exploitation.talon`** - Quick SROP demonstration
 
 ### Comprehensive Examples
-- **`advanced_exploitation_workflow.talon`** - Complete modern exploitation workflow
+- **`complete_exploitation_workflow.talon`** - Complete modern exploitation workflow
 - **`ultimate_exploit_combo.talon`** - Multi-stage attack combining multiple techniques
 
 ---
@@ -73,7 +73,7 @@ Comprehensive guide to all TALON example files organized by topic.
 ## Format String Attacks
 
 - **`02_format_string_attack.talon`** - Basic format string exploitation
-- **`advanced_fmtstr_showcase.talon`** - Advanced format string techniques
+- **`format_string_techniques.talon`** - Format string exploitation techniques
 - **`exploit_chain_format_string.talon`** - Format string exploitation chain
 - **`ctf_format_string_leak_write.talon`** - CTF-style leak and write
 - **`format_string_vuln.c`** - Vulnerable C program for testing
@@ -86,7 +86,7 @@ Comprehensive guide to all TALON example files organized by topic.
 - **`05_heap_exploitation.talon`** - Heap exploitation fundamentals
 - **`exploit_chain_heap_uaf.talon`** - Use-After-Free exploitation
 - **`ctf_heap_tcache_poison.talon`** - Tcache poisoning attack
-- **`advanced_heap_exploitation.rs`** - Advanced heap techniques (Rust)
+- **`heap_exploitation_techniques.rs`** - Heap exploitation techniques (Rust)
 
 ### Practice Targets
 - **`heap_vuln.c`** - Vulnerable heap program for testing
@@ -95,7 +95,7 @@ Comprehensive guide to all TALON example files organized by topic.
 
 ## ROP Techniques
 
-- **`advanced_rop_exploitation.talon`** - Complete ROP workflow
+- **`rop_exploitation_techniques.talon`** - Complete ROP workflow
 - **`rop_dsl_showcase.talon`** - ROP DSL syntax and features
 - **`ctf_blind_rop.talon`** - Blind ROP (no binary access)
 - **`ctf_one_gadget_pwn.talon`** - One-gadget exploitation
@@ -105,7 +105,7 @@ Comprehensive guide to all TALON example files organized by topic.
 ## Shellcode Development
 
 - **`05_shellcode_injection.rs`** - Shellcode injection techniques (Rust)
-- **`advanced_shellcode_showcase.talon`** - Advanced shellcode techniques
+- **`shellcode_generation_techniques.talon`** - Shellcode generation techniques
 - **`ctf_shellcode_encoder.talon`** - Shellcode encoding/decoding
 - **`polymorphic_shellcode.talon`** - Polymorphic shellcode generation
 
@@ -270,7 +270,7 @@ For developers extending TALON or understanding internals:
 - **`03_srop_exploitation.rs`** - SROP in Rust
 - **`04_format_string.rs`** - Format string in Rust
 - **`05_shellcode_injection.rs`** - Shellcode injection in Rust
-- **`advanced_heap_exploitation.rs`** - Advanced heap in Rust
+- **`heap_exploitation_techniques.rs`** - Heap exploitation in Rust
 
 ---
 
@@ -309,7 +309,7 @@ talon run --dev examples/01_basic_overflow.talon
 talon run --dry-run examples/ssh_exploitation.talon
 
 # Run with AI assistance
-talon run --ai examples/advanced_rop_exploitation.talon
+talon run --ai examples/rop_exploitation_techniques.talon
 
 # Run with error explanations
 talon run --explain-errors examples/ctf_automation.talon
@@ -319,7 +319,7 @@ talon run --explain-errors examples/ctf_automation.talon
 
 1. **Learn Basics**: Start with `tutorial_01_basics.talon`
 2. **Simple Exploits**: Try `01_basic_overflow.talon`
-3. **Advanced Techniques**: Progress to `advanced_rop_exploitation.talon`
+3. **Exploitation Techniques**: Progress to `rop_exploitation_techniques.talon`
 4. **Real Challenges**: Use `otw/bandit/` for real SSH challenges
 5. **Production**: Apply `production_error_obfuscation.talon` for deployment
 

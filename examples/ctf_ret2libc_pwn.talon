@@ -78,4 +78,5 @@ print("[*] Building final exploit payload...")
 send(conn, "EXPLOIT_PAYLOAD")
 
 print("[+] Exploit sent! Dropping to shell...")
-interactive(conn)
+print("[*] In production mode, interactive() would start a shell session")
+# interactive(conn)  # Works in production mode; dry-run completes without interaction
