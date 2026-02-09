@@ -3416,25 +3416,86 @@ fn eval_expr<'a>(
                         Ok(Value::Bytes(payload))
                     }
                     "interactive" => {
+                        println!("[DEBUG] ===== interactive() called =====");
+                        
                         if arg_values.is_empty() {
                             return Err(
                                 "interactive() requires socket/connection argument".to_string()
                             );
                         }
 
-                        let host = arg_map
-                            .get("host")
-                            .or_else(|| arg_values.get(0))
-                            .map(|v| v.to_string())
-                            .unwrap_or_else(|| "127.0.0.1".to_string());
+                        // Debug: Print first argument type
+                        println!("[DEBUG] interactive() first arg type: {}", 
+                            match arg_values.get(0) {
+                                Some(Value::Map(_)) => "Map",
+                                Some(Value::String(_)) => "String",
+                                Some(Value::Number(_)) => "Number",
+                                Some(Value::Bytes(_)) => "Bytes",
+                                Some(Value::List(_)) => "List",
+                                Some(Value::Set(_)) => "Set",
+                                Some(Value::Null) => "Null",
+                                None => "None",
+                                _ => "Other",
+                            }
+                        );
 
-                        let port = if let Some(Value::Number(p)) =
-                            arg_map.get("port").or_else(|| arg_values.get(1))
-                        {
-                            *p as u16
+                        // Extract host, port, and dry-run flag from connection object if first arg is a Map
+                        let (host, port, is_dry_run_conn) = if let Some(Value::Map(conn_map)) = arg_values.get(0) {
+                            println!("[DEBUG] Found connection map");
+                            // Check if connection is in dry-run mode
+                            let is_dry_run_conn = conn_map
+                                .get("dry_run")
+                                .and_then(|v| match v {
+                                    Value::Number(n) => Some(*n != 0),
+                                    _ => None,
+                                })
+                                .unwrap_or(false);
+
+                            // Extract host from connection map
+                            let host = conn_map
+                                .get("host")
+                                .and_then(|v| match v {
+                                    Value::String(s) => Some(s.clone()),
+                                    _ => None,
+                                })
+                                .unwrap_or_else(|| "127.0.0.1".to_string());
+                            
+                            // Extract port from connection map
+                            let port = conn_map
+                                .get("port")
+                                .and_then(|v| match v {
+                                    Value::Number(n) => Some(*n as u16),
+                                    _ => None,
+                                })
+                                .unwrap_or(1337);
+                            
+                            (host, port, is_dry_run_conn)
                         } else {
-                            1337
+                            // Fall back to old behavior if not a connection map
+                            let host = arg_map
+                                .get("host")
+                                .or_else(|| arg_values.get(0))
+                                .map(|v| v.to_string())
+                                .unwrap_or_else(|| "127.0.0.1".to_string());
+
+                            let port = if let Some(Value::Number(p)) =
+                                arg_map.get("port").or_else(|| arg_values.get(1))
+                            {
+                                *p as u16
+                            } else {
+                                1337
+                            };
+                            
+                            (host, port, false)
                         };
+
+                        // Check if in dry-run mode (either global or connection-specific)
+                        println!("[DEBUG] dry_run={}, is_dry_run_conn={}", *dry_run, is_dry_run_conn);
+                        if *dry_run || is_dry_run_conn {
+                            println!("[\x1b[36mINTERACTIVE\x1b[0m] [DRY-RUN] Would start interactive shell session");
+                            return Ok(Value::String("Interactive session (dry-run mode)".to_string()));
+                        }
+                        println!("[DEBUG] About to create interactive shell with host={}, port={}", host, port);
 
                         let mut shell =
                             crate::interactive_shell::create_interactive_shell(&host, port)

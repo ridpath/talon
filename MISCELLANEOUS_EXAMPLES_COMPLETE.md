@@ -81,7 +81,7 @@ All 6 miscellaneous example files have been verified to be 100% production ready
 
 ---
 
-### 6. ✅ world_class_exploit.talon
+### 6. ✅ advanced_exploitation_workflow.talon
 **Status**: Fully Working  
 **Exit Code**: 0  
 **Key Features**:

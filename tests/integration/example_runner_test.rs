@@ -165,8 +165,8 @@ fn test_rop_dsl_showcase() {
 }
 
 #[test]
-fn test_world_class_exploit() {
-    let path = Path::new(EXAMPLES_DIR).join("world_class_exploit.talon");
+fn test_advanced_exploitation_workflow() {
+    let path = Path::new(EXAMPLES_DIR).join("advanced_exploitation_workflow.talon");
 
     if !path.exists() {
         println!("Skipping: example file not found");

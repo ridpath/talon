@@ -54,7 +54,7 @@ Comprehensive guide to all TALON example files organized by topic.
 - **`ctf_quick_exploitation.talon`** - Quick SROP demonstration
 
 ### Comprehensive Examples
-- **`world_class_exploit.talon`** - Complete modern exploitation workflow
+- **`advanced_exploitation_workflow.talon`** - Complete modern exploitation workflow
 - **`ultimate_exploit_combo.talon`** - Multi-stage attack combining multiple techniques
 
 ---
@@ -86,7 +86,7 @@ Comprehensive guide to all TALON example files organized by topic.
 - **`05_heap_exploitation.talon`** - Heap exploitation fundamentals
 - **`exploit_chain_heap_uaf.talon`** - Use-After-Free exploitation
 - **`ctf_heap_tcache_poison.talon`** - Tcache poisoning attack
-- **`world_class_heap_pwn.rs`** - Advanced heap techniques (Rust)
+- **`advanced_heap_exploitation.rs`** - Advanced heap techniques (Rust)
 
 ### Practice Targets
 - **`heap_vuln.c`** - Vulnerable heap program for testing
@@ -270,7 +270,7 @@ For developers extending TALON or understanding internals:
 - **`03_srop_exploitation.rs`** - SROP in Rust
 - **`04_format_string.rs`** - Format string in Rust
 - **`05_shellcode_injection.rs`** - Shellcode injection in Rust
-- **`world_class_heap_pwn.rs`** - Advanced heap in Rust
+- **`advanced_heap_exploitation.rs`** - Advanced heap in Rust
 
 ---
 

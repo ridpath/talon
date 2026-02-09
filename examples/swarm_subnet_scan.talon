@@ -158,7 +158,7 @@ define function grab_banner(conn_id, port, timeout) {
         
         // If no banner, try sending probe
         if len(banner) == 0 {
-            if port == 80 || port == 8080 || port == 443 || port == 8443 {
+            if port == 80 or port == 8080 or port == 443 or port == 8443 {
                 send(conn_id, "GET / HTTP/1.0\r\n\r\n")
                 banner = recv(conn_id, 1024, timeout)
             } else if port == 22 {
