@@ -6019,6 +6019,45 @@ fn eval_expr<'a>(
                             _ => Err(format!("len() not supported for type: {:?}", arg_values[0])),
                         }
                     }
+                    "find" => {
+                        if arg_values.len() < 2 {
+                            return Err("find() requires 2 arguments: find(list, pattern)".into());
+                        }
+                        match (&arg_values[0], &arg_values[1]) {
+                            (Value::List(list), Value::String(pattern)) => {
+                                // Search for matching element in list
+                                for item in list {
+                                    match item {
+                                        Value::String(s) if s.contains(pattern) => return Ok(item.clone()),
+                                        Value::Map(m) => {
+                                            // Check if map has a property that matches
+                                            if let Some(Value::String(desc)) = m.get("description") {
+                                                if desc.contains(pattern) {
+                                                    return Ok(item.clone());
+                                                }
+                                            }
+                                            if let Some(Value::String(name)) = m.get("name") {
+                                                if name.contains(pattern) {
+                                                    return Ok(item.clone());
+                                                }
+                                            }
+                                        }
+                                        _ => {}
+                                    }
+                                }
+                                Err(format!("Pattern '{}' not found in list", pattern))
+                            }
+                            (Value::String(s), Value::String(pattern)) => {
+                                // String contains check
+                                if s.contains(pattern) {
+                                    Ok(Value::Number(s.find(pattern).unwrap_or(0) as i64))
+                                } else {
+                                    Ok(Value::Number(-1))
+                                }
+                            }
+                            _ => Err("find() requires (list, pattern) or (string, pattern)".into()),
+                        }
+                    }
                     "hex" => {
                         if arg_values.is_empty() {
                             return Err("hex() requires 1 argument: hex(number)".into());

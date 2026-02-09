@@ -843,6 +843,22 @@ pub fn register_builtins() -> HashMap<String, BuiltinFunction> {
     );
 
     registry.insert(
+        "find".to_string(),
+        BuiltinFunction::new(
+            "find",
+            "find(list: list, pattern: string) -> value or find(string: string, pattern: string) -> int",
+            "Searches a list for an element matching the pattern, or finds substring index in string",
+            "Utilities",
+            vec![
+                "let gadgets = quick_rop(\"./binary\")",
+                "let pop_rdi = find(gadgets, \"pop rdi; ret\")",
+                "let index = find(\"hello world\", \"world\")",
+            ],
+        )
+        .with_related(vec!["quick_rop", "rop_find", "len"]),
+    );
+
+    registry.insert(
         "range".to_string(),
         BuiltinFunction::new(
             "range",
