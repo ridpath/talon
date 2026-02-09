@@ -3490,8 +3490,8 @@ fn eval_expr<'a>(
                         };
 
                         // Check if in dry-run mode (either global or connection-specific)
-                        println!("[DEBUG] dry_run={}, is_dry_run_conn={}", *dry_run, is_dry_run_conn);
-                        if *dry_run || is_dry_run_conn {
+                        println!("[DEBUG] dry_run={}, is_dry_run_conn={}", dry_run, is_dry_run_conn);
+                        if dry_run || is_dry_run_conn {
                             println!("[\x1b[36mINTERACTIVE\x1b[0m] [DRY-RUN] Would start interactive shell session");
                             return Ok(Value::String("Interactive session (dry-run mode)".to_string()));
                         }
