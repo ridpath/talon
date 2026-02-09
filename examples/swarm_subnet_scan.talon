@@ -230,7 +230,7 @@ define function identify_service(port, banner) {
     return base_service
 }
 
-define extract_version(banner, service_name) {
+define function extract_version(banner, service_name) {
     let start = index_of(banner, service_name)
     if start >= 0 {
         let version_str = substring(banner, start, start + 30)
@@ -239,7 +239,7 @@ define extract_version(banner, service_name) {
     return ""
 }
 
-define categorize_services(open_ports_list) {
+define function categorize_services(open_ports_list) {
     let summary_map = Map()
     
     for entry in open_ports_list {
@@ -265,15 +265,15 @@ define categorize_services(open_ports_list) {
     return summary_list
 }
 
-define current_timestamp() {
+define function current_timestamp() {
     return "2026-02-06T18:59:00Z"
 }
 
-define swarm_share_service(ip, port, service, banner) {
+define function swarm_share_service(ip, port, service, banner) {
     // In production, this would use swarm.share_intel()
     return true
 }
 
-define get_agent_id() {
+define function get_agent_id() {
     return "agent-scan-01"
 }

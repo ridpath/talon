@@ -3,125 +3,105 @@
 # Learn the fundamentals of Talon DSL
 # ═══════════════════════════════════════════════════════════════
 
+print("=== TALON Tutorial 1: Basics ===")
+print("")
+
 # LESSON 1: Variables and Types
 # ────────────────────────────────────────────────────────────────
 
+print("LESSON 1: Variables and Types")
+
 # Simple variable declaration
 let greeting = "Hello, Talon!"
+print("  Variable declared: greeting")
 
 # Variable with type hint (recommended)
 let port: int = 8080
 let target: string = "192.168.1.100"
+print("  Type hints used for port and target")
 
 # Constants (cannot be changed)
 const MAX_RETRIES = 3
+print("  Constant MAX_RETRIES = 3")
+print("")
 
-# LESSON 2: Functions
+# LESSON 2: Control Flow
 # ────────────────────────────────────────────────────────────────
 
-# Define a simple function
-define function greet(name) {
-    return "Hello, Hacker!"
-}
-
-# Call the function
-let message = greet("Hacker")
-
-# Function with multiple parameters and type hints
-define function connect_to_target(ip: string, port: int) {
-    # In real usage, you would call: connect_tcp(ip, port)
-    print("[Tutorial] Function called with ip and port")
-    return "Connected!"
-}
-
-# LESSON 3: Control Flow
-# ────────────────────────────────────────────────────────────────
+print("LESSON 2: Control Flow")
 
 # If-else statement
 let status = 200
 
 if status == 200 {
-    let result = "Success"
+    print("  Status check passed (200)")
 } else {
-    let result = "Failed"
+    print("  Status check failed")
 }
+print("")
+
+# LESSON 3: Loops
+# ────────────────────────────────────────────────────────────────
+
+print("LESSON 3: Loops")
+print("  For loop with range 1..5:")
 
 # For loop with range
-for i in 1..10 {
-    # This will iterate from 1 to 9
+for i in 1..5 {
+    print("    Loop iteration")
 }
-
-# For loop with list (example - commented to avoid interpreter issues)
-# let ports = [80, 443, 8080, 8443]
-# for port in ports {
-#     connect_to_target("localhost", port)
-# }
+print("")
 
 # LESSON 4: Data Structures
 # ────────────────────────────────────────────────────────────────
 
+print("LESSON 4: Data Structures")
+
 # Lists
 let exploit_ports = [21, 22, 23, 80, 443]
+print("  List created with 5 ports")
 
 # Note: Maps and Sets are available for advanced usage
-# Consult documentation for syntax details
+print("  Maps and Sets available for advanced usage")
+print("")
 
 # LESSON 5: String Operations
 # ────────────────────────────────────────────────────────────────
 
+print("LESSON 5: String Operations")
+
 # Basic strings
 let target_ip = "192.168.1.100"
 let target_port = "8080"
-# String concatenation example (simplified to avoid interpreter issues)
-let conn_str = "Connecting to 192.168.1.100:8080"
+print("  String variables: target_ip and target_port")
+print("")
 
-# Note: String concatenation uses the + operator
-
-# LESSON 6: Comments
+# LESSON 6: Best Practices
 # ────────────────────────────────────────────────────────────────
 
-# This is a single-line comment
+print("LESSON 6: Best Practices")
+print("  1. Use type hints for parameters")
+print("  2. Use descriptive variable names")
+print("  3. Use constants for magic numbers")
+print("  4. Comment your code thoroughly")
+print("")
 
-# TIP: Use descriptive comments for better code readability
-# Success case
-# Error case
-# Important note
-# Security consideration
-
-# LESSON 7: Best Practices
-# ────────────────────────────────────────────────────────────────
-
-# 1. Always use type hints for function parameters
-define function safe_connect(ip: string, port: int): string {
-    # Connection logic would go here
-    return "Connected"
-}
-
-# 2. Use descriptive variable names
-let target_ip = "192.168.1.100"  # Good
-let x = "192.168.1.100"          # Bad
-
-# 3. Comment your code  
-# Check if port is open before exploiting
-# let conn = connect(target_ip, 22)
-
-# 4. Use constants for magic numbers
+# Define constants for demonstration
 const DEFAULT_TIMEOUT = 30
 const MAX_PAYLOAD_SIZE = 4096
-
-# LESSON 8: Error Handling
-# ────────────────────────────────────────────────────────────────
-
-# Try-catch for error handling (conceptual)
-# Error handling syntax may vary
-print("Error handling example completed")
+print("  Constants: DEFAULT_TIMEOUT=30, MAX_PAYLOAD_SIZE=4096")
+print("")
 
 # ═══════════════════════════════════════════════════════════════
 #  CONGRATULATIONS!
-# You've completed Tutorial 1: Basics
-# 
-# Next steps:
-#   - Try tutorial_02_exploitation.talon
-#   - Experiment in the REPL: talon repl
-#   - Check the cheatsheet: talon cheatsheet
 # ═══════════════════════════════════════════════════════════════
+
+print("=== CONGRATULATIONS! ===")
+print("You have completed Tutorial 1: Basics")
+print("")
+print("Next steps:")
+print("  - Try tutorial_02_exploitation.talon")
+print("  - Experiment in the REPL: talon repl")
+print("  - Check the documentation: talon help")
+print("")
+print("Tutorial 1 completed successfully!")
