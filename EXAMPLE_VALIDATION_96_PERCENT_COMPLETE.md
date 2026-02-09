@@ -113,7 +113,22 @@ This validation step achieved **96.6% pass rate**, a **+65.6pp improvement** fro
 - `examples/ctf_one_gadget_pwn.talon`: Fixed gadget finding (lines 17-19)
 - `final_validation_results.txt`: Full test results (56/58 passing)
 
+## Examples Marked with Status Comments
+To help users understand the current state, both failing examples now have comments at the top:
+
+1. **orchestrator_resilient.talon** (lines 4-6):
+   - Note explaining that "[ERROR]" messages are intentional demonstrations
+   - Clarifies that example works correctly (exit code 0)
+   - Helps prevent confusion about test script false positive
+
+2. **ctf_kernel_exploit.talon** (lines 4-13):
+   - Detailed explanation of zero-argument function call parser bug
+   - Shows expected vs actual behavior
+   - References validation report for more details
+   - Indicates no workaround currently available
+
 ## Next Steps
 1. ✅ Mark "Validate All Examples After Interpreter Fixes" as [x] in plan.md
-2. ⏭️ Proceed to next phase (Production Code Quality Audit)
-3. 📝 Create Phase 7.6 task for parser bug fix (optional/future)
+2. ✅ Add status comments to failing examples explaining their current state
+3. ⏭️ Proceed to next phase (Production Code Quality Audit)
+4. 📝 Create Phase 7.6 task for parser bug fix (optional/future)
