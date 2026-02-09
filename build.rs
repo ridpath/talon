@@ -76,14 +76,15 @@ fn get_builtin_functions() -> Vec<&'static str> {
         "pack", "unpack",
         // Exploitation
         "Elf", "Libc", "ROP", "shellcode", "cyclic", "cyclic_find", "fmtstr_payload",
-        "xor", "rol", "ror", "make_elf", "make_pe", "asm", "asm_at", "pwn",
-        "rop_find", "parallel_exploit", "flat",
+        "fmtstr_leak", "xor", "rol", "ror", "make_elf", "make_pe", "asm", "asm_at", "pwn",
+        "rop_find", "parallel_exploit", "flat", "allocate", "edit", "trigger_function_pointer",
         // Binary Analysis
         "oracle_analyze", "oracle_find_shellcode", "oracle_gadget_density", "oracle_report",
-        "disasm", "analyze", "auto_offset",
+        "disasm", "analyze", "auto_offset", "Patch", "patch_nop_out", "patch_save",
+        "patch_set_dry_run", "analyze_elf", "analyze_heap", "checksec", "parse_elf", "find",
         // Utilities
         "copy", "remote", "help", "len", "range", "int", "bytes", "str",
-        "random_string", "extract_pattern",
+        "random_string", "extract_pattern", "connect_tcp", "map_set", "map_get",
         // File I/O
         "read", "write",
         // String Manipulation
@@ -98,7 +99,7 @@ fn get_builtin_functions() -> Vec<&'static str> {
         "pool_spray", "heap_feng_shui",
         // Kernel
         "token_steal", "process_hide", "rootkit_install", "kaslr_leak",
-        "smep_bypass", "kernel_write", "kernel_read",
+        "smep_bypass", "kernel_write", "kernel_read", "check_kernel_protections",
         // Crypto
         "padding_oracle", "bleichenbacher", "timing_attack", "weak_keys",
         "hash_collision", "aes_padding_attack", "rsa_factorize",
