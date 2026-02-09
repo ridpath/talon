@@ -1,6 +1,0 @@
-[DRY-RUN] Running in dry-run mode (no network I/O will be executed)
-[*] Multi-Stage PWN Challenge
-[*] Target: multi.pwn.ctf : 31337
-\n[STAGE 1] Information Disclosure
-==================================================
-[ERROR] Unknown function: connect

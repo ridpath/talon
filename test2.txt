@@ -1,6 +1,0 @@
-[DRY-RUN] Running in dry-run mode (no network I/O will be executed)
-[*] Blind ROP Exploitation
-[*] Target: blind.pwn.ctf : 8888
-[+] Step 1: Finding crash offset...
-
-thread 'main' (58264) has overflowed its stack
