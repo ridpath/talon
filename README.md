@@ -58,7 +58,7 @@ TALON is a compiled, exploit centric language for offensive security and binary 
 ## Key Capabilities
 
 **Verified Core Features:**
-- **Dot notation object system (Titan syntax)**: `elf.symbols.main`, `elf.plt.puts`, `elf.got.__libc_start_main`
+- **Dot notation object system **: `elf.symbols.main`, `elf.plt.puts`, `elf.got.__libc_start_main`
 - **Stateful ROP builder**: Object-oriented gadget search with `ROP(elf)` and `find(rop, "pop rdi")`
 - **Libc database integration**: 4 pre-loaded versions (Ubuntu 18.04/20.04/22.04, Debian 10) with automatic offset calculation
 - **Real interactive I/O**: Bidirectional stdin/stdout bridge with connection registry
