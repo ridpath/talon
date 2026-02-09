@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+#![allow(deprecated)]
 use std::fmt;
 use std::panic;
 use std::sync::{Arc, RwLock};
