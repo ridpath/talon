@@ -1025,7 +1025,7 @@ fn interpret_with_scope<'a>(
                         println!("[SHELLCODE] Executing {} bytes", code.len());
                         let cs = Capstone::new().x86().mode(ArchMode::Mode64).build().ok();
                         if let Some(cs) = cs {
-                            if let Ok(insns) = cs.disasm_all(&code, 0x1000) {
+                            if let Ok(insns) = cs.disasm_all(code, 0x1000) {
                                 println!("[TRACE]");
                                 for i in insns.iter().take(20) {
                                     println!("   0x{:x}: {}", i.address(), i);
@@ -3611,7 +3611,7 @@ fn eval_expr<'a>(
                         let mut chain = if let Some(Value::String(state_json)) =
                             vars.read().await.get(&chain_key)
                         {
-                            serde_json::from_str::<ExploitChain>(&state_json)
+                            serde_json::from_str::<ExploitChain>(state_json)
                                 .unwrap_or_else(|_| ExploitChain::new())
                         } else {
                             ExploitChain::new()
@@ -8323,11 +8323,12 @@ fn eval_expr<'a>(
                         }
                     }
                     "anticheat_detect" => {
-                        let mut detected = Vec::new();
-                        detected.push(Value::String("EasyAntiCheat: Not detected".to_string()));
-                        detected.push(Value::String("BattlEye: Not detected".to_string()));
-                        detected.push(Value::String("Vanguard: Not detected".to_string()));
-                        detected.push(Value::String("VAC: Not detected".to_string()));
+                        let detected = vec![
+                            Value::String("EasyAntiCheat: Not detected".to_string()),
+                            Value::String("BattlEye: Not detected".to_string()),
+                            Value::String("Vanguard: Not detected".to_string()),
+                            Value::String("VAC: Not detected".to_string()),
+                        ];
                         Ok(Value::List(detected))
                     }
                     "kernel_driver_status" => {
@@ -9993,7 +9994,7 @@ fn eval_expr<'a>(
                             if len > 0 {
                                 msg.push_str("Did you mean:\n");
                                 msg.push_str(&format!("  1. data[{}]  (last element)\n", len - 1));
-                                msg.push_str(&format!("  2. data[-1]  (last element, negative indexing)\n"));
+                                msg.push_str("  2. data[-1]  (last element, negative indexing)\n");
                                 if actual_idx > len as usize {
                                     let extend_count = actual_idx - len as usize + 1;
                                     msg.push_str(&format!("  3. Extend list with {} elements\n", extend_count));
@@ -10018,7 +10019,7 @@ fn eval_expr<'a>(
                             if len > 0 {
                                 msg.push_str("Did you mean:\n");
                                 msg.push_str(&format!("  1. bytes[{}]  (last byte)\n", len - 1));
-                                msg.push_str(&format!("  2. bytes[-1]  (last byte, negative indexing)\n"));
+                                msg.push_str("  2. bytes[-1]  (last byte, negative indexing)\n");
                                 msg.push_str(&format!("  3. Use slicing: bytes[0..{}]\n", len));
                             } else {
                                 msg.push_str("Note: Bytes is empty.\n");
@@ -10040,7 +10041,7 @@ fn eval_expr<'a>(
                             if len > 0 {
                                 msg.push_str("Did you mean:\n");
                                 msg.push_str(&format!("  1. str[{}]  (last character)\n", len - 1));
-                                msg.push_str(&format!("  2. str[-1]  (last character, negative indexing)\n"));
+                                msg.push_str("  2. str[-1]  (last character, negative indexing)\n");
                                 msg.push_str(&format!("  3. Use slicing: str[0..{}]\n", len));
                             } else {
                                 msg.push_str("Note: String is empty.\n");

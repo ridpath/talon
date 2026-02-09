@@ -798,7 +798,7 @@ impl AutoROPSolver {
             }],
             payload_description: "JOP (Jump-Oriented Programming) chain using indirect jumps"
                 .to_string(),
-            constraints_satisfied: self.check_constraints(&vec![gadget.address]),
+            constraints_satisfied: self.check_constraints(&[gadget.address]),
             success_probability: 0.70,
         })
     }
@@ -827,7 +827,7 @@ impl AutoROPSolver {
             }],
             payload_description: "COP (Call-Oriented Programming) chain using indirect calls"
                 .to_string(),
-            constraints_satisfied: self.check_constraints(&vec![gadget.address]),
+            constraints_satisfied: self.check_constraints(&[gadget.address]),
             success_probability: 0.68,
         })
     }
@@ -849,7 +849,7 @@ impl AutoROPSolver {
                 instructions: pivot.instructions.clone(),
             }],
             payload_description: "Stack pivot to gain control over ROP chain location".to_string(),
-            constraints_satisfied: self.check_constraints(&vec![pivot.address]),
+            constraints_satisfied: self.check_constraints(&[pivot.address]),
             success_probability: 0.82,
         })
     }

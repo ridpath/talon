@@ -529,7 +529,7 @@ impl PolymorphicEngine {
         match opcode {
             0x90 => {
                 // NOP equivalents
-                let variants = vec![
+                let variants = [
                     vec![0x90],                // nop
                     vec![0x66, 0x90],          // 66 nop
                     vec![0x0f, 0x1f, 0x00],    // multi-byte nop

@@ -189,7 +189,7 @@ pub fn fmtstr_write(address: u64, value: u64, offset: usize) -> Vec<u8> {
     payload.extend_from_slice(&address.to_le_bytes());
 
     // Padding
-    payload.extend_from_slice(&vec![b'A'; 8]);
+    payload.extend_from_slice(&[b'A'; 8]);
 
     // Format string
     let bytes_to_write = (value & 0xFFFF) as usize;
