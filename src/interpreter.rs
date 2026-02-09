@@ -4202,6 +4202,23 @@ fn eval_expr<'a>(
                             port.to_string().yellow()
                         );
 
+                        if dry_run {
+                            println!("{} {} SSH connection mock (dry-run mode)",
+                                "[SSH]".green(),
+                                "[DRY-RUN]".yellow()
+                            );
+                            
+                            let mut ssh_map = std::collections::HashMap::new();
+                            ssh_map.insert("host".to_string(), Value::String(host));
+                            ssh_map.insert("port".to_string(), Value::Number(port as i64));
+                            ssh_map.insert("user".to_string(), Value::String(user));
+                            ssh_map.insert("type".to_string(), Value::String("ssh".to_string()));
+                            ssh_map.insert("id".to_string(), Value::Number(999));
+                            ssh_map.insert("dry_run".to_string(), Value::Number(1));
+                            
+                            return Ok(Value::Map(ssh_map));
+                        }
+
                         let connection =
                             SshConnection::connect(&host, port, &user, &password)
                                 .map_err(|e| format!("SSH connection failed: {}", e))?;
