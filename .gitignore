@@ -103,6 +103,17 @@ INSTALLATION.md
 *_ARCHITECTURE*.md
 *_FEATURES*.md
 *_COMPARISON*.md
+*_ROADMAP*.md
+*_PLAN*.md
+*_IN_PROGRESS*.md
+*_DECISIONS*.md
+*_VERIFICATION*.md
+*_AUDIT*.md
+*_FIX*.md
+*_INVESTIGATION*.md
+*_IMPLEMENTATION*.md
+*_COMPLETE.md
+*_FINAL*.md
 
 # Documentation audit artifacts
 help_output.txt
