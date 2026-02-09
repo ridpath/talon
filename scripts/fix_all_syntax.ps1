@@ -28,7 +28,7 @@ $syntaxErrorFiles = @(
     "time_travel_debugging.talon",
     "tutorial_01_basics.talon",
     "tutorial_02_exploitation.talon",
-    "advanced_exploitation_workflow.talon"
+    "complete_exploitation_workflow.talon"
 )
 
 Write-Host "Fixing SYNTAX_ERROR examples..." -ForegroundColor Cyan
