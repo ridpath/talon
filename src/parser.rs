@@ -1511,34 +1511,43 @@ fn parse_unary(pair: Pair<Rule>) -> Expr {
     for postfix in parts {
         if postfix.as_rule() == Rule::postfix {
             let mut post_parts = postfix.into_inner();
-            let first = post_parts.next().unwrap();
+            
+            // Check if we have any inner elements (for zero-argument function calls)
+            let first_opt = post_parts.next();
+            
+            if let Some(first) = first_opt {
+                if first.as_rule() == Rule::ident {
+                    let method = first.as_str().to_string();
+                    base = Expr::MethodChain {
+                        base: Box::new(base),
+                        calls: vec![method],
+                    };
+                } else if first.as_rule() == Rule::slice_range {
+                    let mut range_parts = first.into_inner();
+                    let start = Box::new(parse_expr(range_parts.next().unwrap()));
+                    let end = Box::new(parse_expr(range_parts.next().unwrap()));
+                    base = Expr::Slice {
+                        base: Box::new(base),
+                        start,
+                        end,
+                    };
+                } else if first.as_rule() == Rule::expr {
+                    base = Expr::Index {
+                        base: Box::new(base),
+                        index: Box::new(parse_expr(first)),
+                    };
+                } else {
+                    // This is a function call with arguments
+                    let args = parse_call_args(Some(first));
 
-            if first.as_rule() == Rule::ident {
-                let method = first.as_str().to_string();
-                base = Expr::MethodChain {
-                    base: Box::new(base),
-                    calls: vec![method],
-                };
-            } else if first.as_rule() == Rule::slice_range {
-                let mut range_parts = first.into_inner();
-                let start = Box::new(parse_expr(range_parts.next().unwrap()));
-                let end = Box::new(parse_expr(range_parts.next().unwrap()));
-                base = Expr::Slice {
-                    base: Box::new(base),
-                    start,
-                    end,
-                };
-            } else if first.as_rule() == Rule::expr {
-                base = Expr::Index {
-                    base: Box::new(base),
-                    index: Box::new(parse_expr(first)),
-                };
+                    if let Expr::Ident(name) = base {
+                        base = Expr::Call { name, args };
+                    }
+                }
             } else {
-                // This is a function call - first element should be call_args
-                let args = parse_call_args(Some(first));
-
+                // No inner elements - this is a zero-argument function call `()`
                 if let Expr::Ident(name) = base {
-                    base = Expr::Call { name, args };
+                    base = Expr::Call { name, args: vec![] };
                 }
             }
         }
