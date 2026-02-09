@@ -1,5 +1,4 @@
 use std::collections::HashMap;
-#![allow(deprecated)]
 use std::fmt;
 use std::panic;
 use std::sync::{Arc, RwLock};
@@ -7,6 +6,7 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 
+#[allow(deprecated)]
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     Aes256Gcm, Nonce,
