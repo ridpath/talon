@@ -1,0 +1,42 @@
+[DRY-RUN] Running in dry-run mode (no network I/O will be executed)
+=== TALON Tutorial 1: Basics ===
+
+LESSON 1: Variables and Types
+  Variable declared: greeting
+  Type hints used for port and target
+  Constant MAX_RETRIES = 3
+
+LESSON 2: Control Flow
+  Status check passed (200)
+
+LESSON 3: Loops
+  For loop with range 1..5:
+    Loop iteration
+    Loop iteration
+    Loop iteration
+    Loop iteration
+
+LESSON 4: Data Structures
+  List created with 5 ports
+  Maps and Sets available for advanced usage
+
+LESSON 5: String Operations
+  String variables: target_ip and target_port
+
+LESSON 6: Best Practices
+  1. Use type hints for parameters
+  2. Use descriptive variable names
+  3. Use constants for magic numbers
+  4. Comment your code thoroughly
+
+  Constants: DEFAULT_TIMEOUT=30, MAX_PAYLOAD_SIZE=4096
+
+=== CONGRATULATIONS! ===
+You have completed Tutorial 1: Basics
+
+Next steps:
+  - Try tutorial_02_exploitation.talon
+  - Experiment in the REPL: talon repl
+  - Check the documentation: talon help
+
+Tutorial 1 completed successfully!

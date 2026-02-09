@@ -1,0 +1,80 @@
+[DRY-RUN] Running in dry-run mode (no network I/O will be executed)
+=== Polymorphic Shellcode Demonstration ===
+
+Example 1: Basic Shellcode Generation
+
+  Base shellcode generated: x64/execve
+  Shellcode size: varies by architecture
+
+Example 2: Polymorphic Code Mutation Strategies
+
+  Strategy 1: Junk Code Insertion
+    - Adds harmless NOPs and dead code
+    - Increases size by 10-50%
+    - Low detection evasion
+
+  Strategy 2: Register Permutation
+    - Swaps register usage
+    - Maintains functionality
+    - Medium detection evasion
+
+  Strategy 3: Instruction Equivalence
+    - Replaces with equivalent instructions
+    - Example: XOR eax,eax → SUB eax,eax
+    - High detection evasion
+
+  Strategy 4: String Encryption
+    - XOR-encodes embedded strings
+    - Adds decoder stub
+    - Very high detection evasion
+
+Example 3: Entropy Analysis
+
+  Entropy range for evasion: 6.0 - 7.5
+  - Too low (< 6.0): Detected as encrypted/packed
+  - Optimal (6.0-7.5): Appears normal
+  - Too high (> 7.5): Triggers heuristic detection
+
+Example 4: Practical Exploitation with Shellcode
+
+  Target: 192.168.1.100
+  Port: 9999
+
+  Simulating 3 exploitation attempts...
+  Attempt 1: Generating fresh shellcode variant
+    - Mutation seed: 42
+    - Variant would be unique
+    - Size would vary slightly
+  Attempt 2: Generating fresh shellcode variant
+    - Mutation seed: 84
+    - Variant would be unique
+    - Size would vary slightly
+
+Example 5: Evasion Best Practices
+
+  Polymorphic shellcode helps evade:
+    1. Signature-based detection (AV/EDR)
+    2. Static analysis tools
+    3. Yara rules targeting specific byte patterns
+
+  Key principles:
+    1. Generate fresh variant for each target
+    2. Monitor entropy to stay within 6.0-7.5 range
+    3. Test variants for functionality before deployment
+    4. Avoid excessive mutation (reduces reliability)
+
+=== Technical Implementation Notes ===
+
+Mutation Strategies Available:
+  - JunkCodeInsertion: Density 0.1-0.5
+  - RegisterPermutation: Full x64/x86 register mapping
+  - InstructionEquivalence: 3+ equivalent instruction sets
+  - StringEncryption: XOR with configurable keys
+
+Production Implementation:
+  - Use PolymorphicEngine from opsec module
+  - Integrate with ShellcodeDatabase
+  - Validate functionality after mutation
+  - Calculate Shannon entropy for each variant
+
+Polymorphic Shellcode example completed successfully!
