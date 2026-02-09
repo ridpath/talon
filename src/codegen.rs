@@ -751,7 +751,7 @@ fn generate_command(
             // Already handled in generate_main_rs before entry point
         }
         Command::CallMacro { name, args } => {
-            let arg_strs: Vec<String> = args.iter().map(|a| generate_expr(a)).collect();
+            let arg_strs: Vec<String> = args.iter().map(generate_expr).collect();
             writeln!(buf, "    // Macro call: {}!({})", name, arg_strs.join(", "))?;
         }
         Command::DefineMacro(macro_def) => {

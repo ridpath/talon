@@ -182,6 +182,12 @@ pub struct PatchRegistry {
     next_id: PatchId,
 }
 
+impl Default for PatchRegistry {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl PatchRegistry {
     pub fn new() -> Self {
         PatchRegistry {
@@ -211,11 +217,15 @@ impl PatchRegistry {
 }
 
 // Exploit Chain State Management
+// Note: Some fields reserved for future functionality (debug mode, checkpointing)
 #[derive(Clone)]
 struct ExploitChainState {
-    id: u64,
-    debug: bool,
-    checkpoints: HashMap<String, HashMap<String, Value>>,
+    #[allow(dead_code)]
+    id: u64,  // Reserved for chain tracking
+    #[allow(dead_code)]
+    debug: bool,  // Reserved for debug mode
+    #[allow(dead_code)]
+    checkpoints: HashMap<String, HashMap<String, Value>>,  // Reserved for time-travel debugging
     state: HashMap<String, Value>,
 }
 
@@ -2572,11 +2582,11 @@ fn eval_expr<'a>(
                     }
                     // String concatenation: String + Any
                     (Value::String(lv), _) if op == "+" => {
-                        Ok(Value::String(format!("{}{}", lv, r.to_string())))
+                        Ok(Value::String(format!("{}{}", lv, r)))
                     }
                     // String concatenation: Any + String
                     (_, Value::String(rv)) if op == "+" => {
-                        Ok(Value::String(format!("{}{}", l.to_string(), rv)))
+                        Ok(Value::String(format!("{}{}", l, rv)))
                     }
                     // String repetition: String * Number
                     (Value::String(s), Value::Number(n)) if op == "*" => {
@@ -2773,7 +2783,7 @@ fn eval_expr<'a>(
                         Ok(Value::String(format!(
                             "{}({})",
                             name,
-                            eval_expr(&*expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?
+                            eval_expr(expr, vars.clone(), funcs.clone(), macros.clone(), context.clone(), dry_run).await?
                         )))
                     }
                 }
@@ -2882,7 +2892,7 @@ fn eval_expr<'a>(
                     "shellcode" => {
                         let arch_str = arg_map
                             .get("arch")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .map(|v| v.to_string())
                             .unwrap_or_else(|| "x64".to_string());
 
@@ -3375,7 +3385,7 @@ fn eval_expr<'a>(
                     }
                     "fmtstr_payload" => {
                         let offset = if let Some(Value::Number(off)) =
-                            arg_map.get("offset").or_else(|| arg_values.get(0))
+                            arg_map.get("offset").or_else(|| arg_values.first())
                         {
                             *off as usize
                         } else {
@@ -3426,7 +3436,7 @@ fn eval_expr<'a>(
 
                         // Debug: Print first argument type
                         println!("[DEBUG] interactive() first arg type: {}", 
-                            match arg_values.get(0) {
+                            match arg_values.first() {
                                 Some(Value::Map(_)) => "Map",
                                 Some(Value::String(_)) => "String",
                                 Some(Value::Number(_)) => "Number",
@@ -3440,7 +3450,7 @@ fn eval_expr<'a>(
                         );
 
                         // Extract host, port, and dry-run flag from connection object if first arg is a Map
-                        let (host, port, is_dry_run_conn) = if let Some(Value::Map(conn_map)) = arg_values.get(0) {
+                        let (host, port, is_dry_run_conn) = if let Some(Value::Map(conn_map)) = arg_values.first() {
                             println!("[DEBUG] Found connection map");
                             // Check if connection is in dry-run mode
                             let is_dry_run_conn = conn_map
@@ -3474,7 +3484,7 @@ fn eval_expr<'a>(
                             // Fall back to old behavior if not a connection map
                             let host = arg_map
                                 .get("host")
-                                .or_else(|| arg_values.get(0))
+                                .or_else(|| arg_values.first())
                                 .map(|v| v.to_string())
                                 .unwrap_or_else(|| "127.0.0.1".to_string());
 
@@ -3515,7 +3525,7 @@ fn eval_expr<'a>(
                         // This function is provided for explicit close semantics
                         let _conn = arg_map
                             .get("conn")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("close() requires connection argument")?;
 
                         // In dry-run or normal mode, connections will be cleaned up automatically
@@ -3570,7 +3580,7 @@ fn eval_expr<'a>(
                         // Enable or disable debug mode for exploit chains
                         let chain = arg_map
                             .get("chain")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("chain_set_debug() requires chain object")?;
 
                         let enable = if let Some(Value::Number(n)) =
@@ -3949,7 +3959,7 @@ fn eval_expr<'a>(
                     "remote" => {
                         let host = arg_map
                             .get("host")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("remote() requires 'host' parameter")?
                             .to_string();
 
@@ -3987,7 +3997,7 @@ fn eval_expr<'a>(
                         // Supports both formats: connect_tcp("host:port") or connect_tcp("host", port)
                         let first_arg = arg_map
                             .get("host")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("connect_tcp() requires 'host' parameter or 'host:port' string")?
                             .to_string();
 
@@ -4061,7 +4071,7 @@ fn eval_expr<'a>(
                         // Supports both formats: connect("host:port") or connect("host", port)
                         let first_arg = arg_map
                             .get("host")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("connect() requires 'host' parameter or 'host:port' string")?
                             .to_string();
 
@@ -4133,7 +4143,7 @@ fn eval_expr<'a>(
                     "process" => {
                         let binary = arg_map
                             .get("binary")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("process() requires 'binary' parameter")?
                             .to_string();
 
@@ -4168,7 +4178,7 @@ fn eval_expr<'a>(
                     "connect_ssh" => {
                         let host = arg_map
                             .get("host")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("connect_ssh() requires 'host' parameter")?
                             .to_string();
 
@@ -4232,7 +4242,7 @@ fn eval_expr<'a>(
                     "connect_ssh_pty" => {
                         let host = arg_map
                             .get("host")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("connect_ssh_pty() requires 'host' parameter")?
                             .to_string();
 
@@ -4296,7 +4306,7 @@ fn eval_expr<'a>(
                     "connect_ssh_key" => {
                         let host = arg_map
                             .get("host")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("connect_ssh_key() requires 'host' parameter")?
                             .to_string();
 
@@ -4354,7 +4364,7 @@ fn eval_expr<'a>(
                     "ssh_run" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_run() requires SSH connection")?;
 
                         let command = arg_map
@@ -4386,7 +4396,7 @@ fn eval_expr<'a>(
                     "ssh_upload" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_upload() requires SSH connection")?;
 
                         let local_path = arg_map
@@ -4429,7 +4439,7 @@ fn eval_expr<'a>(
                     "ssh_download" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_download() requires SSH connection")?;
 
                         let remote_path = arg_map
@@ -4472,7 +4482,7 @@ fn eval_expr<'a>(
                     "ssh_forward" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_forward() requires SSH connection")?;
 
                         let local_port = if let Some(Value::Number(p)) =
@@ -4526,7 +4536,7 @@ fn eval_expr<'a>(
                     "ssh_interactive_start" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_interactive_start() requires SSH connection")?;
 
                         let ssh_id = if let Value::SshConnection(id) = ssh {
@@ -4554,7 +4564,7 @@ fn eval_expr<'a>(
                     "ssh_interactive_send" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_interactive_send() requires SSH connection")?;
 
                         let data_val = arg_map
@@ -4595,7 +4605,7 @@ fn eval_expr<'a>(
                     "ssh_interactive_recv" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_interactive_recv() requires SSH connection")?;
 
                         let timeout_ms = if let Some(Value::Number(t)) =
@@ -4630,7 +4640,7 @@ fn eval_expr<'a>(
                     "ssh_interactive_close" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_interactive_close() requires SSH connection")?;
 
                         let ssh_id = if let Value::SshConnection(id) = ssh {
@@ -4658,7 +4668,7 @@ fn eval_expr<'a>(
                     "ssh_interact" => {
                         let ssh = arg_map
                             .get("ssh")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("ssh_interact() requires SSH connection")?;
 
                         let command = arg_map
@@ -4738,7 +4748,7 @@ fn eval_expr<'a>(
                     "send" => {
                         let conn = arg_map
                             .get("conn")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("send() requires connection object")?;
 
                         let data_val = arg_map
@@ -4802,7 +4812,7 @@ fn eval_expr<'a>(
                     "sendline" => {
                         let conn = arg_map
                             .get("conn")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("sendline() requires connection object")?;
 
                         let data_val = arg_map
@@ -4856,7 +4866,7 @@ fn eval_expr<'a>(
                     "recv" => {
                         let conn = arg_map
                             .get("conn")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("recv() requires connection object")?;
 
                         let n = if let Some(Value::Number(num)) =
@@ -4910,7 +4920,7 @@ fn eval_expr<'a>(
                     "recvline" => {
                         let conn = arg_map
                             .get("conn")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("recvline() requires connection object")?;
 
                         let conn_id = if let Value::Map(m) = conn {
@@ -4941,7 +4951,7 @@ fn eval_expr<'a>(
                         // Receive data until a specific delimiter is found
                         let conn = arg_map
                             .get("conn")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("recv_until() requires connection object")?;
 
                         let delimiter = if let Some(Value::String(s)) =
@@ -5027,11 +5037,11 @@ fn eval_expr<'a>(
                     "find_pattern_offset" => {
                         // Find the offset of a pattern within data
                         let data = if let Some(Value::Bytes(b)) =
-                            arg_map.get("data").or_else(|| arg_values.get(0))
+                            arg_map.get("data").or_else(|| arg_values.first())
                         {
                             b.clone()
                         } else if let Some(Value::String(s)) =
-                            arg_map.get("data").or_else(|| arg_values.get(0))
+                            arg_map.get("data").or_else(|| arg_values.first())
                         {
                             s.as_bytes().to_vec()
                         } else {
@@ -5096,7 +5106,7 @@ fn eval_expr<'a>(
                         // Create a checkpoint in an exploit chain
                         let chain = arg_map
                             .get("chain")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("chain_checkpoint() requires chain object")?;
 
                         let label = if let Some(Value::String(s)) =
@@ -5132,7 +5142,7 @@ fn eval_expr<'a>(
                         // Store a value in an exploit chain's state
                         let chain = arg_map
                             .get("chain")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("chain_store() requires chain object")?;
 
                         let key = if let Some(Value::String(s)) =
@@ -5177,7 +5187,7 @@ fn eval_expr<'a>(
                         // Rewind an exploit chain to a checkpoint (placeholder - full implementation would restore state)
                         let chain = arg_map
                             .get("chain")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("chain_rewind() requires chain object")?;
 
                         let checkpoint = if let Some(Value::String(s)) =
@@ -5477,7 +5487,7 @@ fn eval_expr<'a>(
                     "analyze_heap" => {
                         let binary = arg_map
                             .get("binary")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("analyze_heap() requires 'binary' parameter")?
                             .to_string();
 
@@ -5501,7 +5511,7 @@ fn eval_expr<'a>(
                     "Patch" => {
                         let binary = arg_map
                             .get("binary")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("Patch() requires 'binary' parameter")?
                             .to_string();
 
@@ -5531,7 +5541,7 @@ fn eval_expr<'a>(
                     "patch_nop_out" => {
                         let patch_val = arg_map
                             .get("patch")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("patch_nop_out() requires Patch object")?;
 
                         let patch_id = if let Value::Patch(id) = patch_val {
@@ -5571,7 +5581,7 @@ fn eval_expr<'a>(
                     "patch_save" => {
                         let patch_val = arg_map
                             .get("patch")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("patch_save() requires Patch object")?;
 
                         let patch_id = if let Value::Patch(id) = patch_val {
@@ -5601,7 +5611,7 @@ fn eval_expr<'a>(
                     "patch_set_dry_run" => {
                         let patch_val = arg_map
                             .get("patch")
-                            .or_else(|| arg_values.get(0))
+                            .or_else(|| arg_values.first())
                             .ok_or("patch_set_dry_run() requires Patch object")?;
 
                         let patch_id = if let Value::Patch(id) = patch_val {
@@ -5627,7 +5637,7 @@ fn eval_expr<'a>(
                         Ok(Value::Null)
                     }
                     "patch_replace_call" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_replace_call() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5658,7 +5668,7 @@ fn eval_expr<'a>(
                         Ok(Value::Null)
                     }
                     "patch_insert_asm" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_insert_asm() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5689,7 +5699,7 @@ fn eval_expr<'a>(
                         Ok(Value::Null)
                     }
                     "patch_patch_string" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_patch_string() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5718,7 +5728,7 @@ fn eval_expr<'a>(
                         Ok(Value::Number(count as i64))
                     }
                     "patch_inject_shellcode" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_inject_shellcode() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5748,7 +5758,7 @@ fn eval_expr<'a>(
                         Ok(Value::Number(offset as i64))
                     }
                     "patch_create_code_cave" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_create_code_cave() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5775,7 +5785,7 @@ fn eval_expr<'a>(
                         Ok(Value::Number(offset as i64))
                     }
                     "patch_preview_diff" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_preview_diff() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5792,7 +5802,7 @@ fn eval_expr<'a>(
                         Ok(Value::String(diff))
                     }
                     "patch_recalculate_headers" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_recalculate_headers() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5813,7 +5823,7 @@ fn eval_expr<'a>(
                         Ok(Value::Null)
                     }
                     "patch_find_pattern" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_find_pattern() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5843,7 +5853,7 @@ fn eval_expr<'a>(
                         Ok(Value::List(offset_values))
                     }
                     "patch_verify_integrity" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_verify_integrity() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5868,7 +5878,7 @@ fn eval_expr<'a>(
                         Ok(Value::Number(if is_valid { 1 } else { 0 }))
                     }
                     "patch_undo" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_undo() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5889,7 +5899,7 @@ fn eval_expr<'a>(
                         Ok(Value::Null)
                     }
                     "patch_rollback_all" => {
-                        let patch_val = arg_map.get("patch").or_else(|| arg_values.get(0))
+                        let patch_val = arg_map.get("patch").or_else(|| arg_values.first())
                             .ok_or("patch_rollback_all() requires Patch object")?;
                         let patch_id = if let Value::Patch(id) = patch_val {
                             *id
@@ -5911,7 +5921,7 @@ fn eval_expr<'a>(
                     }
                     "fmtstr_leak" => {
                         let offset = if let Some(Value::Number(n)) =
-                            arg_map.get("offset").or_else(|| arg_values.get(0))
+                            arg_map.get("offset").or_else(|| arg_values.first())
                         {
                             *n as u64
                         } else {
@@ -8415,7 +8425,7 @@ fn eval_expr<'a>(
                     }
                     
                     "watch_memory" => {
-                        let _session = arg_values.get(0).ok_or("watch_memory() requires session")?;
+                        let _session = arg_values.first().ok_or("watch_memory() requires session")?;
                         let address = arg_values.get(1).ok_or("watch_memory() requires address")?;
                         println!("[META] Watching memory at address: {}", address);
                         Ok(Value::Null)
@@ -8438,7 +8448,7 @@ fn eval_expr<'a>(
                     }
                     
                     "tunable" => {
-                        let initial = arg_map.get("initial").or_else(|| arg_values.get(0))
+                        let initial = arg_map.get("initial").or_else(|| arg_values.first())
                             .ok_or("tunable() requires 'initial' parameter")?;
                         let range_val = arg_map.get("range");
                         
@@ -8454,19 +8464,19 @@ fn eval_expr<'a>(
                     }
                     
                     "optimize_tunable" => {
-                        let tunable = arg_values.get(0).ok_or("optimize_tunable() requires tunable")?;
+                        let tunable = arg_values.first().ok_or("optimize_tunable() requires tunable")?;
                         println!("[META] Optimizing tunable parameter: {}", tunable);
                         Ok(Value::Null)
                     }
                     
                     "checkpoint_script" => {
-                        let name = arg_values.get(0).ok_or("checkpoint_script() requires name")?;
+                        let name = arg_values.first().ok_or("checkpoint_script() requires name")?;
                         println!("[META] Creating script checkpoint: {}", name);
                         Ok(Value::Null)
                     }
                     
                     "resume_from_checkpoint" => {
-                        let name = arg_values.get(0).ok_or("resume_from_checkpoint() requires name")?;
+                        let name = arg_values.first().ok_or("resume_from_checkpoint() requires name")?;
                         println!("[META] Resuming from checkpoint: {}", name);
                         Ok(Value::Null)
                     }
@@ -8479,7 +8489,7 @@ fn eval_expr<'a>(
                     }
                     
                     "fork_strategy" => {
-                        let name = arg_values.get(0).ok_or("fork_strategy() requires name")?;
+                        let name = arg_values.first().ok_or("fork_strategy() requires name")?;
                         println!("[META] Forking strategy: {}", name);
                         let mut strategy = HashMap::new();
                         strategy.insert("name".to_string(), name.clone());
@@ -8487,7 +8497,7 @@ fn eval_expr<'a>(
                     }
                     
                     "test_strategy" => {
-                        let _strategy = arg_values.get(0).ok_or("test_strategy() requires strategy")?;
+                        let _strategy = arg_values.first().ok_or("test_strategy() requires strategy")?;
                         println!("[META] Testing strategy (placeholder)");
                         let mut result = HashMap::new();
                         result.insert("success_rate".to_string(), Value::Number(85)); // Placeholder
@@ -8500,13 +8510,13 @@ fn eval_expr<'a>(
                     }
                     
                     "patch_function" => {
-                        let name = arg_values.get(0).ok_or("patch_function() requires function name")?;
+                        let name = arg_values.first().ok_or("patch_function() requires function name")?;
                         println!("[META] Patching function: {}", name);
                         Ok(Value::Null)
                     }
                     
                     "execute" => {
-                        let code = arg_values.get(0).ok_or("execute() requires code")?;
+                        let code = arg_values.first().ok_or("execute() requires code")?;
                         println!("[META] Executing generated code: {}", code);
                         Ok(Value::Null)
                     }
@@ -8539,7 +8549,7 @@ fn eval_expr<'a>(
                     }
                     
                     "execute_strategy" => {
-                        let _strategy = arg_values.get(0).ok_or("execute_strategy() requires strategy")?;
+                        let _strategy = arg_values.first().ok_or("execute_strategy() requires strategy")?;
                         println!("[STRATEGY] Executing strategy (placeholder)");
                         // Return success for demo purposes
                         Ok(Value::String("success".to_string()))
@@ -8555,7 +8565,7 @@ fn eval_expr<'a>(
                     }
                     
                     "analyze_target" => {
-                        let _binary = arg_values.get(0).ok_or("analyze_target() requires binary path")?;
+                        let _binary = arg_values.first().ok_or("analyze_target() requires binary path")?;
                         println!("[FORECASTING] Analyzing target binary (placeholder)");
                         let mut forecast = HashMap::new();
                         forecast.insert("patch_gaps".to_string(), Value::List(Vec::new()));
@@ -8588,7 +8598,7 @@ fn eval_expr<'a>(
                     }
                     
                     "assemble" => {
-                        let primitives = arg_values.get(0).ok_or("assemble() requires primitives list")?;
+                        let primitives = arg_values.first().ok_or("assemble() requires primitives list")?;
                         println!("[FRACTAL] Assembling primitives into ROP chain: {}", primitives);
                         
                         let mut chain = HashMap::new();

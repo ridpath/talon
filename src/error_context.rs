@@ -1,3 +1,7 @@
+// Suppress deprecation warnings for aes_gcm's GenericArray (transitive dependency)
+// This will be resolved when aes_gcm upgrades to generic-array 1.x
+#![allow(deprecated)]
+
 use std::collections::HashMap;
 use std::fmt;
 use std::panic;
@@ -6,7 +10,6 @@ use std::fs::{File, OpenOptions};
 use std::io::Write;
 use std::path::PathBuf;
 
-#[allow(deprecated)]
 use aes_gcm::{
     aead::{Aead, KeyInit, OsRng},
     Aes256Gcm, Nonce,
@@ -181,6 +184,12 @@ pub struct ProductionErrorContext {
     error_counter: Arc<RwLock<HashMap<ErrorType, usize>>>,
 }
 
+impl Default for ProductionErrorContext {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ProductionErrorContext {
     pub fn new() -> Self {
         let mut secret_key_bytes = [0u8; SECRET_KEY_LENGTH];
@@ -245,7 +254,7 @@ impl ProductionErrorContext {
 
         let mut hasher = Sha256::new();
         hasher.update(&encrypted_message);
-        hasher.update(&nonce_bytes);
+        hasher.update(nonce_bytes);
         hasher.update(error_id.as_str().as_bytes());
         let message_hash = hasher.finalize();
 

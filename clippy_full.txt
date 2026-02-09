@@ -1,0 +1,2419 @@
+    Checking talon v0.1.0 (C:\Users\rootless\.zenflow\worktrees\iamtalon-d954)
+error: this expression creates a reference which is immediately dereferenced by the compiler
+    --> src\interpreter.rs:1028:62
+     |
+1028 | ...                   if let Ok(insns) = cs.disasm_all(&code, 0x1000) {
+     |                                                        ^^^^^ help: change this to: `code`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrow
+     = note: `-D clippy::needless-borrow` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::needless_borrow)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+    --> src\interpreter.rs:3614:66
+     |
+3614 | ...                   serde_json::from_str::<ExploitChain>(&state_json)
+     |                                                            ^^^^^^^^^^^ help: change this to: `state_json`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrow
+
+error: redundant closure
+    --> src\interpreter.rs:6170:46
+     |
+6170 | ...                   (start..end).map(|i| Value::Number(i)).collect();
+     |                                        ^^^^^^^^^^^^^^^^^^^^ help: replace the closure with the tuple variant itself: `Value::Number`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#redundant_closure
+     = note: `-D clippy::redundant-closure` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::redundant_closure)]`
+
+error: manual implementation of an assign operation
+    --> src\interpreter.rs:8299:41
+     |
+8299 | ...                   addr = addr + offset;
+     |                       ^^^^^^^^^^^^^^^^^^^^ help: replace it with: `addr += offset`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#assign_op_pattern
+     = note: `-D clippy::assign-op-pattern` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::assign_op_pattern)]`
+
+error: calls to `push` immediately after creation
+    --> src\interpreter.rs:8326:25
+     |
+8326 | /                         let mut detected = Vec::new();
+8327 | |                         detected.push(Value::String("EasyAntiCheat: Not detected".to_string()));
+8328 | |                         detected.push(Value::String("BattlEye: Not detected".to_string()));
+8329 | |                         detected.push(Value::String("Vanguard: Not detected".to_string()));
+8330 | |                         detected.push(Value::String("VAC: Not detected".to_string()));
+     | |______________________________________________________________________________________^ help: consider using the `vec![]` macro: `let detected = vec![..];`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#vec_init_then_push
+     = note: `-D clippy::vec-init-then-push` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::vec_init_then_push)]`
+
+error: the loop variable `i` is only used to index `obfuscated`
+    --> src\interpreter.rs:8642:42
+     |
+8642 | ...                   for i in 0..obfuscated.len() {
+     |                                ^^^^^^^^^^^^^^^^^^^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_range_loop
+     = note: `-D clippy::needless-range-loop` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::needless_range_loop)]`
+help: consider using an iterator
+     |
+8642 -                                 for i in 0..obfuscated.len() {
+8642 +                                 for <item> in &mut obfuscated {
+     |
+
+error: useless use of `format!`
+    --> src\interpreter.rs:9996:47
+     |
+9996 | ...                   msg.push_str(&format!("  2. data[-1]  (last element, negative indexing)\n"));
+     |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"  2. data[-1]  (last element, negative indexing)\n".to_string()`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+     = note: `-D clippy::useless-format` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::useless_format)]`
+
+error: useless use of `format!`
+     --> src\interpreter.rs:10021:47
+      |
+10021 | ...                   msg.push_str(&format!("  2. bytes[-1]  (last byte, negative indexing)\n"));
+      |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"  2. bytes[-1]  (last byte, negative indexing)\n".to_string()`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: useless use of `format!`
+     --> src\interpreter.rs:10043:47
+      |
+10043 | ...                   msg.push_str(&format!("  2. str[-1]  (last character, negative indexing)\n"));
+      |                                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"  2. str[-1]  (last character, negative indexing)\n".to_string()`
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: the loop variable `i` is used to index `matrix`
+     --> src\interpreter.rs:10241:14
+      |
+10241 |     for i in 0..=len1 {
+      |              ^^^^^^^^
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+      |
+10241 -     for i in 0..=len1 {
+10241 +     for (i, <item>) in matrix.iter_mut().enumerate().take(len1 + 1) {
+      |
+
+error: the loop variable `j` is used to index `matrix`
+     --> src\interpreter.rs:10244:14
+      |
+10244 |     for j in 0..=len2 {
+      |              ^^^^^^^^
+      |
+      = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+      |
+10244 -     for j in 0..=len2 {
+10244 +     for (j, <item>) in matrix.iter_mut().enumerate().take(len2 + 1) {
+      |
+
+error: this loop could be written as a `for` loop
+    --> src\parser.rs:1310:5
+     |
+1310 |     while let Some(next) = parts.next() {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `for next in parts`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#while_let_on_iterator
+     = note: `-D clippy::while-let-on-iterator` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::while_let_on_iterator)]`
+
+error: this loop could be written as a `for` loop
+    --> src\parser.rs:1324:5
+     |
+1324 |     while let Some(next) = parts.next() {
+     |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `for next in parts`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#while_let_on_iterator
+
+error: you seem to be trying to use `match` for an equality check. Consider using `if`
+    --> src\parser.rs:1475:9
+     |
+1475 | /         match inner.as_rule() {
+1476 | |             Rule::arg_item => {
+1477 | |                 // Check if this is a named argument (Python-style or Map-style) or positional
+1478 | |                 let first_child = inner.into_inner().next().unwrap();
+...    |
+1500 | |             _ => {}
+1501 | |         }
+     | |_________^
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_match
+     = note: `-D clippy::single-match` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::single_match)]`
+help: try
+     |
+1475 ~         if inner.as_rule() == Rule::arg_item {
+1476 +             // Check if this is a named argument (Python-style or Map-style) or positional
+1477 +             let first_child = inner.into_inner().next().unwrap();
+1478 +             match first_child.as_rule() {
+1479 +                 Rule::python_named_arg => {
+1480 +                     // Python-style named argument: name=value
+1481 +                     let mut arg_parts = first_child.into_inner();
+1482 +                     let key = arg_parts.next().unwrap().as_str().to_string();
+1483 +                     let value = parse_expr(arg_parts.next().unwrap());
+1484 +                     args.push((Some(key), value));
+1485 +                 }
+1486 +                 Rule::func_named_arg => {
+1487 +                     // Map-style named argument: name:value
+1488 +                     let mut arg_parts = first_child.into_inner();
+1489 +                     let key = arg_parts.next().unwrap().as_str().to_string();
+1490 +                     let value = parse_expr(arg_parts.next().unwrap());
+1491 +                     args.push((Some(key), value));
+1492 +                 }
+1493 +                 _ => {
+1494 +                     // Positional argument (expr)
+1495 +                     args.push((None, parse_expr(first_child)));
+1496 +                 }
+1497 +             }
+1498 +         }
+     |
+
+error: this loop could be written as a `for` loop
+  --> src\parser_utils.rs:31:29
+   |
+31 | ...                   while let Some(ch) = chars.next() {
+   |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `for ch in chars.by_ref()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#while_let_on_iterator
+
+error: calling `push_str()` using a single-character string literal
+   --> src\parser_utils.rs:137:5
+    |
+137 |     output.push_str("\n");
+    |     ^^^^^^^^^^^^^^^^^^^^^ help: consider using `push` with a character literal: `output.push('\n')`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_char_add_str
+    = note: `-D clippy::single-char-add-str` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::single_char_add_str)]`
+
+error: useless use of `format!`
+   --> src\binary_patch.rs:169:24
+    |
+169 |             return Err(format!("NOP range extends beyond binary size"));
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"NOP range extends beyond binary size".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: calling `push_str()` using a single-character string literal
+   --> src\binary_patch.rs:343:13
+    |
+343 |             diff.push_str("\n");
+    |             ^^^^^^^^^^^^^^^^^^^ help: consider using `push` with a character literal: `diff.push('\n')`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_char_add_str
+
+error: calling `push_str()` using a single-character string literal
+   --> src\binary_patch.rs:392:13
+    |
+392 |             backup_data.push_str("\n");
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `push` with a character literal: `backup_data.push('\n')`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_char_add_str
+
+error: useless use of `format!`
+   --> src\binary_patch.rs:420:24
+    |
+420 |             return Err(format!("Cannot undo operation - original offset invalid"));
+    |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"Cannot undo operation - original offset invalid".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: the loop variable `j` is only used to index `data`
+   --> src\binary_patch.rs:874:30
+    |
+874 |                     for j in i + new_bytes.len()..i + old_bytes.len() {
+    |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_range_loop
+help: consider using an iterator
+    |
+874 -                     for j in i + new_bytes.len()..i + old_bytes.len() {
+874 +                     for <item> in data.iter_mut().take(i + old_bytes.len()).skip(i + new_bytes.len()) {
+    |
+
+error: the borrowed expression implements the required traits
+   --> src\binary_patch.rs:948:35
+    |
+948 |         let pattern = hex::decode(&hex_pattern.replace(" ", ""))
+    |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `hex_pattern.replace(" ", "")`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+    = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
+
+error: manual implementation of `.is_multiple_of()`
+   --> src\cyclic_tools.rs:124:12
+    |
+124 |         if n % p == 0 {
+    |            ^^^^^^^^^^ help: replace with: `n.is_multiple_of(p)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_is_multiple_of
+    = note: `-D clippy::manual-is-multiple-of` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_is_multiple_of)]`
+
+error: parameter is only used in recursion
+   --> src\cyclic_tools.rs:115:5
+    |
+115 |     sequence: &mut [u8],
+    |     ^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_sequence`
+    |
+note: parameter used here
+   --> src\cyclic_tools.rs:131:19
+    |
+131 |         de_bruijn(sequence, a, t + 1, p, k, n, result);
+    |                   ^^^^^^^^
+...
+135 |             de_bruijn(sequence, a, t + 1, t, k, n, result);
+    |                       ^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#only_used_in_recursion
+    = note: `-D clippy::only-used-in-recursion` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::only_used_in_recursion)]`
+
+error: manual implementation of `.is_multiple_of()`
+  --> src\encoding_tools.rs:55:15
+   |
+55 |         while result.len() % 8 != 0 {
+   |               ^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!result.len().is_multiple_of(8)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_is_multiple_of
+
+error: you are using an explicit closure for copying elements
+   --> src\encoding_tools.rs:329:9
+    |
+329 | /         text.to_uppercase()
+330 | |             .chars()
+331 | |             .filter_map(|c| map.get(&c))
+332 | |             .map(|&s| s)
+    | |________________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#map_clone
+    = note: `-D clippy::map-clone` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::map_clone)]`
+help: consider calling the dedicated `copied` method
+    |
+329 ~         text.to_uppercase()
+330 +             .chars()
+331 +             .filter_map(|c| map.get(&c)).copied()
+    |
+
+error: casting to the same type is unnecessary (`u64` -> `u64`)
+  --> src\format_string.rs:63:34
+   |
+63 |                 let byte_value = ((value >> (byte_idx * 8)) & 0xFF) as u64;
+   |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `((value >> (byte_idx * 8)) & 0xFF)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#unnecessary_cast
+   = note: `-D clippy::unnecessary-cast` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::unnecessary_cast)]`
+
+error: casting to the same type is unnecessary (`u64` -> `u64`)
+   --> src\format_string.rs:108:34
+    |
+108 |                 let byte_value = ((value >> (byte_idx * 8)) & 0xFF) as u64;
+    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `((value >> (byte_idx * 8)) & 0xFF)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#unnecessary_cast
+
+error: length comparison to zero
+   --> src\rop_gadget_finder.rs:142:20
+    |
+142 |                 if insns.len() == 0 {
+    |                    ^^^^^^^^^^^^^^^^ help: using `is_empty` is clearer and more explicit: `insns.is_empty()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#len_zero
+    = note: `-D clippy::len-zero` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::len_zero)]`
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:340:23
+    |
+340 |           let pop_rdi = rdi_gadgets
+    |  _______________________^
+341 | |             .iter()
+342 | |             .filter(|g| g.instructions.len() <= 2)
+343 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+    = note: `-D clippy::filter-next` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::filter_next)]`
+help: try
+    |
+340 ~         let pop_rdi = rdi_gadgets
+341 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:349:23
+    |
+349 |           let pop_rsi = rsi_gadgets
+    |  _______________________^
+350 | |             .iter()
+351 | |             .filter(|g| g.instructions.len() <= 2)
+352 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+349 ~         let pop_rsi = rsi_gadgets
+350 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:358:23
+    |
+358 |           let pop_rdx = rdx_gadgets
+    |  _______________________^
+359 | |             .iter()
+360 | |             .filter(|g| g.instructions.len() <= 2)
+361 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+358 ~         let pop_rdx = rdx_gadgets
+359 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:367:23
+    |
+367 |           let pop_rax = rax_gadgets
+    |  _______________________^
+368 | |             .iter()
+369 | |             .filter(|g| g.instructions.len() <= 2)
+370 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+367 ~         let pop_rax = rax_gadgets
+368 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:388:23
+    |
+388 |           let pop_rdi = rdi_gadgets
+    |  _______________________^
+389 | |             .iter()
+390 | |             .filter(|g| g.instructions.len() <= 2)
+391 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+388 ~         let pop_rdi = rdi_gadgets
+389 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:405:23
+    |
+405 |           let pop_rdi = rdi_gadgets
+    |  _______________________^
+406 | |             .iter()
+407 | |             .filter(|g| g.instructions.len() <= 2)
+408 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+405 ~         let pop_rdi = rdi_gadgets
+406 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:414:23
+    |
+414 |           let pop_rsi = rsi_gadgets
+    |  _______________________^
+415 | |             .iter()
+416 | |             .filter(|g| g.instructions.len() <= 2)
+417 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+414 ~         let pop_rsi = rsi_gadgets
+415 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:423:23
+    |
+423 |           let pop_rdx = rdx_gadgets
+    |  _______________________^
+424 | |             .iter()
+425 | |             .filter(|g| g.instructions.len() <= 2)
+426 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+423 ~         let pop_rdx = rdx_gadgets
+424 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: called `filter(..).next()` on an `Iterator`. This is more succinctly expressed by calling `.find(..)` instead
+   --> src\rop_gadget_finder.rs:432:23
+    |
+432 |           let pop_rax = rax_gadgets
+    |  _______________________^
+433 | |             .iter()
+434 | |             .filter(|g| g.instructions.len() <= 2)
+435 | |             .next()
+    | |___________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#filter_next
+help: try
+    |
+432 ~         let pop_rax = rax_gadgets
+433 +             .iter().find(|g| g.instructions.len() <= 2)
+    |
+
+error: manual arithmetic check found
+   --> src\rop_tools.rs:194:29
+    |
+194 |                 let start = if offset >= 20 { offset - 20 } else { 0 };
+    |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace it with: `offset.saturating_sub(20)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#implicit_saturating_sub
+    = note: `-D clippy::implicit-saturating-sub` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::implicit_saturating_sub)]`
+
+error: length comparison to zero
+   --> src\rop_tools.rs:202:24
+    |
+202 |                     if insns.len() > 0 {
+    |                        ^^^^^^^^^^^^^^^ help: using `!is_empty` is clearer and more explicit: `!insns.is_empty()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#len_zero
+
+error: length comparison to zero
+   --> src\rop_tools.rs:230:57
+    |
+230 |         gadgets.retain(|g| g.instructions.len() <= 5 && g.instructions.len() > 0);
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^ help: using `!is_empty` is clearer and more explicit: `!g.instructions.is_empty()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#len_zero
+
+error: this `if` has identical blocks
+   --> src\rop_tools.rs:260:58
+    |
+260 |               } else if instr_lower.starts_with("pop rsi") {
+    |  __________________________________________________________^
+261 | |                 score += 45;
+262 | |             } else if instr_lower.starts_with("pop rdx") {
+    | |_____________^
+    |
+note: same as this
+   --> src\rop_tools.rs:262:58
+    |
+262 |               } else if instr_lower.starts_with("pop rdx") {
+    |  __________________________________________________________^
+263 | |                 score += 45;
+264 | |             } else if instr_lower.starts_with("pop rax") {
+    | |_____________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#if_same_then_else
+    = note: `-D clippy::if-same-then-else` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::if_same_then_else)]`
+
+error: this `if` has identical blocks
+   --> src\rop_tools.rs:282:54
+    |
+282 |               } else if instr_lower.starts_with("add") {
+    |  ______________________________________________________^
+283 | |                 score += 10;
+284 | |             } else if instr_lower.starts_with("sub") {
+    | |_____________^
+    |
+note: same as this
+   --> src\rop_tools.rs:284:54
+    |
+284 |               } else if instr_lower.starts_with("sub") {
+    |  ______________________________________________________^
+285 | |                 score += 10;
+286 | |             }
+    | |_____________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#if_same_then_else
+
+error: manual implementation of `.is_multiple_of()`
+    --> src\rop_tools.rs:1109:12
+     |
+1109 |         if chain_size_bytes % 16 != 0 {
+     |            ^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `!chain_size_bytes.is_multiple_of(16)`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_is_multiple_of
+
+error: this `if` has identical blocks
+    --> src\rop_tools.rs:1216:58
+     |
+1216 |               } else if instr_lower.starts_with("pop rsi") {
+     |  __________________________________________________________^
+1217 | |                 score += 55;
+1218 | |             } else if instr_lower.starts_with("pop rdx") {
+     | |_____________^
+     |
+note: same as this
+    --> src\rop_tools.rs:1218:58
+     |
+1218 |               } else if instr_lower.starts_with("pop rdx") {
+     |  __________________________________________________________^
+1219 | |                 score += 55;
+1220 | |             } else if instr_lower.starts_with("pop rax") {
+     | |_____________^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#if_same_then_else
+
+error: this `if` has identical blocks
+    --> src\rop_tools.rs:1242:54
+     |
+1242 |               } else if instr_lower.starts_with("add") {
+     |  ______________________________________________________^
+1243 | |                 score += 15;
+1244 | |             } else if instr_lower.starts_with("sub") {
+     | |_____________^
+     |
+note: same as this
+    --> src\rop_tools.rs:1244:54
+     |
+1244 |               } else if instr_lower.starts_with("sub") {
+     |  ______________________________________________________^
+1245 | |                 score += 15;
+1246 | |             } else if instr_lower.starts_with("call") {
+     | |_____________^
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#if_same_then_else
+
+error: you should consider adding a `Default` implementation for `ShellcodeLibrary`
+  --> src\shellcode_library.rs:31:5
+   |
+31 | /     pub fn new() -> Self {
+32 | |         let mut lib = ShellcodeLibrary {
+33 | |             shellcodes: HashMap::new(),
+34 | |         };
+...  |
+38 | |         lib
+39 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+   = note: `-D clippy::new-without-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::new_without_default)]`
+help: try adding this
+   |
+30 + impl Default for ShellcodeLibrary {
+31 +     fn default() -> Self {
+32 +         Self::new()
+33 +     }
+34 + }
+   |
+
+error: you should consider adding a `Default` implementation for `SropBuilder`
+   --> src\srop_tools.rs:184:5
+    |
+184 | /     pub fn new() -> Self {
+185 | |         SropBuilder {
+186 | |             frames: Vec::new(),
+187 | |             syscall_gadget: None,
+...   |
+190 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+182 + impl Default for SropBuilder {
+183 +     fn default() -> Self {
+184 +         Self::new()
+185 +     }
+186 + }
+    |
+
+error: you should consider adding a `Default` implementation for `TaintTracker`
+   --> src\advanced_fuzzer.rs:132:5
+    |
+132 | /     pub fn new() -> Self {
+133 | |         TaintTracker {
+134 | |             tainted_bytes: HashMap::new(),
+135 | |             taint_sources: vec![TaintSource::Stdin],
+...   |
+145 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+131 + impl Default for TaintTracker {
+132 +     fn default() -> Self {
+133 +         Self::new()
+134 +     }
+135 + }
+    |
+
+error: use of `or_insert_with` to construct default value
+   --> src\advanced_fuzzer.rs:150:14
+    |
+150 |             .or_insert_with(Vec::new)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#unwrap_or_default
+    = note: `-D clippy::unwrap-or-default` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::unwrap_or_default)]`
+
+error: this `if` statement can be collapsed
+   --> src\advanced_fuzzer.rs:219:13
+    |
+219 | /             if self.is_stack_address(value) {
+220 | |                 if self.alert_patterns.contains(&LeakType::StackAddressLeak) {
+221 | |                     leaks.push(TaintLeak {
+222 | |                         leak_type: LeakType::StackAddressLeak,
+...   |
+234 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#collapsible_if
+    = note: `-D clippy::collapsible-if` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::collapsible_if)]`
+help: collapse nested if block
+    |
+219 ~             if self.is_stack_address(value)
+220 ~                 && self.alert_patterns.contains(&LeakType::StackAddressLeak) {
+221 |                     leaks.push(TaintLeak {
+...
+232 |                     );
+233 ~                 }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\advanced_fuzzer.rs:236:13
+    |
+236 | /             if self.is_heap_address(value) {
+237 | |                 if self.alert_patterns.contains(&LeakType::HeapAddressLeak) {
+238 | |                     leaks.push(TaintLeak {
+239 | |                         leak_type: LeakType::HeapAddressLeak,
+...   |
+251 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+236 ~             if self.is_heap_address(value)
+237 ~                 && self.alert_patterns.contains(&LeakType::HeapAddressLeak) {
+238 |                     leaks.push(TaintLeak {
+...
+249 |                     );
+250 ~                 }
+    |
+
+error: this `if` statement can be collapsed
+   --> src\advanced_fuzzer.rs:253:13
+    |
+253 | /             if self.is_canary(value) {
+254 | |                 if self.alert_patterns.contains(&LeakType::CanaryLeak) {
+255 | |                     leaks.push(TaintLeak {
+256 | |                         leak_type: LeakType::CanaryLeak,
+...   |
+268 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+253 ~             if self.is_canary(value)
+254 ~                 && self.alert_patterns.contains(&LeakType::CanaryLeak) {
+255 |                     leaks.push(TaintLeak {
+...
+266 |                     );
+267 ~                 }
+    |
+
+error: incompatible bit mask: `_ & 18446462598732840960` can never be equal to `576443160117379072`
+   --> src\advanced_fuzzer.rs:309:9
+    |
+309 |         (addr & 0xffff000000000000) == 0x7fff00000000000
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#bad_bit_mask
+    = note: `#[deny(clippy::bad_bit_mask)]` on by default
+
+error: manual `RangeInclusive::contains` implementation
+   --> src\advanced_fuzzer.rs:310:16
+    |
+310 |             || (addr >= 0x7ffffffde000 && addr <= 0x7ffffffff000)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0x7ffffffde000..=0x7ffffffff000).contains(&addr)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+    = note: `-D clippy::manual-range-contains` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_range_contains)]`
+
+error: manual `RangeInclusive::contains` implementation
+   --> src\advanced_fuzzer.rs:315:16
+    |
+315 |               && addr >= 0x0000555555554000
+    |  ________________^
+316 | |             && addr <= 0x0000555556000000
+    | |_________________________________________^ help: use: `(0x0000555555554000..=0x0000555556000000).contains(&addr)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+
+error: manual `RangeInclusive::contains` implementation
+   --> src\advanced_fuzzer.rs:324:32
+    |
+324 |         (addr & 0xfff) == 0 && addr >= 0x555555554000 && addr <= 0x555555556000
+    |                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0x555555554000..=0x555555556000).contains(&addr)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+
+error: incompatible bit mask: `_ & 18446462598732840960` can never be equal to `139637976727552`
+   --> src\advanced_fuzzer.rs:328:9
+    |
+328 |         (addr & 0xffff000000000000) == 0x7f0000000000
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#bad_bit_mask
+
+error: manual `RangeInclusive::contains` implementation
+   --> src\advanced_fuzzer.rs:329:16
+    |
+329 |             || (addr >= 0x7ffff7a00000 && addr <= 0x7ffff7e00000)
+    |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0x7ffff7a00000..=0x7ffff7e00000).contains(&addr)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+
+error: calls to `push` immediately after creation
+   --> src\advanced_fuzzer.rs:382:9
+    |
+382 | /         let mut inputs = Vec::new();
+383 | |
+384 | |         inputs.push(b"AAAA".to_vec());
+385 | |         inputs.push(b"A".repeat(100));
+...   |
+388 | |         inputs.push(b"\x00".repeat(8));
+389 | |         inputs.push(vec![0x41; 256]);
+    | |_____________________________________^ help: consider using the `vec![]` macro: `let mut inputs = vec![..];`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#vec_init_then_push
+
+error: useless use of `format!`
+   --> src\advanced_fuzzer.rs:441:26
+    |
+441 |           report.push_str(&format!(
+    |  __________________________^
+442 | |             "═══════════════════════════════════════════════════════════════════════════\n"
+443 | |         ));
+    | |_________^ help: consider using `.to_string()`: `"═══════════════════════════════════════════════════════════════════════════\n".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: useless use of `format!`
+   --> src\advanced_fuzzer.rs:444:26
+    |
+444 |         report.push_str(&format!("TAINT ANALYSIS LEAK REPORT\n"));
+    |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"TAINT ANALYSIS LEAK REPORT\n".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: useless use of `format!`
+   --> src\advanced_fuzzer.rs:445:26
+    |
+445 |           report.push_str(&format!(
+    |  __________________________^
+446 | |             "═══════════════════════════════════════════════════════════════════════════\n\n"
+447 | |         ));
+    | |_________^ help: consider using `.to_string()`: `"═══════════════════════════════════════════════════════════════════════════\n\n".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: you should consider adding a `Default` implementation for `CoverageMap`
+   --> src\advanced_fuzzer.rs:487:5
+    |
+487 | /     pub fn new() -> Self {
+488 | |         CoverageMap {
+489 | |             edge_hits: HashMap::new(),
+490 | |             virgin_bits: [0xff; 65536],
+491 | |         }
+492 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+486 + impl Default for CoverageMap {
+487 +     fn default() -> Self {
+488 +         Self::new()
+489 +     }
+490 + }
+    |
+
+error: the borrowed expression implements the required traits
+   --> src\advanced_fuzzer.rs:510:27
+    |
+510 |             hasher.update(&[*bit]);
+    |                           ^^^^^^^ help: change this to: `[*bit]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: you should consider adding a `Default` implementation for `EnergyScheduler`
+   --> src\advanced_fuzzer.rs:526:5
+    |
+526 | /     pub fn new() -> Self {
+527 | |         EnergyScheduler {
+528 | |             power_schedules: HashMap::new(),
+529 | |         }
+530 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+525 + impl Default for EnergyScheduler {
+526 +     fn default() -> Self {
+527 +         Self::new()
+528 +     }
+529 + }
+    |
+
+error: you should consider adding a `Default` implementation for `CorpusMinimizer`
+   --> src\advanced_fuzzer.rs:577:5
+    |
+577 | /     pub fn new() -> Self {
+578 | |         CorpusMinimizer {
+579 | |             seen_coverage: HashSet::new(),
+580 | |         }
+581 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+576 + impl Default for CorpusMinimizer {
+577 +     fn default() -> Self {
+578 +         Self::new()
+579 +     }
+580 + }
+    |
+
+error: called `map(..).flatten()` on `Iterator`
+   --> src\advanced_fuzzer.rs:851:18
+    |
+851 |                   .map(|i| self.taint_tracker.get_taint_info(i))
+    |  __________________^
+852 | |                 .flatten()
+    | |__________________________^ help: try replacing `map` with `flat_map` and remove the `.flatten()`: `flat_map(|i| self.taint_tracker.get_taint_info(i))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#map_flatten
+    = note: `-D clippy::map-flatten` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::map_flatten)]`
+
+error: you should consider adding a `Default` implementation for `SimilarityEngine`
+  --> src\binary_similarity.rs:68:5
+   |
+68 | /     pub fn new() -> Self {
+69 | |         println!("╔═══════════════════════════════════════════════════════════════╗");
+70 | |         println!("║   BINARY SIMILARITY ANALYSIS ENGINE INITIALIZED               ║");
+71 | |         println!("╚═══════════════════════════════════════════════════════════════╝");
+...  |
+82 | |         engine
+83 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+67 + impl Default for SimilarityEngine {
+68 +     fn default() -> Self {
+69 +         Self::new()
+70 +     }
+71 + }
+   |
+
+error: the loop variable `i` is used to index `features`
+   --> src\binary_similarity.rs:560:18
+    |
+560 |         for i in 9..16 {
+    |                  ^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_range_loop
+help: consider using an iterator and enumerate()
+    |
+560 -         for i in 9..16 {
+560 +         for (i, <item>) in features.iter_mut().enumerate().take(16).skip(9) {
+    |
+
+error: clamp-like pattern without using clamp function
+   --> src\binary_similarity.rs:585:9
+    |
+585 |         cosine_sim.max(0.0).min(1.0) as f64
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with clamp: `cosine_sim.clamp(0.0, 1.0)`
+    |
+    = note: clamp will panic if max < min, min.is_nan(), or max.is_nan()
+    = note: clamp returns NaN if the input is NaN
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_clamp
+    = note: `-D clippy::manual-clamp` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_clamp)]`
+
+error: you seem to want to iterate on a map's values
+   --> src\binary_similarity.rs:621:38
+    |
+621 |         for (_vendor, signatures) in &self.vendor_signatures {
+    |                                      ^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#for_kv_map
+    = note: `-D clippy::for-kv-map` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::for_kv_map)]`
+help: use the corresponding method
+    |
+621 -         for (_vendor, signatures) in &self.vendor_signatures {
+621 +         for signatures in self.vendor_signatures.values() {
+    |
+
+error: this `if` statement can be collapsed
+  --> src\crypto_tools.rs:71:13
+   |
+71 | /             if parts.len() == 2 {
+72 | |                 if parts[0].len() == 32 && parts[1].len() == 32 {
+73 | |                     possible_types.push("MD5(pass:salt)".to_string());
+74 | |                 }
+75 | |             }
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#collapsible_if
+help: collapse nested if block
+   |
+71 ~             if parts.len() == 2
+72 ~                 && parts[0].len() == 32 && parts[1].len() == 32 {
+73 |                     possible_types.push("MD5(pass:salt)".to_string());
+74 ~                 }
+   |
+
+error: the borrowed expression implements the required traits
+   --> src\crypto_tools.rs:125:19
+    |
+125 |               .args(&[
+    |  ___________________^
+126 | |                 "-m",
+127 | |                 &mode.to_string(),
+128 | |                 "-a",
+...   |
+133 | |                 "--quiet",
+134 | |             ])
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+help: change this to
+    |
+125 ~             .args([
+126 +                 "-m",
+127 +                 &mode.to_string(),
+128 +                 "-a",
+129 +                 "0",
+130 +                 hash_file,
+131 +                 wordlist,
+132 +                 "--show",
+133 +                 "--quiet",
+134 ~             ])
+    |
+
+error: the borrowed expression implements the required traits
+   --> src\crypto_tools.rs:159:19
+    |
+159 |             .args(&["--wordlist", wordlist, hash_file])
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `["--wordlist", wordlist, hash_file]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> src\crypto_tools.rs:167:19
+    |
+167 |             .args(&["--show", hash_file])
+    |                   ^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `["--show", hash_file]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+   --> src\crypto_tools.rs:238:19
+    |
+238 |             .args(&["-w", output, "-d", "2", "-m", "5", url])
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `["-w", output, "-d", "2", "-m", "5", url]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: you should consider adding a `Default` implementation for `RainbowTable`
+   --> src\crypto_tools.rs:481:5
+    |
+481 | /     pub fn new() -> Self {
+482 | |         RainbowTable {
+483 | |             table: HashMap::new(),
+484 | |         }
+485 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+480 + impl Default for RainbowTable {
+481 +     fn default() -> Self {
+482 +         Self::new()
+483 +     }
+484 + }
+    |
+
+error: you should consider adding a `Default` implementation for `CVEScanner`
+  --> src\cve_scanner.rs:72:5
+   |
+72 | /     pub fn new() -> Self {
+73 | |         println!("╔═══════════════════════════════════════════════════════════════╗");
+74 | |         println!("║     CVE SCANNER & IMPACT ASSESSMENT INITIALIZED               ║");
+75 | |         println!("╚═══════════════════════════════════════════════════════════════╝");
+...  |
+86 | |         scanner
+87 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+71 + impl Default for CVEScanner {
+72 +     fn default() -> Self {
+73 +         Self::new()
+74 +     }
+75 + }
+   |
+
+error: the borrowed expression implements the required traits
+   --> src\cve_scanner.rs:289:23
+    |
+289 |                 .args(&["-n", "1", "-w", "1000", "exploit-db.com"])
+    |                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `["-n", "1", "-w", "1000", "exploit-db.com"]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: this boolean expression can be simplified
+   --> src\cve_scanner.rs:324:12
+    |
+324 |         if !fs::metadata(target).is_ok() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `fs::metadata(target).is_err()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#nonminimal_bool
+    = note: `-D clippy::nonminimal-bool` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::nonminimal_bool)]`
+
+error: the borrowed expression implements the required traits
+   --> src\cve_scanner.rs:548:62
+    |
+548 |             if let Ok(output) = Command::new("dumpbin").args(&["/exports", target]).output() {
+    |                                                              ^^^^^^^^^^^^^^^^^^^^^ help: change this to: `["/exports", target]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: returning the result of a `let` binding from a block
+   --> src\cve_scanner.rs:661:9
+    |
+660 |         let risk = (base_score * exploit_multiplier * (confidence_avg / 100.0)).min(10.0);
+    |         ---------------------------------------------------------------------------------- unnecessary `let` binding
+661 |         risk
+    |         ^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#let_and_return
+    = note: `-D clippy::let-and-return` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::let_and_return)]`
+help: return the expression directly
+    |
+660 ~         
+661 ~         (base_score * exploit_multiplier * (confidence_avg / 100.0)).min(10.0)
+    |
+
+error: you should consider adding a `Default` implementation for `CyclicPattern`
+  --> src\cyclic_pattern.rs:16:5
+   |
+16 | /     pub fn new() -> Self {
+17 | |         CyclicPattern {
+18 | |             alphabet: ALPHABET.to_vec(),
+19 | |             n: SUBSEQUENCE_LENGTH,
+20 | |         }
+21 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+15 + impl Default for CyclicPattern {
+16 +     fn default() -> Self {
+17 +         Self::new()
+18 +     }
+19 + }
+   |
+
+error: this function has too many arguments (9/7)
+  --> src\cyclic_pattern.rs:30:9
+   |
+30 | /         fn db(
+31 | |             t: usize,
+32 | |             p: usize,
+33 | |             sequence: &mut [usize],
+...  |
+39 | |             max_len: usize,
+40 | |         ) {
+   | |_________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#too_many_arguments
+   = note: `-D clippy::too-many-arguments` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::too_many_arguments)]`
+
+error: this `else { if .. }` block can be collapsed
+  --> src\cyclic_pattern.rs:56:20
+   |
+56 |               } else {
+   |  ____________________^
+57 | |                 if t < a.len() && (t - p) < a.len() {
+58 | |                     a[t] = a[t - p];
+59 | |                     db(
+...  |
+92 | |             }
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#collapsible_else_if
+   = note: `-D clippy::collapsible-else-if` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::collapsible_else_if)]`
+help: collapse nested if block
+   |
+56 ~             } else if t < a.len() && (t - p) < a.len() {
+57 +                 a[t] = a[t - p];
+58 +                 db(
+59 +                     t + 1,
+60 +                     p,
+61 +                     sequence,
+62 +                     a,
+63 +                     alphabet_len,
+64 +                     n,
+65 +                     result,
+66 +                     alphabet,
+67 +                     max_len,
+68 +                 );
+69 + 
+70 +                 for j in (a[t - p] + 1)..alphabet_len {
+71 +                     if result.len() >= max_len {
+72 +                         return;
+73 +                     }
+74 +                     if t < a.len() && t < sequence.len() {
+75 +                         a[t] = j;
+76 +                         sequence[t] = j;
+77 +                         db(
+78 +                             t + 1,
+79 +                             t,
+80 +                             sequence,
+81 +                             a,
+82 +                             alphabet_len,
+83 +                             n,
+84 +                             result,
+85 +                             alphabet,
+86 +                             max_len,
+87 +                         );
+88 +                     }
+89 +                 }
+90 +             }
+   |
+
+error: manual implementation of `.is_multiple_of()`
+  --> src\cyclic_pattern.rs:46:20
+   |
+46 |                 if n % p == 0 {
+   |                    ^^^^^^^^^^ help: replace with: `n.is_multiple_of(p)`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_is_multiple_of
+
+error: stripping a prefix manually
+   --> src\cyclic_pattern.rs:201:48
+    |
+201 |         if let Ok(value) = u64::from_str_radix(&search_value[2..], 16) {
+    |                                                ^^^^^^^^^^^^^^^^^^
+    |
+note: the prefix was tested here
+   --> src\cyclic_pattern.rs:200:5
+    |
+200 |     if search_value.starts_with("0x") {
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_strip
+    = note: `-D clippy::manual-strip` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_strip)]`
+help: try using the `strip_prefix` method
+    |
+200 ~     if let Some(<stripped>) = search_value.strip_prefix("0x") {
+201 ~         if let Ok(value) = u64::from_str_radix(<stripped>, 16) {
+    |
+
+error: writing `&Vec` instead of `&[_]` involves a new object where a slice will do
+   --> src\diff_fuzzer.rs:257:51
+    |
+257 |     fn execute_target(&self, target: &str, input: &Vec<u8>) -> Result<ExecutionResult, String> {
+    |                                                   ^^^^^^^^ help: change this to: `&[u8]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#ptr_arg
+    = note: `-D clippy::ptr-arg` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::ptr_arg)]`
+
+error: writing `&Vec` instead of `&[_]` involves a new object where a slice will do
+   --> src\diff_fuzzer.rs:314:16
+    |
+314 |         input: &Vec<u8>,
+    |                ^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#ptr_arg
+help: change this to
+    |
+314 ~         input: &[u8],
+315 |         old_result: &ExecutionResult,
+...
+322 |                         return Some(DivergenceCase {
+323 ~                             input: input.to_owned(),
+324 |                             old_result: old_result.clone(),
+...
+334 |                         return Some(DivergenceCase {
+335 ~                             input: input.to_owned(),
+336 |                             old_result: old_result.clone(),
+...
+346 |                         return Some(DivergenceCase {
+347 ~                             input: input.to_owned(),
+348 |                             old_result: old_result.clone(),
+...
+358 |                         return Some(DivergenceCase {
+359 ~                             input: input.to_owned(),
+360 |                             old_result: old_result.clone(),
+...
+370 |                         return Some(DivergenceCase {
+371 ~                             input: input.to_owned(),
+372 |                             old_result: old_result.clone(),
+...
+386 |                         return Some(DivergenceCase {
+387 ~                             input: input.to_owned(),
+388 |                             old_result: old_result.clone(),
+...
+398 |                         return Some(DivergenceCase {
+399 ~                             input: input.to_owned(),
+    |
+
+error: `format!` in `format!` args
+   --> src\diff_fuzzer.rs:469:24
+    |
+469 |           let poc_code = format!(
+    |  ________________________^
+470 | |             r#"#!/usr/bin/env python3
+471 | | # Auto-generated PoC for Divergence #{}
+472 | | # Type: {:?}
+...   |
+531 | |             self.target_new
+532 | |         );
+    | |_________^
+    |
+    = help: combine the `format!(..)` arguments with the outer `format!(..)` call
+    = help: or consider changing `format!` to `format_args!`
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#format_in_format_args
+    = note: `-D clippy::format-in-format-args` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::format_in_format_args)]`
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+  --> src\disasm_visualizer.rs:76:47
+   |
+76 |             let bytes_str = self.format_bytes(&insn.bytes());
+   |                                               ^^^^^^^^^^^^^ help: change this to: `insn.bytes()`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrow
+
+error: use of `or_insert_with` to construct default value
+   --> src\doc_generator.rs:674:14
+    |
+674 |             .or_insert_with(Vec::new)
+    |              ^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `or_default()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#unwrap_or_default
+
+error: you seem to want to iterate on a map's keys
+   --> src\doc_generator.rs:882:33
+    |
+882 |         for (module_name, _) in &self.modules {
+    |                                 ^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#for_kv_map
+help: use the corresponding method
+    |
+882 -         for (module_name, _) in &self.modules {
+882 +         for module_name in self.modules.keys() {
+    |
+
+error: calling `push_str()` using a single-character string literal
+   --> src\doc_generator.rs:902:21
+    |
+902 |                     content.push_str("\n");
+    |                     ^^^^^^^^^^^^^^^^^^^^^^ help: consider using `push` with a character literal: `content.push('\n')`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_char_add_str
+
+error: manual `Range::contains` implementation
+   --> src\exploit_chaining.rs:311:12
+    |
+311 |         if value >= 0x7f0000000000 && value < 0x800000000000 {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0x7f0000000000..0x800000000000).contains(&value)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+
+error: manual `RangeInclusive::contains` implementation
+   --> src\exploit_chaining.rs:313:19
+    |
+313 |         } else if value >= 0x00007ffffffde000 && value <= 0x00007ffffffff000 {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0x00007ffffffde000..=0x00007ffffffff000).contains(&value)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+
+error: manual `Range::contains` implementation
+   --> src\exploit_chaining.rs:315:19
+    |
+315 |         } else if value >= 0x0000555555554000 && value < 0x0000556000000000 {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0x0000555555554000..0x0000556000000000).contains(&value)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+
+error: manual `Range::contains` implementation
+   --> src\exploit_chaining.rs:317:19
+    |
+317 |         } else if value >= 0x0000000000400000 && value < 0x0000000001000000 {
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: use: `(0x0000000000400000..0x0000000001000000).contains(&value)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_range_contains
+
+error: redundant pattern matching, consider using `is_err()`
+   --> src\exploit_chaining.rs:394:28
+    |
+394 |                     if let Err(_) = self.reconnect() {
+    |                     -------^^^^^^------------------- help: try: `if self.reconnect().is_err()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#redundant_pattern_matching
+    = note: `-D clippy::redundant-pattern-matching` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::redundant_pattern_matching)]`
+
+error: you should consider adding a `Default` implementation for `FlagFinder`
+  --> src\flag_tools.rs:9:5
+   |
+ 9 | /     pub fn new() -> Self {
+10 | |         let patterns = vec![
+11 | |             Regex::new(r"flag\{[^}]+\}").unwrap(),
+12 | |             Regex::new(r"FLAG\{[^}]+\}").unwrap(),
+...  |
+23 | |         FlagFinder { patterns }
+24 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+ 8 + impl Default for FlagFinder {
+ 9 +     fn default() -> Self {
+10 +         Self::new()
+11 +     }
+12 + }
+   |
+
+error: the borrowed expression implements the required traits
+   --> src\flag_tools.rs:149:39
+    |
+149 |         let mut request = client.post(&format!("{}/api/v1/challenges/attempt", self.url));
+    |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `format!("{}/api/v1/challenges/attempt", self.url)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: the borrowed expression implements the required traits
+  --> src\gdb_mi.rs:38:19
+   |
+38 |             .args(&["--interpreter=mi", binary])
+   |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `["--interpreter=mi", binary]`
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: this `if` has identical blocks
+   --> src\gdb_tools.rs:446:49
+    |
+446 |           } else if cfg!(target_arch = "aarch64") {
+    |  _________________________________________________^
+447 | |             self.get_register("pc")
+448 | |         } else {
+    | |_________^
+    |
+note: same as this
+   --> src\gdb_tools.rs:448:16
+    |
+448 |           } else {
+    |  ________________^
+449 | |             self.get_register("pc")
+450 | |         }
+    | |_________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#if_same_then_else
+
+error: using `clone` on type `u32` which implements the `Copy` trait
+   --> src\interactive_io.rs:648:9
+    |
+648 |         self.ctrl_c_count.lock().unwrap_or_else(|e| e.into_inner()).clone()
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try dereferencing it: `*self.ctrl_c_count.lock().unwrap_or_else(|e| e.into_inner())`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#clone_on_copy
+    = note: `-D clippy::clone-on-copy` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::clone_on_copy)]`
+
+error: you should consider adding a `Default` implementation for `KernelExploiter`
+   --> src\kernel_exploiter.rs:96:5
+    |
+ 96 | /     pub fn new() -> Self {
+ 97 | |         println!("╔═══════════════════════════════════════════════════════════════╗");
+ 98 | |         println!("║     KERNEL EXPLOITATION FRAMEWORK INITIALIZED                 ║");
+ 99 | |         println!("╚═══════════════════════════════════════════════════════════════╝");
+...   |
+111 | |         exploiter
+112 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+ 95 + impl Default for KernelExploiter {
+ 96 +     fn default() -> Self {
+ 97 +         Self::new()
+ 98 +     }
+ 99 + }
+    |
+
+error: calls to `push` immediately after creation
+   --> src\kernel_exploiter.rs:899:9
+    |
+899 | /         let mut chain = Vec::new();
+900 | |
+901 | |         // xor rdi, rdi
+902 | |         chain.push(kbase + 0x8a0); // pop rdi; ret
+...   |
+922 | |         chain.push(0); // RSP
+923 | |         chain.push(0x2b); // SS
+    | |_________________________^ help: consider using the `vec![]` macro: `let chain = vec![..];`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#vec_init_then_push
+
+error: calls to `push` immediately after creation
+   --> src\kernel_exploiter.rs:933:9
+    |
+933 | /         let mut chain = Vec::new();
+934 | |
+935 | |         // pop rdi; ret
+936 | |         chain.push(kbase + 0x8a0);
+...   |
+941 | |         chain.push(kbase + 0x64210);
+    | |____________________________________^ help: consider using the `vec![]` macro: `let chain = vec![..];`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#vec_init_then_push
+
+error: this manual char comparison can be written more succinctly
+    --> src\kernel_exploiter.rs:1202:20
+     |
+1202 |             .split(|c| c == '.' || c == '-')
+     |                    ^^^^^^^^^^^^^^^^^^^^^^^^ help: consider using an array of `char`: `['.', '-']`
+     |
+     = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_pattern_char_comparison
+     = note: `-D clippy::manual-pattern-char-comparison` implied by `-D warnings`
+     = help: to override `-D warnings` add `#[allow(clippy::manual_pattern_char_comparison)]`
+
+error: you should consider adding a `Default` implementation for `LibcDatabase`
+   --> src\libc_db.rs:110:5
+    |
+110 | /     pub fn new() -> Self {
+111 | |         let cache_path = dirs::home_dir().map(|p| {
+112 | |             p.join(".talon")
+113 | |                 .join("libc_cache.json")
+...   |
+129 | |         db
+130 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+108 + impl Default for LibcDatabase {
+109 +     fn default() -> Self {
+110 +         Self::new()
+111 +     }
+112 + }
+    |
+
+error: called `map(..).flatten()` on `Option`
+   --> src\libc_db.rs:111:43
+    |
+111 |           let cache_path = dirs::home_dir().map(|p| {
+    |  ___________________________________________^
+112 | |             p.join(".talon")
+113 | |                 .join("libc_cache.json")
+114 | |                 .to_str()
+115 | |                 .map(String::from)
+116 | |         }).flatten();
+    | |____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#map_flatten
+help: try replacing `map` with `and_then` and remove the `.flatten()`
+    |
+111 ~         let cache_path = dirs::home_dir().and_then(|p| {
+112 +             p.join(".talon")
+113 +                 .join("libc_cache.json")
+114 +                 .to_str()
+115 +                 .map(String::from)
+116 ~         });
+    |
+
+error: this expression creates a reference which is immediately dereferenced by the compiler
+   --> src\libc_db.rs:596:57
+    |
+596 |                 if let Ok(offset) = u64::from_str_radix(&offset_str.trim_start_matches("0x"), 16) {
+    |                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `offset_str.trim_start_matches("0x")`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrow
+
+error: you should consider adding a `Default` implementation for `ParallelExploiter`
+  --> src\parallel_exploit.rs:41:5
+   |
+41 | /     pub fn new() -> Self {
+42 | |         ParallelExploiter {
+43 | |             timeout_ms: 30000,
+44 | |             max_concurrent: 10,
+...  |
+48 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+40 + impl Default for ParallelExploiter {
+41 +     fn default() -> Self {
+42 +         Self::new()
+43 +     }
+44 + }
+   |
+
+error: this loop could be written as a `for` loop
+   --> src\repl.rs:136:9
+    |
+136 |         while let Some(ch) = chars.next() {
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: try: `for ch in chars`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#while_let_on_iterator
+
+error: you should consider adding a `Default` implementation for `REPL`
+   --> src\repl.rs:427:5
+    |
+427 | /     pub fn new() -> Self {
+428 | |         let mut repl = REPL {
+429 | |             history: Vec::new(),
+430 | |             variables: HashMap::new(),
+...   |
+438 | |         repl
+439 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+426 + impl Default for REPL {
+427 +     fn default() -> Self {
+428 +         Self::new()
+429 +     }
+430 + }
+    |
+
+error: manual implementation of `.is_multiple_of()`
+   --> src\repl.rs:475:12
+    |
+475 |         if self.history.len() % 10 == 0 && !self.history.is_empty() {
+    |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: replace with: `self.history.len().is_multiple_of(10)`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_is_multiple_of
+
+error: you should consider adding a `Default` implementation for `ShellcodeDatabase`
+  --> src\shellcode_db.rs:92:5
+   |
+92 | /     pub fn new() -> Self {
+93 | |         let mut db = ShellcodeDatabase {
+94 | |             shellcodes: HashMap::new(),
+95 | |         };
+...  |
+98 | |         db
+99 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+90 + impl Default for ShellcodeDatabase {
+91 +     fn default() -> Self {
+92 +         Self::new()
+93 +     }
+94 + }
+   |
+
+error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
+  --> src\socket_tools.rs:57:13
+   |
+57 | /             match TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
+58 | |                 Ok(_) => {
+59 | |                     println!("[SCAN] Port {} OPEN", port);
+60 | |                     open_ports.push(port);
+61 | |                 }
+62 | |                 Err(_) => {}
+63 | |             }
+   | |_____________^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_match
+help: try
+   |
+57 ~             if let Ok(_) = TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
+58 +                 println!("[SCAN] Port {} OPEN", port);
+59 +                 open_ports.push(port);
+60 +             }
+   |
+
+error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
+   --> src\socket_tools.rs:98:21
+    |
+ 98 | /                     match TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
+ 99 | |                         Ok(_) => {
+100 | |                             println!("[SCAN] Port {} OPEN", port);
+101 | |                             open_ports.lock().unwrap().push(port);
+102 | |                         }
+103 | |                         Err(_) => {}
+104 | |                     }
+    | |_____________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_match
+help: try
+    |
+ 98 ~                     if let Ok(_) = TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
+ 99 +                         println!("[SCAN] Port {} OPEN", port);
+100 +                         open_ports.lock().unwrap().push(port);
+101 +                     }
+    |
+
+error: this can be `std::io::Error::other(_)`
+   --> src\socket_tools.rs:152:13
+    |
+152 |         Err(Error::new(ErrorKind::Other, "Proxy connection failed"))
+    |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#io_other_error
+    = note: `-D clippy::io-other-error` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::io_other_error)]`
+help: use `std::io::Error::other`
+    |
+152 -         Err(Error::new(ErrorKind::Other, "Proxy connection failed"))
+152 +         Err(Error::other("Proxy connection failed"))
+    |
+
+error: you seem to be trying to use `match` for destructuring a single pattern. Consider using `if let`
+   --> src\socket_tools.rs:203:13
+    |
+203 | /             match TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
+204 | |                 Ok(_) => {
+205 | |                     println!("[SUBNET] Host {} is alive", host);
+206 | |                     alive_hosts.push(host);
+207 | |                 }
+208 | |                 Err(_) => {}
+209 | |             }
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#single_match
+help: try
+    |
+203 ~             if let Ok(_) = TcpStream::connect_timeout(&addr, Duration::from_millis(timeout_ms)) {
+204 +                 println!("[SUBNET] Host {} is alive", host);
+205 +                 alive_hosts.push(host);
+206 +             }
+    |
+
+error: you should consider adding a `Default` implementation for `ExploitSession`
+   --> src\session_state.rs:136:5
+    |
+136 | /     pub fn new() -> Self {
+137 | |         ExploitSession {
+138 | |             state: Arc::new(RwLock::new(SessionState::default())),
+139 | |             history: Arc::new(RwLock::new(Vec::new())),
+140 | |         }
+141 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+135 + impl Default for ExploitSession {
+136 +     fn default() -> Self {
+137 +         Self::new()
+138 +     }
+139 + }
+    |
+
+error: deref which would be done by auto-deref
+   --> src\session_state.rs:179:17
+    |
+179 |         updater(&mut *state)
+    |                 ^^^^^^^^^^^ help: try: `&mut state`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#explicit_auto_deref
+    = note: `-D clippy::explicit-auto-deref` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::explicit_auto_deref)]`
+
+error: unnecessary `if let` since only the `Ok` variant of the iterator element is used
+   --> src\ssh_bridge.rs:221:13
+    |
+221 | /             for stream in listener.incoming() {
+222 | |                 if let Ok(mut local_stream) = stream {
+223 | |                     let mut buf = vec![0u8; 4096];
+224 | |                     loop {
+...   |
+246 | |             }
+    | |_____________^
+    |
+help: try `.flatten()` and remove the `if let` statement in the for loop
+   --> src\ssh_bridge.rs:222:17
+    |
+222 | /                 if let Ok(mut local_stream) = stream {
+223 | |                     let mut buf = vec![0u8; 4096];
+224 | |                     loop {
+225 | |                         match local_stream.read(&mut buf) {
+...   |
+245 | |                 }
+    | |_________________^
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#manual_flatten
+    = note: `-D clippy::manual-flatten` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::manual_flatten)]`
+help: try
+    |
+221 ~             for mut local_stream in listener.incoming().flatten() {
+222 +                 let mut buf = vec![0u8; 4096];
+223 +                 loop {
+224 +                     match local_stream.read(&mut buf) {
+225 +                         Ok(0) => break,
+226 +                         Ok(n) => {
+227 +                             if channel.write_all(&buf[..n]).is_err() {
+228 +                                 break;
+229 +                             }
+230 +                         }
+231 +                         Err(_) => break,
+232 +                     }
+233 +                     
+234 +                     match channel.read(&mut buf) {
+235 +                         Ok(0) => break,
+236 +                         Ok(n) => {
+237 +                             if local_stream.write_all(&buf[..n]).is_err() {
+238 +                                 break;
+239 +                             }
+240 +                         }
+241 +                         Err(_) => break,
+242 +                     }
+243 +                 }
+244 +             }
+    |
+
+error: useless use of `format!`
+   --> src\time_travel.rs:343:26
+    |
+343 |             gdb.execute(&format!("checkpoint"))?;
+    |                          ^^^^^^^^^^^^^^^^^^^^^ help: consider using `.to_string()`: `"checkpoint".to_string()`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+
+error: match expression looks like `matches!` macro
+   --> src\time_travel.rs:602:25
+    |
+602 |               .filter(|e| match (event_type_filter, &e.event_type) {
+    |  _________________________^
+603 | |                 (EventTypeFilter::MemoryWrite, EventType::MemoryWrite { .. }) => true,
+604 | |                 (EventTypeFilter::MemoryRead, EventType::MemoryRead { .. }) => true,
+605 | |                 (EventTypeFilter::NetworkSend, EventType::NetworkSend { .. }) => true,
+...   |
+611 | |                 _ => false,
+612 | |             })
+    | |_____________^ help: try: `matches!((event_type_filter, &e.event_type), (EventTypeFilter::MemoryWrite, EventType::MemoryWrite { .. }) | (EventTypeFilter::MemoryRead, EventType::MemoryRead { .. }) | (EventTypeFilter::NetworkSend, EventType::NetworkSend { .. }) | (EventTypeFilter::NetworkReceive, EventType::NetworkReceive { .. }) | (EventTypeFilter::RegisterModify, EventType::RegisterModify { .. }) | (EventTypeFilter::FunctionCall, EventType::FunctionCall { .. }) | (EventTypeFilter::Checkpoint, EventType::Checkpoint { .. }) | (EventTypeFilter::Custom, EventType::Custom { .. }))`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#match_like_matches_macro
+    = note: `-D clippy::match-like-matches-macro` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::match_like_matches_macro)]`
+
+error: you should consider adding a `Default` implementation for `PlaybackEngine`
+   --> src\time_travel.rs:745:5
+    |
+745 | /     pub fn new() -> Self {
+746 | |         PlaybackEngine {
+747 | |             events: Vec::new(),
+748 | |             current_index: 0,
+...   |
+751 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+744 + impl Default for PlaybackEngine {
+745 +     fn default() -> Self {
+746 +         Self::new()
+747 +     }
+748 + }
+    |
+
+error: you should consider adding a `Default` implementation for `SQLInjectionTester`
+  --> src\web_tools.rs:29:5
+   |
+29 | /     pub fn new() -> Self {
+30 | |         let payloads = vec![
+31 | |             "' OR '1'='1".to_string(),
+32 | |             "' OR '1'='1' --".to_string(),
+...  |
+64 | |     }
+   | |_____^
+   |
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+   |
+27 + impl Default for SQLInjectionTester {
+28 +     fn default() -> Self {
+29 +         Self::new()
+30 +     }
+31 + }
+   |
+
+error: you should consider adding a `Default` implementation for `XSSChecker`
+   --> src\web_tools.rs:142:5
+    |
+142 | /     pub fn new() -> Self {
+143 | |         let payloads = vec![
+144 | |             "<script>alert('XSS')</script>".to_string(),
+145 | |             "<img src=x onerror=alert('XSS')>".to_string(),
+...   |
+157 | |         XSSChecker { payloads }
+158 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+141 + impl Default for XSSChecker {
+142 +     fn default() -> Self {
+143 +         Self::new()
+144 +     }
+145 + }
+    |
+
+error: you should consider adding a `Default` implementation for `SSRFTester`
+   --> src\web_tools.rs:217:5
+    |
+217 | /     pub fn new() -> Self {
+218 | |         let payloads = vec![
+219 | |             "http://127.0.0.1/".to_string(),
+220 | |             "http://localhost/".to_string(),
+...   |
+231 | |         SSRFTester { payloads }
+232 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+216 + impl Default for SSRFTester {
+217 +     fn default() -> Self {
+218 +         Self::new()
+219 +     }
+220 + }
+    |
+
+error: you should consider adding a `Default` implementation for `LFITester`
+   --> src\web_tools.rs:293:5
+    |
+293 | /     pub fn new() -> Self {
+294 | |         let payloads = vec![
+295 | |             "../../../etc/passwd".to_string(),
+296 | |             "..\\..\\..\\windows\\win.ini".to_string(),
+...   |
+307 | |         LFITester { payloads }
+308 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+292 + impl Default for LFITester {
+293 +     fn default() -> Self {
+294 +         Self::new()
+295 +     }
+296 + }
+    |
+
+error: you should consider adding a `Default` implementation for `TemplateInjectionTester`
+   --> src\web_tools.rs:362:5
+    |
+362 | /     pub fn new() -> Self {
+363 | |         let mut payloads = HashMap::new();
+364 | |
+365 | |         payloads.insert(
+...   |
+400 | |         TemplateInjectionTester { payloads }
+401 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+361 + impl Default for TemplateInjectionTester {
+362 +     fn default() -> Self {
+363 +         Self::new()
+364 +     }
+365 + }
+    |
+
+error: you should consider adding a `Default` implementation for `CommandInjectionTester`
+   --> src\web_tools.rs:593:5
+    |
+593 | /     pub fn new() -> Self {
+594 | |         let payloads = vec![
+595 | |             "; id".to_string(),
+596 | |             "| id".to_string(),
+...   |
+608 | |         CommandInjectionTester { payloads }
+609 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+592 + impl Default for CommandInjectionTester {
+593 +     fn default() -> Self {
+594 +         Self::new()
+595 +     }
+596 + }
+    |
+
+error: you should consider adding a `Default` implementation for `DirectoryTraversalTester`
+   --> src\web_tools.rs:660:5
+    |
+660 | /     pub fn new() -> Self {
+661 | |         let payloads = vec![
+662 | |             "../".to_string(),
+663 | |             "../../".to_string(),
+...   |
+674 | |         DirectoryTraversalTester { payloads }
+675 | |     }
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+    |
+659 + impl Default for DirectoryTraversalTester {
+660 +     fn default() -> Self {
+661 +         Self::new()
+662 +     }
+663 + }
+    |
+
+error: you should consider adding a `Default` implementation for `ScriptHelper`
+ --> src\helpers.rs:6:5
+  |
+6 | /     pub fn new() -> Self {
+7 | |         ScriptHelper
+8 | |     }
+  | |_____^
+  |
+  = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#new_without_default
+help: try adding this
+  |
+5 + impl Default for ScriptHelper {
+6 +     fn default() -> Self {
+7 +         Self::new()
+8 +     }
+9 + }
+  |
+
+error: useless use of `format!`
+   --> src\helpers.rs:110:22
+    |
+110 |               "pwn" => format!(
+    |  ______________________^
+111 | |                 r#"
+112 | | # Talon Quick Start: Binary Exploitation
+...   |
+131 | | "#
+132 | |             ),
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+help: consider using `.to_string()`
+    |
+110 ~             "pwn" => r#"
+111 + # Talon Quick Start: Binary Exploitation
+112 + 
+113 + # 1. Information gathering
+114 + analyze pe file "target.exe"
+115 + disassemble "target.exe"
+116 + 
+117 + # 2. Find vulnerabilities
+118 + scan strings in "target.exe"
+119 + detect vm in "target.exe"
+120 + 
+121 + # 3. Build exploit
+122 + let overflow_size = 264
+123 + let ret_addr = 0xdeadbeef
+124 + 
+125 + # 4. Craft payload
+126 + stack overflow with padding overflow_size and return to ret_addr
+127 + 
+128 + # 5. Execute
+129 + execute shellcode in memory
+130 ~ "#.to_string(),
+    |
+
+error: useless use of `format!`
+   --> src\helpers.rs:134:23
+    |
+134 |               "web3" => format!(
+    |  _______________________^
+135 | |                 r#"
+136 | | # Talon Quick Start: Web3 Exploitation
+...   |
+152 | | "#
+153 | |             ),
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+help: consider using `.to_string()`
+    |
+134 ~             "web3" => r#"
+135 + # Talon Quick Start: Web3 Exploitation
+136 + 
+137 + # 1. Contract analysis
+138 + fetch contract "0xContractAddress" using api key "YOUR_KEY"
+139 + parse abi json "contract.json"
+140 + 
+141 + # 2. Vulnerability scanning
+142 + scan for reentrancy in "contract.sol"
+143 + detect delegatecall in "contract.sol"
+144 + 
+145 + # 3. Transaction analysis
+146 + trace transaction "0xTxHash"
+147 + simulate wallet drain from "0xVictim" token "0xToken" amount "1000"
+148 + 
+149 + # 4. Execute
+150 + call ethereum node "https://mainnet.infura.io/v3/KEY" with data "0x..."
+151 ~ "#.to_string(),
+    |
+
+error: useless use of `format!`
+   --> src\helpers.rs:155:26
+    |
+155 |               "fuzzing" => format!(
+    |  __________________________^
+156 | |                 r#"
+157 | | # Talon Quick Start: Fuzzing
+...   |
+173 | | "#
+174 | |             ),
+    | |_____________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+help: consider using `.to_string()`
+    |
+155 ~             "fuzzing" => r#"
+156 + # Talon Quick Start: Fuzzing
+157 + 
+158 + # 1. Basic file fuzzing
+159 + fuzz file "input.dat"
+160 + 
+161 + # 2. Network fuzzing
+162 + fuzz remote "192.168.1.100" on port 8080
+163 + 
+164 + # 3. Coverage-guided fuzzing (advanced)
+165 + let fuzzer = AFL()
+166 + fuzzer.add_seed("seed1.dat")
+167 + fuzzer.run("./target", 10000)
+168 + 
+169 + # 4. Format-specific fuzzing
+170 + fuzz png "image.png"
+171 + fuzz elf "binary"
+172 ~ "#.to_string(),
+    |
+
+error: useless use of `format!`
+   --> src\helpers.rs:340:9
+    |
+340 | /         format!(
+341 | |             r#"
+342 | | ═══════════════════════════════════════════════════════════════
+343 | |                     TALON DSL CHEAT SHEET
+...   |
+421 | | "#
+422 | |         )
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_format
+help: consider using `.to_string()`
+    |
+340 ~         r#"
+341 ~ ═══════════════════════════════════════════════════════════════
+342 +                     TALON DSL CHEAT SHEET
+343 ~ ═══════════════════════════════════════════════════════════════
+344 + 
+345 + VARIABLES & TYPES
+346 +   let x = 42                    # Auto type
+347 +   let name: string = "talon"    # With type hint
+348 +   const PI = 3.14               # Constant
+349 + 
+350 + FUNCTIONS
+351 +   define function add(a, b)
+352 +       return a + b
+353 +   end
+354 +   
+355 +   add(5, 10)                    # Call function
+356 + 
+357 + CONTROL FLOW
+358 +   if x > 10
+359 +       # do something
+360 +   else
+361 +       # do something else
+362 +   end
+363 +   
+364 +   for i in 0..10
+365 +       # loop body
+366 +   end
+367 + 
+368 + EXPLOITATION BASICS
+369 +   # Buffer overflow
+370 +   stack overflow with padding 264 and return to 0xdeadbeef
+371 +   
+372 +   # Format string
+373 +   format string exploit on "vuln" using offset 6
+374 +   
+375 +   # Shellcode
+376 +   load shellcode from "payload.bin"
+377 +   execute shellcode in memory
+378 + 
+379 + NETWORK OPERATIONS
+380 +   connect to "192.168.1.100" on port 4444
+381 +   fuzz remote "target.com" on port 80
+382 + 
+383 + BINARY ANALYSIS
+384 +   analyze pe file "malware.exe"
+385 +   disassemble "binary"
+386 +   scan strings in "file.exe"
+387 +   
+388 + WEB3 / BLOCKCHAIN
+389 +   parse abi json "contract.json"
+390 +   scan for reentrancy in "contract.sol"
+391 +   trace transaction "0xTxHash"
+392 + 
+393 + FUZZING
+394 +   fuzz file "input.dat"
+395 +   fuzz binary "target" with seed "seed.bin" for 1000 cycles
+396 + 
+397 + ADVANCED FEATURES
+398 +   # Pattern matching
+399 +   match value
+400 +       case 1: # handle 1
+401 +       case 2: # handle 2
+402 +   end
+403 +   
+404 +   # Try-catch
+405 +   try
+406 +       # risky operation
+407 +   catch err
+408 +       # handle error
+409 +   end
+410 +   
+411 +   # Async operations
+412 +   define async function fetch_data()
+413 +       await download_file()
+414 +   end
+415 + 
+416 ~ ═══════════════════════════════════════════════════════════════
+417 + TIP: Run 'talon list-templates' to see exploit templates!
+418 + TIP: Use 'talon repl' for interactive testing!
+419 ~ ═══════════════════════════════════════════════════════════════
+420 + "#.to_string()
+    |
+
+error: this `if` statement can be collapsed
+   --> src\mitigation_detector.rs:220:9
+    |
+220 | /         if self.protections.aslr || self.protections.pie {
+221 | |             if strategy.primary_technique == ExploitTechnique::RopChain 
+222 | |                 || strategy.primary_technique == ExploitTechnique::Ret2Libc {
+223 | |                 strategy.requires_leak.push(LeakRequirement::LibcBaseLeak);
+...   |
+232 | |         }
+    | |_________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#collapsible_if
+help: collapse nested if block
+    |
+220 ~         if (self.protections.aslr || self.protections.pie) {
+221 ~             && (strategy.primary_technique == ExploitTechnique::RopChain 
+222 ~                 || strategy.primary_technique == ExploitTechnique::Ret2Libc) {
+223 |                 strategy.requires_leak.push(LeakRequirement::LibcBaseLeak);
+...
+230 |                 strategy.constraints.push("Must leak libc base for ret2libc".to_string());
+231 ~             }
+    |
+
+error: field assignment outside of initializer for an instance created with Default::default()
+  --> src\ml_oracle.rs:42:13
+   |
+42 | /             config.backend = match backend.as_str() {
+43 | |                 "lm_studio" => AiBackend::LmStudio,
+44 | |                 "local_gguf" => AiBackend::LocalGguf,
+45 | |                 "disabled" => AiBackend::Disabled,
+46 | |                 _ => AiBackend::LmStudio,
+47 | |             };
+   | |______________^
+   |
+note: consider initializing the variable with `ml_oracle::AiConfig { backend: match backend.as_str() {
+                      "lm_studio" => AiBackend::LmStudio,
+                      "local_gguf" => AiBackend::LocalGguf,
+                      "disabled" => AiBackend::Disabled,
+                      _ => AiBackend::LmStudio,
+                  }, ..Default::default() }` and removing relevant reassignments
+  --> src\ml_oracle.rs:41:13
+   |
+41 |             let mut config = AiConfig::default();
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+   = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#field_reassign_with_default
+   = note: `-D clippy::field-reassign-with-default` implied by `-D warnings`
+   = help: to override `-D warnings` add `#[allow(clippy::field_reassign_with_default)]`
+
+error: the borrowed expression implements the required traits
+   --> src\forensics\live_response.rs:338:19
+    |
+338 |             .args(&["computersystem", "get", "model"])
+    |                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: change this to: `["computersystem", "get", "model"]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#needless_borrows_for_generic_args
+
+error: useless use of `vec!`
+   --> src\fmtstr_tools.rs:192:31
+    |
+192 |     payload.extend_from_slice(&vec![b'A'; 8]);
+    |                               ^^^^^^^^^^^^^^ help: you can use a slice directly: `&[b'A'; 8]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+    = note: `-D clippy::useless-vec` implied by `-D warnings`
+    = help: to override `-D warnings` add `#[allow(clippy::useless_vec)]`
+
+error: useless use of `vec!`
+   --> src\heap_tools.rs:252:33
+    |
+252 |         chain.extend_from_slice(&vec![b'C'; 0x60]);
+    |                                 ^^^^^^^^^^^^^^^^^ help: you can use a slice directly: `&[b'C'; 0x60]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+
+error: useless use of `vec!`
+   --> src\rop_tools.rs:801:59
+    |
+801 |             constraints_satisfied: self.check_constraints(&vec![gadget.address]),
+    |                                                           ^^^^^^^^^^^^^^^^^^^^^ help: you can use a slice directly: `&[gadget.address]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+
+error: useless use of `vec!`
+   --> src\rop_tools.rs:830:59
+    |
+830 |             constraints_satisfied: self.check_constraints(&vec![gadget.address]),
+    |                                                           ^^^^^^^^^^^^^^^^^^^^^ help: you can use a slice directly: `&[gadget.address]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+
+error: useless use of `vec!`
+   --> src\rop_tools.rs:852:59
+    |
+852 |             constraints_satisfied: self.check_constraints(&vec![pivot.address]),
+    |                                                           ^^^^^^^^^^^^^^^^^^^^ help: you can use a slice directly: `&[pivot.address]`
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+
+error: useless use of `vec!`
+   --> src\shellcode_encoders.rs:163:16
+    |
+163 |       let nops = vec![
+    |  ________________^
+164 | |         vec![0x90],       // nop
+165 | |         vec![0x87, 0xC0], // xchg eax, eax
+166 | |         vec![0x97],       // xchg eax, edi
+167 | |         vec![0x40],       // inc eax (only works in 32-bit)
+168 | |         vec![0x48],       // dec eax (only works in 32-bit)
+169 | |     ];
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+help: you can use an array directly
+    |
+163 ~     let nops = [vec![0x90],       // nop
+164 +         vec![0x87, 0xC0], // xchg eax, eax
+165 +         vec![0x97],       // xchg eax, edi
+166 +         vec![0x40],       // inc eax (only works in 32-bit)
+167 ~         vec![0x48]];
+    |
+
+error: useless use of `vec!`
+   --> src\shellcode_encoders.rs:235:24
+    |
+235 |       let nop_variants = vec![
+    |  ________________________^
+236 | |         0x90, // nop
+237 | |         0x41, // inc ecx
+238 | |         0x4A, // dec edx
+239 | |         0x48, // dec eax
+240 | |     ];
+    | |_____^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+help: you can use an array directly
+    |
+235 ~     let nop_variants = [0x90, // nop
+236 +         0x41, // inc ecx
+237 +         0x4A, // dec edx
+238 ~         0x48];
+    |
+
+error: useless use of `vec!`
+   --> src\opsec\polymorphic.rs:532:32
+    |
+532 |                   let variants = vec![
+    |  ________________________________^
+533 | |                     vec![0x90],                // nop
+534 | |                     vec![0x66, 0x90],          // 66 nop
+535 | |                     vec![0x0f, 0x1f, 0x00],    // multi-byte nop
+536 | |                     vec![0x48, 0x87, 0xc0],    // xchg rax, rax
+537 | |                 ];
+    | |_________________^
+    |
+    = help: for further information visit https://rust-lang.github.io/rust-clippy/rust-1.92.0/index.html#useless_vec
+help: you can use an array directly
+    |
+532 ~                 let variants = [vec![0x90],                // nop
+533 +                     vec![0x66, 0x90],          // 66 nop
+534 +                     vec![0x0f, 0x1f, 0x00],    // multi-byte nop
+535 ~                     vec![0x48, 0x87, 0xc0]];
+    |
+
+error: could not compile `talon` (lib) due to 150 previous errors
