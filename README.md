@@ -10,7 +10,7 @@ kernel exploit prototyping, smart contract auditing language
 <img src="talon.png" alt="Talon scripting language logo" width="50%">
 
 
-TALON is a compiled, exploit centric language for offensive security and binary research. Built on a Rust/LLVM engine, it provides a native environment to automate ROP chain synthesis, libc resolution, and binary patching—allowing researchers to move from initial analysis to functional exploit payloads with minimal overhead.
+TALON is a compiled, exploit language for offensive security and binary research. Built on a Rust/LLVM engine, it provides a native environment to automate ROP chain synthesis, libc resolution, and binary patching allowing researchers to move from initial analysis to functional exploit payloads with minimal overhead.
 
 **Core Architecture:**
 - Rust-based interpreter with async I/O primitives
@@ -19,7 +19,7 @@ TALON is a compiled, exploit centric language for offensive security and binary 
 - Integrated libc database with automatic offset resolution
 - Real interactive shell bridging (stdin/stdout multiplexing)
 
-> **ALPHA NOTICE**: TALON is under **active development**. Core functionality is tested (88/88 unit tests, 28/28 doc tests). Breaking changes expected. Ideal for CTF competitions, exploit research, and offensive technique prototyping.
+> **ALPHA NOTICE**: TALON is under **active development**. Breaking changes expected. Ideal for CTF competitions, exploit research, and offensive technique prototyping.
 
 
 [![codecov](https://codecov.io/gh/ridpath/talon/branch/main/graph/badge.svg)](https://codecov.io/gh/ridpath/talon)
@@ -304,6 +304,8 @@ cargo test heap_                       # All heap-related tests
 cargo test format_string              # Format string tests
 ```
 
+
+
 ### Fuzzing
 
 TALON includes comprehensive fuzzing infrastructure using cargo-fuzz (libFuzzer):
@@ -407,7 +409,6 @@ All commits are automatically tested via **GitHub Actions**:
 - Performance regression detection
 - Benchmark result archiving
 - Performance trend tracking
-
 
 
 ### Testing Documentation
