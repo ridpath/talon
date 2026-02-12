@@ -38,7 +38,7 @@ keystone-engine = { version = "0.1", optional = true }
 yara = { version = "0.25", optional = true }
 pelite = "0.10"
 goblin = "0.7"
-statrs = "0.16"
+statrs = "0.18"
 z3 = { version = "0.19", features = ["static-link-z3"], optional = true }
 
 # Threads / IO
