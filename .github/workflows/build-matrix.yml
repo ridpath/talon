@@ -213,13 +213,13 @@ jobs:
     
     steps:
       - name: Download x64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: talon-macos-x64
           path: ./bin-x64
           
       - name: Download ARM64 binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: talon-macos-arm64
           path: ./bin-arm64
@@ -268,7 +268,7 @@ jobs:
       
     steps:
       - name: Download Linux x64 musl binary
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           name: talon-linux-x64
           path: ./
@@ -305,7 +305,7 @@ jobs:
       
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v7
         with:
           path: ./artifacts
           
