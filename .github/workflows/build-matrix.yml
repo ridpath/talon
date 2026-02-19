@@ -192,14 +192,14 @@ jobs:
           fi
           
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}
           path: artifacts/${{ matrix.artifact_name }}
           retention-days: 30
           
       - name: Upload checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ${{ matrix.artifact_name }}.sha256
           path: artifacts/${{ matrix.artifact_name }}.sha256
@@ -244,14 +244,14 @@ jobs:
           shasum -a 256 artifacts/talon-macos-universal > artifacts/talon-macos-universal.sha256
           
       - name: Upload universal binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: talon-macos-universal
           path: artifacts/talon-macos-universal
           retention-days: 30
           
       - name: Upload universal checksum
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: talon-macos-universal.sha256
           path: artifacts/talon-macos-universal.sha256
