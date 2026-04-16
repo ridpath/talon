@@ -101,7 +101,7 @@ dashmap = "5.5"
 # GAME HACKING & EXPLOITATION (Phase 12)
 sysinfo = "0.30"
 windows = { version = "0.52", features = ["Win32_System_Diagnostics_Debug", "Win32_System_Memory", "Win32_System_Threading", "Win32_Foundation", "Win32_System_LibraryLoader"], optional = true }
-mach2 = { version = "0.4", optional = true }
+mach2 = { version = "0.6", optional = true }
 procfs = { version = "0.15", optional = true }
 retour = { version = "0.3", optional = true }
 
